@@ -23,6 +23,19 @@ export interface MissionSnapshot {
   updatedAt: string;
 }
 
+export interface ValidationSubmission {
+  runSucceeded: true;
+  declaredResult: string;
+  gateEvidenceIds: readonly Id[];
+}
+
+export interface HumanAcceptance {
+  accepted: true;
+  actor: "user";
+}
+
+export type AgentBlockReason = "dependency" | "provider" | "budget";
+
 export class Mission {
   private constructor(private snapshotValue: MissionSnapshot) {}
 
@@ -47,20 +60,107 @@ export class Mission {
     });
   }
 
+  static createHuman(input: { id: Id; title: string; projectId?: Id | null; now: string }): Mission {
+    return Mission.create({ ...input, executionKind: "human" });
+  }
+
   static rehydrate(snapshot: MissionSnapshot): Mission {
     return new Mission(structuredClone(snapshot));
   }
 
-  markReady(now: string): void {
-    if (this.snapshotValue.state !== "DRAFT" && this.snapshotValue.state !== "BLOCKED") {
-      throw new DomainError("Only a draft or blocked mission can become ready", "TRANSITION_FORBIDDEN");
+  prepare(now: string): void {
+    this.transitionFrom(["DRAFT"], "READY", now);
+  }
+
+  pickup(now: string): void {
+    this.requireHuman("Only a human mission can be picked up without an agent run");
+    this.transitionFrom(["READY"], "ACTIVE", now);
+  }
+
+  startAgent(now: string): void {
+    this.requireAgent("Only an agent mission can be started through an agent run");
+    this.transitionFrom(["READY"], "ACTIVE", now);
+  }
+
+  block(now: string, reason: string): void {
+    this.requireHuman("Only a human mission can be blocked without an agent run");
+    if (!reason.trim()) throw new DomainError("A blocking reason is required", "BLOCK_REASON_REQUIRED");
+    this.transitionFrom(["ACTIVE"], "BLOCKED", now);
+  }
+
+  blockAgent(now: string, _reason: AgentBlockReason): void {
+    this.requireAgent("Only an agent mission can use an agent blocking reason");
+    this.transitionFrom(["ACTIVE"], "BLOCKED", now);
+  }
+
+  resume(now: string): void {
+    this.transitionFrom(["BLOCKED"], "READY", now);
+  }
+
+  close(now: string): void {
+    this.requireHuman("Only a human mission can be closed without acceptance evidence");
+    this.transitionFrom(["DRAFT", "READY"], "DONE", now);
+  }
+
+  abandon(now: string): void {
+    this.transitionFrom(["DRAFT", "READY", "BLOCKED"], "ABANDONED", now);
+  }
+
+  submitForValidation(now: string, submission: ValidationSubmission): void {
+    if (this.snapshotValue.executionKind !== "agent") {
+      throw new DomainError("A human mission cannot submit an agent result", "TRANSITION_FORBIDDEN");
     }
-    this.snapshotValue.state = "READY";
-    this.snapshotValue.version += 1;
-    this.snapshotValue.updatedAt = now;
+    if (!submission.declaredResult.trim() || submission.gateEvidenceIds.length === 0) {
+      throw new DomainError(
+        "Validation requires a declared result and observed gate evidence",
+        "VALIDATION_EVIDENCE_REQUIRED"
+      );
+    }
+    this.transitionFrom(["ACTIVE"], "VALIDATION", now);
+  }
+
+  accept(now: string, acceptance: HumanAcceptance): void {
+    if (this.snapshotValue.executionKind !== "agent") {
+      throw new DomainError("A human mission cannot accept an agent result", "TRANSITION_FORBIDDEN");
+    }
+    if (!acceptance.accepted || acceptance.actor !== "user") {
+      throw new DomainError("Human acceptance is required", "HUMAN_ACCEPTANCE_REQUIRED");
+    }
+    this.transitionFrom(["VALIDATION"], "DONE", now);
+  }
+
+  requestCorrection(now: string): void {
+    if (this.snapshotValue.executionKind !== "agent") {
+      throw new DomainError("A human mission cannot request agent correction", "TRANSITION_FORBIDDEN");
+    }
+    this.transitionFrom(["VALIDATION"], "READY", now);
   }
 
   snapshot(): MissionSnapshot {
     return structuredClone(this.snapshotValue);
+  }
+
+  private requireHuman(message: string): void {
+    if (this.snapshotValue.executionKind !== "human") {
+      throw new DomainError(message, "TRANSITION_FORBIDDEN");
+    }
+  }
+
+  private requireAgent(message: string): void {
+    if (this.snapshotValue.executionKind !== "agent") {
+      throw new DomainError(message, "TRANSITION_FORBIDDEN");
+    }
+  }
+
+  private transitionFrom(allowed: readonly MissionState[], target: MissionState, now: string): void {
+    if (!allowed.includes(this.snapshotValue.state)) {
+      throw new DomainError(
+        `Mission cannot transition from ${this.snapshotValue.state} to ${target}`,
+        "TRANSITION_FORBIDDEN"
+      );
+    }
+    this.snapshotValue.state = target;
+    this.snapshotValue.version += 1;
+    this.snapshotValue.updatedAt = now;
   }
 }

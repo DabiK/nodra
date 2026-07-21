@@ -40,6 +40,19 @@ describe("architecture boundaries", () => {
     );
   });
 
+  it("keeps inbound controllers and CLI commands dependent on application only", async () => {
+    for (const file of [
+      "apps/api/src/business-error.filter.ts",
+      "apps/api/src/health.controller.ts",
+      "apps/api/src/mission.controller.ts",
+      "apps/api/src/relay.controller.ts",
+      "apps/cli/src/nodra-cli.ts"
+    ]) {
+      const imports = importedModules(await readFile(resolve(file), "utf8"));
+      expect(imports.filter((imported) => /@nodra\/(?:domain|adapters)/.test(imported)), file).toEqual([]);
+    }
+  });
+
   it("keeps barrel files declarative", async () => {
     for (const file of [
       "packages/domain/src/index.ts",

@@ -2,6 +2,7 @@ export { migrateDatabase, type MigrationResult } from "./sqlite/migrate-database
 export { MigrationIntegrityError } from "./sqlite/migration-integrity-error.js";
 export { NodraSqliteDatabase, type NodraDrizzleDatabase } from "./sqlite/nodra-sqlite-database.js";
 export { SqliteHealthProbe } from "./sqlite/sqlite-health-probe.js";
+export { SqliteMissionReadModel } from "./sqlite/sqlite-mission-read-model.js";
 export { SqliteMissionRepository } from "./sqlite/sqlite-mission-repository.js";
 export { verifyDatabase, type DatabaseVerification } from "./sqlite/verify-database.js";
 export { UnavailableWorkflowAdapter } from "./workflow/unavailable-workflow-adapter.js";

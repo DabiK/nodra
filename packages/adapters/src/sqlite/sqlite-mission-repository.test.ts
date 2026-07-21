@@ -1,43 +1,145 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { CreateMission } from "@nodra/application";
+import { ChangeMissionState, CreateMission, GetRelay, ListMissions, ShowMission } from "@nodra/application";
 import { asId } from "@nodra/domain";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrateDatabase } from "./migrate-database.js";
 import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
+import { projects } from "./schema/core.js";
+import { SqliteMissionReadModel } from "./sqlite-mission-read-model.js";
 import { SqliteMissionRepository } from "./sqlite-mission-repository.js";
 import { verifyDatabase } from "./verify-database.js";
 
-describe("SQLite persistence", () => {
-  it("migrates a blank database and persists a mission through the application port", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "nodra-sqlite-"));
-    const database = NodraSqliteDatabase.open(join(directory, "nodra.db"));
-    try {
-      await migrateDatabase(database, resolve("packages/adapters/drizzle"));
-      expect(verifyDatabase(database)).toMatchObject({
-        foreignKeys: true,
-        journalMode: "wal",
-        migrationVersion: 1
-      });
-      const repository = new SqliteMissionRepository(database);
-      await new CreateMission(repository).execute({
-        id: asId("mission-sqlite"),
-        title: "Persist the first Nodra mission",
-        executionKind: "human",
-        now: "2026-07-21T12:00:00.000Z"
-      });
-      const mission = await repository.load(asId("mission-sqlite"));
-      if (!mission) throw new Error("Expected the persisted mission");
-      mission.markReady("2026-07-21T12:01:00.000Z");
-      await repository.save(mission, 0);
+const at = (minute: number) => `2026-07-22T12:${String(minute).padStart(2, "0")}:00.000Z`;
+const context = (commandId: string, minute: number) => ({
+  commandId: asId(commandId),
+  actor: "user" as const,
+  occurredAt: at(minute)
+});
 
-      expect((await repository.load(asId("mission-sqlite")))?.snapshot()).toMatchObject({
-        state: "READY",
-        version: 1
+describe("SQLite human mission vertical slice", () => {
+  let database: NodraSqliteDatabase;
+  let createMission: CreateMission;
+  let changeMissionState: ChangeMissionState;
+  let listMissions: ListMissions;
+  let showMission: ShowMission;
+  let getRelay: GetRelay;
+
+  beforeEach(async () => {
+    const directory = await mkdtemp(join(tmpdir(), "nodra-sqlite-"));
+    database = NodraSqliteDatabase.open(join(directory, "nodra.db"));
+    await migrateDatabase(database, resolve("packages/adapters/drizzle"));
+    const repository = new SqliteMissionRepository(database);
+    const readModel = new SqliteMissionReadModel(database);
+    createMission = new CreateMission(repository);
+    changeMissionState = new ChangeMissionState(repository);
+    listMissions = new ListMissions(readModel);
+    showMission = new ShowMission(readModel);
+    getRelay = new GetRelay(readModel);
+  });
+
+  afterEach(() => database.close());
+
+  it("creates title-only human work atomically without agent configuration, session or run", async () => {
+    expect(verifyDatabase(database)).toMatchObject({ foreignKeys: true, journalMode: "wal", migrationVersion: 1 });
+
+    const mission = await createMission.execute({
+      id: asId("mission-atomic"),
+      title: "Persist a human mission",
+      context: context("command-create", 0)
+    });
+
+    expect(mission).toMatchObject({ executionKind: "human", state: "DRAFT", version: 0, projectId: null });
+    expect(database.connection.prepare("select count(*) as count from mission").get()).toEqual({ count: 1 });
+    expect(database.connection.prepare("select count(*) as count from business_audit_event").get()).toEqual({ count: 1 });
+    expect(database.connection.prepare("select count(*) as count from outbox").get()).toEqual({ count: 1 });
+    expect(database.connection.prepare("select count(*) as count from mission_agent_config").get()).toEqual({ count: 0 });
+    expect(database.connection.prepare("select count(*) as count from conversation").get()).toEqual({ count: 0 });
+    expect(database.connection.prepare("select count(*) as count from run").get()).toEqual({ count: 0 });
+  });
+
+  it("materializes each Relay bucket and returns explicit empty buckets", async () => {
+    await createMission.execute({ id: asId("mission-flow"), title: "Flow", context: context("create-flow", 0) });
+    expect(await getRelay.execute()).toEqual({ ready: [], active: [], blocked: [], decision_required: [] });
+
+    await changeMissionState.execute({
+      missionId: asId("mission-flow"), expectedVersion: 0, action: { type: "prepare" }, context: context("ready-flow", 1)
+    });
+    expect((await getRelay.execute()).ready).toEqual([expect.objectContaining({ id: "mission-flow", state: "READY" })]);
+
+    await changeMissionState.execute({
+      missionId: asId("mission-flow"), expectedVersion: 1, action: { type: "pickup" }, context: context("pickup-flow", 2)
+    });
+    expect((await getRelay.execute()).active).toEqual([expect.objectContaining({ state: "ACTIVE" })]);
+
+    await changeMissionState.execute({
+      missionId: asId("mission-flow"),
+      expectedVersion: 2,
+      action: { type: "block", reason: "Waiting for product decision" },
+      context: context("block-flow", 3)
+    });
+    expect((await getRelay.execute()).blocked).toEqual([
+      expect.objectContaining({ state: "BLOCKED", reasonCode: "Waiting for product decision" })
+    ]);
+
+    await changeMissionState.execute({
+      missionId: asId("mission-flow"), expectedVersion: 3, action: { type: "resume" }, context: context("resume-flow", 4)
+    });
+    await changeMissionState.execute({
+      missionId: asId("mission-flow"), expectedVersion: 4, action: { type: "close" }, context: context("close-flow", 5)
+    });
+    expect(await getRelay.execute()).toEqual({ ready: [], active: [], blocked: [], decision_required: [] });
+    expect(await showMission.execute(asId("mission-flow"))).toMatchObject({ state: "DONE", version: 5 });
+    expect(await listMissions.execute()).toEqual([expect.objectContaining({ id: "mission-flow", state: "DONE" })]);
+    expect(database.connection.prepare("select count(*) as count from business_audit_event").get()).toEqual({ count: 6 });
+    expect(database.connection.prepare("select count(*) as count from outbox").get()).toEqual({ count: 6 });
+  });
+
+  it("filters mission and Relay reads by project without mutating history", async () => {
+    database.orm.insert(projects).values({ id: "project-a", kind: "scratch", name: "A", createdAt: at(0), updatedAt: at(0) }).run();
+    database.orm.insert(projects).values({ id: "project-b", kind: "scratch", name: "B", createdAt: at(0), updatedAt: at(0) }).run();
+    await createMission.execute({
+      id: asId("mission-a"), projectId: asId("project-a"), title: "A", context: context("create-a", 0)
+    });
+    await createMission.execute({
+      id: asId("mission-b"), projectId: asId("project-b"), title: "B", context: context("create-b", 0)
+    });
+    await createMission.execute({ id: asId("mission-scratch"), title: "Scratch", context: context("create-scratch", 0) });
+    for (const [id, commandId] of [["mission-a", "ready-a"], ["mission-b", "ready-b"], ["mission-scratch", "ready-scratch"]] as const) {
+      await changeMissionState.execute({
+        missionId: asId(id), expectedVersion: 0, action: { type: "prepare" }, context: context(commandId, 1)
       });
-    } finally {
-      database.close();
     }
+
+    expect((await listMissions.execute({ projectId: asId("project-a") })).map(({ id }) => id)).toEqual(["mission-a"]);
+    expect((await listMissions.execute({ projectId: null })).map(({ id }) => id)).toEqual(["mission-scratch"]);
+    expect((await getRelay.execute({ projectId: asId("project-b") })).ready.map(({ id }) => id)).toEqual(["mission-b"]);
+    expect(database.connection.prepare("select count(*) as count from business_audit_event").get()).toEqual({ count: 6 });
+  });
+
+  it("returns a stable version conflict and persists none of the attempted command", async () => {
+    await createMission.execute({ id: asId("mission-conflict"), title: "Conflict", context: context("create-conflict", 0) });
+    await changeMissionState.execute({
+      missionId: asId("mission-conflict"), expectedVersion: 0, action: { type: "prepare" }, context: context("ready-conflict", 1)
+    });
+
+    await expect(changeMissionState.execute({
+      missionId: asId("mission-conflict"), expectedVersion: 0, action: { type: "close" }, context: context("stale-conflict", 2)
+    })).rejects.toMatchObject({ code: "MISSION_VERSION_CONFLICT" });
+    expect(await showMission.execute(asId("mission-conflict"))).toMatchObject({ state: "READY", version: 1 });
+    expect(database.connection.prepare("select count(*) as count from business_audit_event").get()).toEqual({ count: 2 });
+    expect(database.connection.prepare("select count(*) as count from outbox").get()).toEqual({ count: 2 });
+  });
+
+  it("rolls back mission and Relay when a later audit insert fails", async () => {
+    await createMission.execute({ id: asId("mission-rollback"), title: "Rollback", context: context("shared-command", 0) });
+
+    await expect(changeMissionState.execute({
+      missionId: asId("mission-rollback"), expectedVersion: 0, action: { type: "prepare" }, context: context("shared-command", 1)
+    })).rejects.toThrow();
+    expect(await showMission.execute(asId("mission-rollback"))).toMatchObject({ state: "DRAFT", version: 0 });
+    expect(await getRelay.execute()).toEqual({ ready: [], active: [], blocked: [], decision_required: [] });
+    expect(database.connection.prepare("select count(*) as count from outbox").get()).toEqual({ count: 1 });
   });
 });

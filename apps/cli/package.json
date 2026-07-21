@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@nodra/adapters": "*",
-    "@nodra/application": "*",
-    "@nodra/domain": "*"
+    "@nodra/application": "*"
   }
 }

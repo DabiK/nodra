@@ -4,9 +4,10 @@ import {
   migrateDatabase,
   NodraSqliteDatabase,
   SqliteHealthProbe,
+  SqliteMissionReadModel,
   SqliteMissionRepository
 } from "@nodra/adapters";
-import { CreateMission, GetHealth } from "@nodra/application";
+import { ChangeMissionState, CreateMission, GetHealth, GetRelay, ListMissions, ShowMission } from "@nodra/application";
 import { ConsoleOutput } from "./console-output.js";
 import { NodraCli } from "./nodra-cli.js";
 
@@ -19,9 +20,15 @@ export const runCli = async (
   const database = NodraSqliteDatabase.open(databaseFile);
   try {
     await migrateDatabase(database, migrationsDirectory);
+    const repository = new SqliteMissionRepository(database);
+    const readModel = new SqliteMissionReadModel(database);
     const cli = new NodraCli(
       new GetHealth(new SqliteHealthProbe(database)),
-      new CreateMission(new SqliteMissionRepository(database)),
+      new CreateMission(repository),
+      new ChangeMissionState(repository),
+      new ListMissions(readModel),
+      new ShowMission(readModel),
+      new GetRelay(readModel),
       new ConsoleOutput()
     );
     return await cli.run(arguments_);
