@@ -125,21 +125,48 @@ describe("SQLite human mission vertical slice", () => {
     });
 
     await expect(changeMissionState.execute({
-      missionId: asId("mission-conflict"), expectedVersion: 0, action: { type: "close" }, context: context("stale-conflict", 2)
+      missionId: asId("mission-conflict"), expectedVersion: 0, action: { type: "close" }, context: context("ready-conflict", 2)
     })).rejects.toMatchObject({ code: "MISSION_VERSION_CONFLICT" });
     expect(await showMission.execute(asId("mission-conflict"))).toMatchObject({ state: "READY", version: 1 });
     expect(database.connection.prepare("select count(*) as count from business_audit_event").get()).toEqual({ count: 2 });
     expect(database.connection.prepare("select count(*) as count from outbox").get()).toEqual({ count: 2 });
   });
 
-  it("rolls back mission and Relay when a later audit insert fails", async () => {
+  it("returns a stable command conflict and rolls back mission, Relay, audit and outbox", async () => {
     await createMission.execute({ id: asId("mission-rollback"), title: "Rollback", context: context("shared-command", 0) });
 
     await expect(changeMissionState.execute({
       missionId: asId("mission-rollback"), expectedVersion: 0, action: { type: "prepare" }, context: context("shared-command", 1)
-    })).rejects.toThrow();
+    })).rejects.toMatchObject({ code: "COMMAND_ID_CONFLICT" });
     expect(await showMission.execute(asId("mission-rollback"))).toMatchObject({ state: "DRAFT", version: 0 });
     expect(await getRelay.execute()).toEqual({ ready: [], active: [], blocked: [], decision_required: [] });
+    expect(database.connection.prepare("select count(*) as count from mission").get()).toEqual({ count: 1 });
+    expect(database.connection.prepare("select count(*) as count from business_audit_event").get()).toEqual({ count: 1 });
+    expect(database.connection.prepare("select count(*) as count from outbox").get()).toEqual({ count: 1 });
+  });
+
+  it("rejects a missing project before writing any mission, Relay, audit or outbox row", async () => {
+    await expect(createMission.execute({
+      id: asId("mission-missing-project"),
+      projectId: asId("project-missing"),
+      title: "Missing project",
+      context: context("missing-project-command", 0)
+    })).rejects.toMatchObject({ code: "PROJECT_NOT_FOUND" });
+
+    for (const table of ["mission", "relay_item", "business_audit_event", "outbox"] as const) {
+      expect(database.connection.prepare(`select count(*) as count from ${table}`).get(), table).toEqual({ count: 0 });
+    }
+  });
+
+  it("rejects a duplicated create command without keeping the second aggregate", async () => {
+    await createMission.execute({ id: asId("mission-first"), title: "First", context: context("duplicate-create", 0) });
+
+    await expect(createMission.execute({
+      id: asId("mission-second"), title: "Second", context: context("duplicate-create", 1)
+    })).rejects.toMatchObject({ code: "COMMAND_ID_CONFLICT" });
+    expect((await listMissions.execute()).map(({ id }) => id)).toEqual(["mission-first"]);
+    expect(await getRelay.execute()).toEqual({ ready: [], active: [], blocked: [], decision_required: [] });
+    expect(database.connection.prepare("select count(*) as count from business_audit_event").get()).toEqual({ count: 1 });
     expect(database.connection.prepare("select count(*) as count from outbox").get()).toEqual({ count: 1 });
   });
 });

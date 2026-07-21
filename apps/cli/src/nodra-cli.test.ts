@@ -87,4 +87,15 @@ describe("NodraCli", () => {
     expect(output.lastJson()).toMatchObject({ code: "MISSION_VERSION_CONFLICT" });
     expect(await cli.run(["mission:block", id, "1"])).toBe(2);
   });
+
+  it("returns stable JSON without stack traces for missing projects and duplicate commands", async () => {
+    expect(await cli.run(["mission:create", "--project", "project-missing", "Missing", "project"])).toBe(1);
+    expect(output.lastJson()).toMatchObject({ code: "PROJECT_NOT_FOUND" });
+    expect(output.values.at(-1)).not.toMatch(/SqliteError|SQLITE_CONSTRAINT|\n\s+at /);
+
+    expect(await cli.run(["mission:create", "--command-id", "cli-duplicate", "First"])).toBe(0);
+    expect(await cli.run(["mission:create", "--command-id", "cli-duplicate", "Second"])).toBe(1);
+    expect(output.lastJson()).toMatchObject({ code: "COMMAND_ID_CONFLICT" });
+    expect(output.values.at(-1)).not.toMatch(/SqliteError|SQLITE_CONSTRAINT|\n\s+at /);
+  });
 });

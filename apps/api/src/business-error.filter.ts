@@ -13,9 +13,15 @@ interface HttpResponse {
 }
 
 const statusFor = (code: string): number => {
-  if (code === "MISSION_NOT_FOUND") return 404;
-  if (code === "MISSION_VERSION_CONFLICT" || code === "TRANSITION_FORBIDDEN") return 409;
+  if (code === "MISSION_NOT_FOUND" || code === "PROJECT_NOT_FOUND") return 404;
+  if (
+    code === "MISSION_VERSION_CONFLICT" ||
+    code === "TRANSITION_FORBIDDEN" ||
+    code === "COMMAND_ID_CONFLICT" ||
+    code === "MISSION_ALREADY_EXISTS"
+  ) return 409;
   if (code === "MISSION_TITLE_REQUIRED" || code === "BLOCK_REASON_REQUIRED") return 422;
+  if (code === "PERSISTENCE_FAILURE") return 500;
   return 400;
 };
 

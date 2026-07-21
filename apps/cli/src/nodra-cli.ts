@@ -15,7 +15,7 @@ export interface CliOutput {
 }
 
 const usage =
-  "Usage: nodra <health|mission:create [--project <id>] <title>|mission:list [--project <id>|--scratch]|mission:show <id>|mission:<prepare|pickup|block|resume|close|abandon> <id> <expectedVersion> [reason]|relay [--project <id>|--scratch]>";
+  "Usage: nodra <health|mission:create [--project <id>] [--command-id <id>] <title>|mission:list [--project <id>|--scratch]|mission:show <id>|mission:<prepare|pickup|block|resume|close|abandon> <id> <expectedVersion> [reason]|relay [--project <id>|--scratch]>";
 
 export class NodraCli {
   constructor(
@@ -36,7 +36,8 @@ export class NodraCli {
         this.output.write(JSON.stringify({ code: error.code, detail: error.message }));
         return 1;
       }
-      throw error;
+      this.output.write(JSON.stringify({ code: "INTERNAL_ERROR", detail: "Unexpected internal error" }));
+      return 1;
     }
   }
 
@@ -58,6 +59,7 @@ export class NodraCli {
   private async create(parameters: readonly string[]): Promise<number> {
     const values = [...parameters];
     let projectId;
+    let commandId;
     const projectIndex = values.indexOf("--project");
     if (projectIndex >= 0) {
       const project = values[projectIndex + 1];
@@ -65,13 +67,20 @@ export class NodraCli {
       projectId = toId(project);
       values.splice(projectIndex, 2);
     }
+    const commandIndex = values.indexOf("--command-id");
+    if (commandIndex >= 0) {
+      const command = values[commandIndex + 1];
+      if (!command) return this.writeUsage();
+      commandId = toId(command);
+      values.splice(commandIndex, 2);
+    }
     const title = values.join(" ").trim();
     if (!title) return this.writeUsage();
     return this.write(
       await this.createMission.execute({
         id: toId(randomUUID()),
         title,
-        context: this.context(),
+        context: this.context(commandId),
         ...(projectId === undefined ? {} : { projectId })
       })
     );
@@ -105,8 +114,8 @@ export class NodraCli {
     throw new DomainError(usage, "CLI_USAGE_ERROR");
   }
 
-  private context() {
-    return { commandId: toId(randomUUID()), actor: "user" as const, occurredAt: new Date().toISOString() };
+  private context(commandId?: ReturnType<typeof toId>) {
+    return { commandId: commandId ?? toId(randomUUID()), actor: "user" as const, occurredAt: new Date().toISOString() };
   }
 
   private write(value: unknown): number {

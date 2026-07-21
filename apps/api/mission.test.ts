@@ -73,4 +73,35 @@ describe("mission and Relay API", () => {
       .expect(409);
     expect(conflict.body).toMatchObject({ status: 409, code: "MISSION_VERSION_CONFLICT", commandId: "stale-command" });
   });
+
+  it("translates duplicated commands and missing projects to correlated problem details", async () => {
+    await request(app.getHttpServer())
+      .post("/api/missions")
+      .send({ title: "First command", commandId: "review-duplicate" })
+      .expect(201);
+    const duplicate = await request(app.getHttpServer())
+      .post("/api/missions")
+      .send({ title: "Second command", commandId: "review-duplicate" })
+      .expect(409);
+    expect(duplicate.headers["content-type"]).toContain("application/problem+json");
+    expect(duplicate.body).toMatchObject({
+      status: 409,
+      code: "COMMAND_ID_CONFLICT",
+      commandId: "review-duplicate"
+    });
+
+    const missingProject = await request(app.getHttpServer())
+      .post("/api/missions")
+      .send({ title: "Missing project", projectId: "project-missing", commandId: "review-project" })
+      .expect(404);
+    expect(missingProject.headers["content-type"]).toContain("application/problem+json");
+    expect(missingProject.body).toMatchObject({
+      status: 404,
+      code: "PROJECT_NOT_FOUND",
+      commandId: "review-project"
+    });
+
+    const list = await request(app.getHttpServer()).get("/api/missions").expect(200);
+    expect(list.body).toHaveLength(1);
+  });
 });
