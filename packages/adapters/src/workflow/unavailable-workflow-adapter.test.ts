@@ -7,6 +7,6 @@ describe("UnavailableWorkflowAdapter", () => {
     const adapter = new UnavailableWorkflowAdapter();
     await expect(
       adapter.start({ missionId: asId("mission-1"), commandId: asId("command-1"), schemaVersion: 1 })
-    ).rejects.toMatchObject({ code: "WORKFLOW_UNAVAILABLE" });
+    ).rejects.toMatchObject({ code: "RUNTIME_UNHEALTHY" });
   });
 });

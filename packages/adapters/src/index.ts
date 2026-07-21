@@ -4,6 +4,30 @@ export { NodraSqliteDatabase, type NodraDrizzleDatabase } from "./sqlite/nodra-s
 export { SqliteHealthProbe } from "./sqlite/sqlite-health-probe.js";
 export { SqliteMissionReadModel } from "./sqlite/sqlite-mission-read-model.js";
 export { SqliteMissionRepository } from "./sqlite/sqlite-mission-repository.js";
+export { SqliteMissionExecutionRepository } from "./sqlite/sqlite-mission-execution-repository.js";
+export { SqliteMissionWorkflowActivity } from "./sqlite/sqlite-mission-workflow-activity.js";
+export { SqliteWorkflowOutboxStore } from "./sqlite/sqlite-workflow-outbox-store.js";
+export { SqliteWorkflowReconciliationStore } from "./sqlite/sqlite-workflow-reconciliation-store.js";
 export { verifyDatabase, type DatabaseVerification } from "./sqlite/verify-database.js";
 export { UnavailableWorkflowAdapter } from "./workflow/unavailable-workflow-adapter.js";
 export { WorkflowUnavailableError } from "./workflow/workflow-unavailable-error.js";
+export { TemporalMissionActivities } from "./temporal/activities/temporal-mission-activities.js";
+export { LazyTemporalConnection, type TemporalConnectionOptions } from "./temporal/client/lazy-temporal-connection.js";
+export { LazyTemporalWorkflowAdapter } from "./temporal/client/lazy-temporal-workflow-adapter.js";
+export { TemporalWorkflowAdapter } from "./temporal/client/temporal-workflow-adapter.js";
+export type {
+  MissionWorkflowActivities,
+  MissionWorkflowInput,
+  MissionWorkflowStartedInput,
+  MissionWorkflowStartedRequest,
+  MissionWorkflowStartedResult,
+  MissionWorkflowStatus
+} from "./temporal/contracts.js";
+export {
+  MISSION_CANCEL_SIGNAL,
+  MISSION_STATUS_QUERY,
+  MISSION_TASK_QUEUE,
+  MISSION_WORKFLOW_NAME
+} from "./temporal/temporal-settings.js";
+export { TemporalMissionWorker, type TemporalMissionWorkerOptions } from "./temporal/worker/temporal-mission-worker.js";
+export { missionWorkflowPath } from "./temporal/workflow-path.js";

@@ -5,11 +5,12 @@ import type {
   HumanMissionAction,
   ListMissions,
   MissionListFilter,
+  StartMission,
   ShowMission
 } from "@nodra/application";
 import { DomainError, toId } from "@nodra/application";
 import { randomUUID } from "node:crypto";
-import { CHANGE_MISSION_STATE, CREATE_MISSION, LIST_MISSIONS, SHOW_MISSION } from "./tokens.js";
+import { CHANGE_MISSION_STATE, CREATE_MISSION, LIST_MISSIONS, SHOW_MISSION, START_MISSION } from "./tokens.js";
 
 @Controller("api/missions")
 export class MissionController {
@@ -17,7 +18,8 @@ export class MissionController {
     @Inject(CREATE_MISSION) private readonly createMission: CreateMission,
     @Inject(CHANGE_MISSION_STATE) private readonly changeMissionState: ChangeMissionState,
     @Inject(LIST_MISSIONS) private readonly listMissions: ListMissions,
-    @Inject(SHOW_MISSION) private readonly showMission: ShowMission
+    @Inject(SHOW_MISSION) private readonly showMission: ShowMission,
+    @Inject(START_MISSION) private readonly startMission: StartMission
   ) {}
 
   @Post()
@@ -52,6 +54,26 @@ export class MissionController {
   @Post(":id/ready")
   ready(@Param("id") id: string, @Body() value: unknown) {
     return this.transition(id, value, { type: "prepare" });
+  }
+
+  @Post(":id/start")
+  @HttpCode(202)
+  start(@Param("id") id: string, @Body() value: unknown) {
+    const body = this.objectBody(value);
+    this.assertKeys(body, ["expectedVersion", "commandId"]);
+    if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
+      throw new DomainError("expectedVersion must be a non-negative integer", "REQUEST_INVALID");
+    }
+    const context = this.context(body.commandId);
+    return this.startMission.execute({
+      missionId: toId(id),
+      expectedVersion: Number(body.expectedVersion),
+      runId: toId(randomUUID()),
+      conversationId: toId(randomUUID()),
+      auditId: toId(`audit/${context.commandId}`),
+      outboxId: toId(`outbox/${context.commandId}`),
+      context
+    });
   }
 
   @Post(":id/pickup")

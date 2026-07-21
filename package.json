@@ -8,13 +8,15 @@
     "packages/application",
     "packages/adapters",
     "apps/api",
-    "apps/cli"
+    "apps/cli",
+    "apps/worker"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev": "npm run dev -w @nodra/api",
     "cli": "npm run dev -w @nodra/cli --",
     "start": "npm run start -w @nodra/api",
+    "worker": "npm run start -w @nodra/worker",
     "typecheck": "tsc -p tsconfig.check.json --noEmit --pretty false",
     "lint": "eslint .",
     "test": "vitest run",

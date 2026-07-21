@@ -22,6 +22,8 @@ const statusFor = (code: string): number => {
   ) return 409;
   if (code === "MISSION_TITLE_REQUIRED" || code === "BLOCK_REASON_REQUIRED") return 422;
   if (code === "PERSISTENCE_FAILURE") return 500;
+  if (code === "RUNTIME_UNHEALTHY" || code === "WORKFLOW_UNAVAILABLE") return 503;
+  if (code === "AGENT_CONFIG_REQUIRED") return 422;
   return 400;
 };
 

@@ -1,10 +1,13 @@
 import type {
   ChangeMissionState,
   CreateMission,
+  DispatchWorkflowOutbox,
   GetHealth,
   GetRelay,
   ListMissions,
   MissionListFilter,
+  ReconcileWorkflows,
+  StartMission,
   ShowMission
 } from "@nodra/application";
 import { DomainError, toId } from "@nodra/application";
@@ -15,7 +18,7 @@ export interface CliOutput {
 }
 
 const usage =
-  "Usage: nodra <health|mission:create [--project <id>] [--command-id <id>] <title>|mission:list [--project <id>|--scratch]|mission:show <id>|mission:<prepare|pickup|block|resume|close|abandon> <id> <expectedVersion> [reason]|relay [--project <id>|--scratch]>";
+  "Usage: nodra <health|mission:create [--project <id>] [--command-id <id>] <title>|mission:list [--project <id>|--scratch]|mission:show <id>|mission:start <id> <expectedVersion> [--command-id <id>]|mission:<prepare|pickup|block|resume|close|abandon> <id> <expectedVersion> [reason]|relay [--project <id>|--scratch]|temporal:dispatch|temporal:reconcile>";
 
 export class NodraCli {
   constructor(
@@ -25,6 +28,9 @@ export class NodraCli {
     private readonly listMissions: ListMissions,
     private readonly showMission: ShowMission,
     private readonly getRelay: GetRelay,
+    private readonly startMission: StartMission,
+    private readonly dispatchWorkflowOutbox: DispatchWorkflowOutbox,
+    private readonly reconcileWorkflows: ReconcileWorkflows,
     private readonly output: CliOutput
   ) {}
 
@@ -51,9 +57,43 @@ export class NodraCli {
       if (!id || parameters.length !== 1) return this.writeUsage();
       return this.write(await this.showMission.execute(toId(id)));
     }
+    if (command === "mission:start") return this.start(parameters);
     if (command === "relay") return this.write(await this.getRelay.execute(this.readFilter(parameters)));
+    if (command === "temporal:dispatch" && parameters.length === 0) {
+      return this.write(await this.dispatchWorkflowOutbox.execute({ limit: 100, occurredAt: new Date().toISOString() }));
+    }
+    if (command === "temporal:reconcile" && parameters.length === 0) {
+      return this.write(await this.reconcileWorkflows.execute());
+    }
     if (command?.startsWith("mission:")) return this.transition(command.slice("mission:".length), parameters);
     return this.writeUsage();
+  }
+
+  private async start(parameters: readonly string[]): Promise<number> {
+    const values = [...parameters];
+    let commandId;
+    const commandIndex = values.indexOf("--command-id");
+    if (commandIndex >= 0) {
+      const command = values[commandIndex + 1];
+      if (!command) return this.writeUsage();
+      commandId = toId(command);
+      values.splice(commandIndex, 2);
+    }
+    const [missionId, expectedVersionText] = values;
+    const expectedVersion = Number(expectedVersionText);
+    if (!missionId || values.length !== 2 || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
+      return this.writeUsage();
+    }
+    const context = this.context(commandId);
+    return this.write(await this.startMission.execute({
+      missionId: toId(missionId),
+      expectedVersion,
+      runId: toId(randomUUID()),
+      conversationId: toId(randomUUID()),
+      auditId: toId(`audit/${context.commandId}`),
+      outboxId: toId(`outbox/${context.commandId}`),
+      context
+    }));
   }
 
   private async create(parameters: readonly string[]): Promise<number> {

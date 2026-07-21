@@ -9,6 +9,7 @@ export { CreateMission, type CreateMissionInput } from "./create-mission.js";
 export { GetRelay } from "./get-relay.js";
 export { GetHealth, type HealthReport } from "./get-health.js";
 export type { HealthProbe } from "./health-probe.js";
+export type { RuntimeHealthProbe } from "./runtime-health-probe.js";
 export { ListMissions } from "./list-missions.js";
 export type {
   MissionAuditRecord,
@@ -24,6 +25,20 @@ export type {
   SaveMissionInput
 } from "./mission-repository.js";
 export { ShowMission } from "./show-mission.js";
+export type { MissionExecutionRepository, PersistMissionStartInput } from "./mission-execution-repository.js";
+export { StartMission, type StartMissionCommand, type StartMissionResult } from "./start-mission.js";
+export {
+  DispatchWorkflowOutbox,
+  type DispatchCheckpoint,
+  type DispatchResult
+} from "./dispatch-workflow-outbox.js";
+export type { PendingWorkflowStart, WorkflowOutboxStore } from "./workflow-outbox-store.js";
+export {
+  ReconcileWorkflows,
+  type ActiveWorkflowRecord,
+  type WorkflowReconciliationItem,
+  type WorkflowReconciliationStore
+} from "./reconcile-workflows.js";
 export type {
   StartMissionInput,
   WorkflowPort,

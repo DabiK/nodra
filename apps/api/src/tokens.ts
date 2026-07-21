@@ -5,3 +5,7 @@ export const GET_HEALTH = Symbol("GET_HEALTH");
 export const GET_RELAY = Symbol("GET_RELAY");
 export const LIST_MISSIONS = Symbol("LIST_MISSIONS");
 export const SHOW_MISSION = Symbol("SHOW_MISSION");
+export const START_MISSION = Symbol("START_MISSION");
+export const DISPATCH_WORKFLOW_OUTBOX = Symbol("DISPATCH_WORKFLOW_OUTBOX");
+export const RECONCILE_WORKFLOWS = Symbol("RECONCILE_WORKFLOWS");
+export const TEMPORAL_CONNECTION = Symbol("TEMPORAL_CONNECTION");

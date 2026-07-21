@@ -46,11 +46,28 @@ describe("architecture boundaries", () => {
       "apps/api/src/health.controller.ts",
       "apps/api/src/mission.controller.ts",
       "apps/api/src/relay.controller.ts",
+      "apps/api/src/runtime.controller.ts",
       "apps/cli/src/nodra-cli.ts"
     ]) {
       const imports = importedModules(await readFile(resolve(file), "utf8"));
       expect(imports.filter((imported) => /@nodra\/(?:domain|adapters)/.test(imported)), file).toEqual([]);
     }
+  });
+
+  it("keeps Temporal workflows deterministic and free of adapter I/O", async () => {
+    const files = await sourceFiles(resolve("packages/adapters/src/temporal/workflows"));
+    const violations: string[] = [];
+    for (const file of files) {
+      const source = await readFile(file, "utf8");
+      const imports = importedModules(source);
+      for (const imported of imports) {
+        if (/(?:node:|sqlite|drizzle|better-sqlite|activities|providers|git|process)/i.test(imported)) {
+          violations.push(`${file}: ${imported}`);
+        }
+      }
+      if (/\b(?:Date|Math\.random|process|fetch)\b/.test(source)) violations.push(`${file}: nondeterministic global`);
+    }
+    expect(violations).toEqual([]);
   });
 
   it("keeps barrel files declarative", async () => {

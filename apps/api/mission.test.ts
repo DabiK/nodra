@@ -5,15 +5,24 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./src/create-app.js";
+import { NodraSqliteDatabase } from "@nodra/adapters";
+import { eq } from "drizzle-orm";
+import { workspaces } from "../../packages/adapters/src/sqlite/schema/core.js";
+import { missionAgentConfigs, missions } from "../../packages/adapters/src/sqlite/schema/missions.js";
+import { outbox } from "../../packages/adapters/src/sqlite/schema/operations.js";
+import { runs } from "../../packages/adapters/src/sqlite/schema/runs.js";
 
 describe("mission and Relay API", () => {
   let app: NestExpressApplication;
+  let databaseFile: string;
 
   beforeEach(async () => {
     const directory = await mkdtemp(join(tmpdir(), "nodra-api-mission-"));
+    databaseFile = join(directory, "nodra.db");
     app = await createApp({
-      databaseFile: join(directory, "nodra.db"),
-      migrationsDirectory: resolve("packages/adapters/drizzle")
+      databaseFile,
+      migrationsDirectory: resolve("packages/adapters/drizzle"),
+      temporalAddress: "127.0.0.1:1"
     });
   });
 
@@ -103,5 +112,85 @@ describe("mission and Relay API", () => {
 
     const list = await request(app.getHttpServer()).get("/api/missions").expect(200);
     expect(list.body).toHaveLength(1);
+  });
+
+  it("keeps reads available, blocks start, and exposes dispatch/reconcile when Temporal is unavailable", async () => {
+    const database = NodraSqliteDatabase.open(databaseFile);
+    try {
+      database.orm.insert(workspaces).values({
+        id: "workspace-api-agent",
+        projectId: null,
+        kind: "scratch",
+        path: join(tmpdir(), "workspace-api-agent"),
+        state: "ready",
+        createdAt: "2026-07-22T12:00:00.000Z"
+      }).run();
+      database.orm.insert(missions).values({
+        id: "api-agent",
+        projectId: null,
+        title: "API agent",
+        executionKind: "agent",
+        state: "READY",
+        version: 1,
+        createdAt: "2026-07-22T12:00:00.000Z",
+        updatedAt: "2026-07-22T12:00:00.000Z"
+      }).run();
+      database.orm.insert(missionAgentConfigs).values({
+        missionId: "api-agent",
+        providerId: "configured-not-called",
+        modelId: "configured-not-called",
+        providerOptionsJson: "{}",
+        missionPrompt: "No provider",
+        permissionPreset: "read_only",
+        workspaceId: "workspace-api-agent",
+        updatedAt: "2026-07-22T12:00:00.000Z"
+      }).run();
+    } finally {
+      database.close();
+    }
+
+    const health = await request(app.getHttpServer()).get("/health").expect(200);
+    expect(health.body).toMatchObject({
+      status: "degraded",
+      components: { sqlite: { status: "ok" }, workflow: { status: "error" } }
+    });
+    await request(app.getHttpServer()).get("/api/missions/api-agent").expect(200);
+    const refused = await request(app.getHttpServer())
+      .post("/api/missions/api-agent/start")
+      .send({ expectedVersion: 1, commandId: "api-unhealthy-start" })
+      .expect(503);
+    expect(refused.body).toMatchObject({ code: "RUNTIME_UNHEALTHY", commandId: "api-unhealthy-start" });
+    await request(app.getHttpServer()).post("/api/runtime/temporal/reconcile").send({}).expect(200, { items: [] });
+
+    const pending = NodraSqliteDatabase.open(databaseFile);
+    try {
+      pending.orm.insert(outbox).values({
+        id: "outbox-api-dispatch",
+        kind: "workflow.mission.start",
+        aggregateId: "api-agent",
+        payloadJson: JSON.stringify({ schemaVersion: 1, missionId: "api-agent", commandId: "api-dispatch" }),
+        dedupeKey: "mission/api-agent",
+        createdAt: "2026-07-22T12:00:00.000Z",
+        publishedAt: null
+      }).run();
+    } finally {
+      pending.close();
+    }
+    const dispatch = await request(app.getHttpServer())
+      .post("/api/runtime/temporal/dispatch")
+      .send({ limit: 10 })
+      .expect(503);
+    expect(dispatch.body).toMatchObject({ code: "RUNTIME_UNHEALTHY" });
+
+    const after = NodraSqliteDatabase.open(databaseFile);
+    try {
+      expect(after.orm.select().from(missions).where(eq(missions.id, "api-agent")).get())
+        .toMatchObject({ state: "READY", version: 1 });
+      expect(after.orm.select().from(runs).all()).toHaveLength(0);
+      expect(after.orm.select().from(outbox).where(eq(outbox.kind, "workflow.mission.start")).all())
+        .toEqual([expect.objectContaining({ id: "outbox-api-dispatch", publishedAt: null })]);
+    } finally {
+      after.close();
+    }
   });
 });

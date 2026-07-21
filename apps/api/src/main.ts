@@ -8,7 +8,9 @@ const host = process.env.HOST ?? "127.0.0.1";
 const port = Number(process.env.PORT ?? 4100);
 const app = await createApp({
   databaseFile: resolve(process.env.NODRA_DATABASE_FILE ?? `${root}/data/nodra.db`),
-  migrationsDirectory: resolve(root, "packages/adapters/drizzle")
+  migrationsDirectory: resolve(root, "packages/adapters/drizzle"),
+  temporalAddress: process.env.NODRA_TEMPORAL_ADDRESS ?? "127.0.0.1:7233",
+  temporalNamespace: process.env.NODRA_TEMPORAL_NAMESPACE ?? "nodra"
 });
 await app.listen(port, host);
 process.stdout.write(`Nodra API ready on http://${host}:${port}\n`);

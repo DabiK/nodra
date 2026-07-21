@@ -6,11 +6,30 @@ import {
   NodraSqliteDatabase,
   SqliteHealthProbe,
   SqliteMissionReadModel,
-  SqliteMissionRepository
+  SqliteMissionRepository,
+  SqliteMissionExecutionRepository,
+  SqliteWorkflowOutboxStore,
+  SqliteWorkflowReconciliationStore,
+  UnavailableWorkflowAdapter
 } from "@nodra/adapters";
-import { ChangeMissionState, CreateMission, GetHealth, GetRelay, ListMissions, ShowMission } from "@nodra/application";
+import {
+  ChangeMissionState,
+  CreateMission,
+  DispatchWorkflowOutbox,
+  GetHealth,
+  GetRelay,
+  ListMissions,
+  ReconcileWorkflows,
+  ShowMission,
+  StartMission
+} from "@nodra/application";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { NodraCli, type CliOutput } from "./nodra-cli.js";
+import { workspaces } from "../../../packages/adapters/src/sqlite/schema/core.js";
+import { missionAgentConfigs, missions } from "../../../packages/adapters/src/sqlite/schema/missions.js";
+import { outbox } from "../../../packages/adapters/src/sqlite/schema/operations.js";
+import { runs } from "../../../packages/adapters/src/sqlite/schema/runs.js";
 
 class MemoryOutput implements CliOutput {
   readonly values: string[] = [];
@@ -37,12 +56,17 @@ describe("NodraCli", () => {
     const readModel = new SqliteMissionReadModel(database);
     output = new MemoryOutput();
     cli = new NodraCli(
-      new GetHealth(new SqliteHealthProbe(database)),
+      new GetHealth(new SqliteHealthProbe(database), { check: async () => ({ status: "ok" }) }),
       new CreateMission(repository),
       new ChangeMissionState(repository),
       new ListMissions(readModel),
       new ShowMission(readModel),
       new GetRelay(readModel),
+      new StartMission(repository, new SqliteMissionExecutionRepository(database), {
+        check: async () => ({ status: "ok" })
+      }),
+      new DispatchWorkflowOutbox(new SqliteWorkflowOutboxStore(database), new UnavailableWorkflowAdapter()),
+      new ReconcileWorkflows(new SqliteWorkflowReconciliationStore(database), new UnavailableWorkflowAdapter()),
       output
     );
   });
@@ -97,5 +121,73 @@ describe("NodraCli", () => {
     expect(await cli.run(["mission:create", "--command-id", "cli-duplicate", "Second"])).toBe(1);
     expect(output.lastJson()).toMatchObject({ code: "COMMAND_ID_CONFLICT" });
     expect(output.values.at(-1)).not.toMatch(/SqliteError|SQLITE_CONSTRAINT|\n\s+at /);
+  });
+
+  it("returns a stable non-zero error for agent start when runtime health is down", async () => {
+    const time = "2026-07-22T12:00:00.000Z";
+    database.orm.insert(workspaces).values({
+      id: "workspace-cli-agent",
+      projectId: null,
+      kind: "scratch",
+      path: join(tmpdir(), "workspace-cli-agent"),
+      state: "ready",
+      createdAt: time
+    }).run();
+    database.orm.insert(missions).values({
+      id: "cli-agent",
+      projectId: null,
+      title: "CLI agent",
+      executionKind: "agent",
+      state: "READY",
+      version: 1,
+      createdAt: time,
+      updatedAt: time
+    }).run();
+    database.orm.insert(missionAgentConfigs).values({
+      missionId: "cli-agent",
+      providerId: "configured-not-called",
+      modelId: "configured-not-called",
+      providerOptionsJson: "{}",
+      missionPrompt: "No provider",
+      permissionPreset: "read_only",
+      workspaceId: "workspace-cli-agent",
+      updatedAt: time
+    }).run();
+    const repository = new SqliteMissionRepository(database);
+    const readModel = new SqliteMissionReadModel(database);
+    const unavailableCli = new NodraCli(
+      new GetHealth(new SqliteHealthProbe(database), { check: async () => ({ status: "error" }) }),
+      new CreateMission(repository),
+      new ChangeMissionState(repository),
+      new ListMissions(readModel),
+      new ShowMission(readModel),
+      new GetRelay(readModel),
+      new StartMission(repository, new SqliteMissionExecutionRepository(database), {
+        check: async () => ({ status: "error" })
+      }),
+      new DispatchWorkflowOutbox(new SqliteWorkflowOutboxStore(database), new UnavailableWorkflowAdapter()),
+      new ReconcileWorkflows(new SqliteWorkflowReconciliationStore(database), new UnavailableWorkflowAdapter()),
+      output
+    );
+    expect(await unavailableCli.run(["mission:start", "cli-agent", "1", "--command-id", "cli-unhealthy"]))
+      .toBe(1);
+    expect(output.lastJson()).toMatchObject({ code: "RUNTIME_UNHEALTHY" });
+    expect(database.orm.select().from(runs).all()).toHaveLength(0);
+
+    database.orm.insert(outbox).values({
+      id: "outbox-cli-dispatch",
+      kind: "workflow.mission.start",
+      aggregateId: "cli-agent",
+      payloadJson: JSON.stringify({ schemaVersion: 1, missionId: "cli-agent", commandId: "cli-dispatch" }),
+      dedupeKey: "mission/cli-agent",
+      createdAt: time,
+      publishedAt: null
+    }).run();
+    expect(await unavailableCli.run(["temporal:dispatch"])).toBe(1);
+    expect(output.lastJson()).toMatchObject({ code: "RUNTIME_UNHEALTHY" });
+    expect(database.orm.select().from(outbox).where(eq(outbox.id, "outbox-cli-dispatch")).get()?.publishedAt)
+      .toBeNull();
+    expect(await unavailableCli.run(["temporal:reconcile"])).toBe(0);
+    expect(output.lastJson()).toEqual({ items: [] });
   });
 });
