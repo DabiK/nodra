@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": false,
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/application" },
+    { "path": "../../packages/adapters" }
+  ],
+  "include": ["src/**/*.ts"]
+}

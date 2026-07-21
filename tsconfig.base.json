@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "useUnknownInCatchVariables": true,
+    "verbatimModuleSyntax": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@nodra/domain": ["packages/domain/src/index.ts"],
+      "@nodra/application": ["packages/application/src/index.ts"],
+      "@nodra/adapters": ["packages/adapters/src/index.ts"]
+    }
+  }
+}

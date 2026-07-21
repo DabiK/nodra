@@ -1,0 +1,14 @@
+import "reflect-metadata";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createApp } from "./create-app.js";
+
+const root = fileURLToPath(new URL("../../..", import.meta.url));
+const host = process.env.HOST ?? "127.0.0.1";
+const port = Number(process.env.PORT ?? 4100);
+const app = await createApp({
+  databaseFile: resolve(process.env.NODRA_DATABASE_FILE ?? `${root}/data/nodra.db`),
+  migrationsDirectory: resolve(root, "packages/adapters/drizzle")
+});
+await app.listen(port, host);
+process.stdout.write(`Nodra API ready on http://${host}:${port}\n`);

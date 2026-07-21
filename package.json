@@ -1,0 +1,38 @@
+{
+  "name": "nodra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/domain",
+    "packages/application",
+    "packages/adapters",
+    "apps/api",
+    "apps/cli"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev -w @nodra/api",
+    "cli": "npm run dev -w @nodra/cli --",
+    "start": "npm run start -w @nodra/api",
+    "typecheck": "tsc -p tsconfig.check.json --noEmit --pretty false",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate --config packages/adapters/drizzle.config.ts",
+    "db:setup": "tsx packages/adapters/scripts/setup-database.ts"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/node": "^24.13.3",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9.39.2",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  }
+}
