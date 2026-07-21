@@ -21,7 +21,8 @@ import {
   ListMissions,
   ReconcileWorkflows,
   ShowMission,
-  StartMission
+  StartMission,
+  toId
 } from "@nodra/application";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
@@ -174,20 +175,22 @@ describe("NodraCli", () => {
     expect(output.lastJson()).toMatchObject({ code: "RUNTIME_UNHEALTHY" });
     expect(database.orm.select().from(runs).all()).toHaveLength(0);
 
-    database.orm.insert(outbox).values({
-      id: "outbox-cli-dispatch",
-      kind: "workflow.mission.start",
-      aggregateId: "cli-agent",
-      payloadJson: JSON.stringify({ schemaVersion: 1, missionId: "cli-agent", commandId: "cli-dispatch" }),
-      dedupeKey: "mission/cli-agent",
-      createdAt: time,
-      publishedAt: null
-    }).run();
+    await new StartMission(repository, new SqliteMissionExecutionRepository(database), {
+      check: async () => ({ status: "ok" })
+    }).execute({
+      missionId: toId("cli-agent"),
+      expectedVersion: 1,
+      runId: toId("run-cli-agent"),
+      conversationId: toId("conversation-cli-agent"),
+      auditId: toId("audit-cli-dispatch"),
+      outboxId: toId("outbox-cli-dispatch"),
+      context: { commandId: toId("cli-dispatch"), actor: "user", occurredAt: time }
+    });
     expect(await unavailableCli.run(["temporal:dispatch"])).toBe(1);
     expect(output.lastJson()).toMatchObject({ code: "RUNTIME_UNHEALTHY" });
     expect(database.orm.select().from(outbox).where(eq(outbox.id, "outbox-cli-dispatch")).get()?.publishedAt)
       .toBeNull();
-    expect(await unavailableCli.run(["temporal:reconcile"])).toBe(0);
-    expect(output.lastJson()).toEqual({ items: [] });
+    expect(await unavailableCli.run(["temporal:reconcile"])).toBe(1);
+    expect(output.lastJson()).toMatchObject({ code: "RUNTIME_UNHEALTHY" });
   });
 });

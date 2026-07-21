@@ -5,7 +5,12 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./src/create-app.js";
-import { NodraSqliteDatabase } from "@nodra/adapters";
+import {
+  NodraSqliteDatabase,
+  SqliteMissionExecutionRepository,
+  SqliteMissionRepository
+} from "@nodra/adapters";
+import { StartMission, toId } from "@nodra/application";
 import { eq } from "drizzle-orm";
 import { workspaces } from "../../packages/adapters/src/sqlite/schema/core.js";
 import { missionAgentConfigs, missions } from "../../packages/adapters/src/sqlite/schema/missions.js";
@@ -164,15 +169,27 @@ describe("mission and Relay API", () => {
 
     const pending = NodraSqliteDatabase.open(databaseFile);
     try {
-      pending.orm.insert(outbox).values({
-        id: "outbox-api-dispatch",
-        kind: "workflow.mission.start",
-        aggregateId: "api-agent",
-        payloadJson: JSON.stringify({ schemaVersion: 1, missionId: "api-agent", commandId: "api-dispatch" }),
-        dedupeKey: "mission/api-agent",
-        createdAt: "2026-07-22T12:00:00.000Z",
-        publishedAt: null
-      }).run();
+      expect(pending.orm.select().from(missions).where(eq(missions.id, "api-agent")).get())
+        .toMatchObject({ state: "READY", version: 1 });
+      expect(pending.orm.select().from(runs).all()).toHaveLength(0);
+      expect(pending.orm.select().from(outbox).where(eq(outbox.kind, "workflow.mission.start")).all()).toHaveLength(0);
+      await new StartMission(
+        new SqliteMissionRepository(pending),
+        new SqliteMissionExecutionRepository(pending),
+        { check: async () => ({ status: "ok" }) }
+      ).execute({
+        missionId: toId("api-agent"),
+        expectedVersion: 1,
+        runId: toId("run-api-agent"),
+        conversationId: toId("conversation-api-agent"),
+        auditId: toId("audit-api-dispatch"),
+        outboxId: toId("outbox-api-dispatch"),
+        context: {
+          commandId: toId("api-dispatch"),
+          actor: "user",
+          occurredAt: "2026-07-22T12:00:00.000Z"
+        }
+      });
     } finally {
       pending.close();
     }
@@ -185,8 +202,8 @@ describe("mission and Relay API", () => {
     const after = NodraSqliteDatabase.open(databaseFile);
     try {
       expect(after.orm.select().from(missions).where(eq(missions.id, "api-agent")).get())
-        .toMatchObject({ state: "READY", version: 1 });
-      expect(after.orm.select().from(runs).all()).toHaveLength(0);
+        .toMatchObject({ state: "ACTIVE", version: 2 });
+      expect(after.orm.select().from(runs).all()).toHaveLength(1);
       expect(after.orm.select().from(outbox).where(eq(outbox.kind, "workflow.mission.start")).all())
         .toEqual([expect.objectContaining({ id: "outbox-api-dispatch", publishedAt: null })]);
     } finally {

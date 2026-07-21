@@ -1,5 +1,5 @@
 import { NativeConnection, Worker } from "@temporalio/worker";
-import type { TemporalMissionActivities } from "../activities/temporal-mission-activities.js";
+import type { TemporalRunActivities } from "../activities/temporal-run-activities.js";
 import { MISSION_TASK_QUEUE } from "../temporal-settings.js";
 
 export interface TemporalMissionWorkerOptions {
@@ -14,7 +14,7 @@ export class TemporalMissionWorker {
 
   constructor(
     private readonly options: TemporalMissionWorkerOptions,
-    private readonly activities: TemporalMissionActivities
+    private readonly activities: TemporalRunActivities
   ) {}
 
   async run(): Promise<void> {

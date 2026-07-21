@@ -5,23 +5,24 @@ export { SqliteHealthProbe } from "./sqlite/sqlite-health-probe.js";
 export { SqliteMissionReadModel } from "./sqlite/sqlite-mission-read-model.js";
 export { SqliteMissionRepository } from "./sqlite/sqlite-mission-repository.js";
 export { SqliteMissionExecutionRepository } from "./sqlite/sqlite-mission-execution-repository.js";
-export { SqliteMissionWorkflowActivity } from "./sqlite/sqlite-mission-workflow-activity.js";
+export { SqliteRunWorkflowActivity } from "./sqlite/sqlite-run-workflow-activity.js";
 export { SqliteWorkflowOutboxStore } from "./sqlite/sqlite-workflow-outbox-store.js";
 export { SqliteWorkflowReconciliationStore } from "./sqlite/sqlite-workflow-reconciliation-store.js";
 export { verifyDatabase, type DatabaseVerification } from "./sqlite/verify-database.js";
 export { UnavailableWorkflowAdapter } from "./workflow/unavailable-workflow-adapter.js";
 export { WorkflowUnavailableError } from "./workflow/workflow-unavailable-error.js";
-export { TemporalMissionActivities } from "./temporal/activities/temporal-mission-activities.js";
+export { TemporalRunActivities } from "./temporal/activities/temporal-run-activities.js";
 export { LazyTemporalConnection, type TemporalConnectionOptions } from "./temporal/client/lazy-temporal-connection.js";
 export { LazyTemporalWorkflowAdapter } from "./temporal/client/lazy-temporal-workflow-adapter.js";
 export { TemporalWorkflowAdapter } from "./temporal/client/temporal-workflow-adapter.js";
 export type {
-  MissionWorkflowActivities,
   MissionWorkflowInput,
-  MissionWorkflowStartedInput,
-  MissionWorkflowStartedRequest,
-  MissionWorkflowStartedResult,
-  MissionWorkflowStatus
+  MissionWorkflowStatus,
+  RunWorkflowActivities,
+  RunWorkflowInput,
+  RunWorkflowStartedInput,
+  RunWorkflowStartedRequest,
+  RunWorkflowStartedResult
 } from "./temporal/contracts.js";
 export {
   MISSION_CANCEL_SIGNAL,

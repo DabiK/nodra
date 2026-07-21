@@ -3,12 +3,14 @@ import { asId, DomainError } from "@nodra/domain";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { outbox } from "./schema/operations.js";
+import { runs } from "./schema/runs.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
 
 interface StartPayload {
   schemaVersion: 1;
   missionId: string;
   commandId: string;
+  runId: string;
 }
 
 export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
@@ -25,10 +27,16 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
         .all();
       return rows.map((row) => {
         const payload = this.parsePayload(row.payloadJson);
+        this.validateIdentity(payload, row.dedupeKey);
         return {
           id: asId(row.id),
           dedupeKey: row.dedupeKey,
-          input: { missionId: asId(payload.missionId), commandId: asId(payload.commandId), schemaVersion: 1 }
+          input: {
+            missionId: asId(payload.missionId),
+            commandId: asId(payload.commandId),
+            runId: asId(payload.runId),
+            schemaVersion: 1
+          }
         };
       });
     } catch (error) {
@@ -59,9 +67,30 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
       throw new DomainError("Workflow outbox payload is invalid", "OUTBOX_PAYLOAD_INVALID");
     }
     const candidate = payload as Record<string, unknown>;
-    if (candidate.schemaVersion !== 1 || typeof candidate.missionId !== "string" || typeof candidate.commandId !== "string") {
+    if (
+      candidate.schemaVersion !== 1 ||
+      typeof candidate.missionId !== "string" || candidate.missionId.trim() === "" ||
+      typeof candidate.commandId !== "string" || candidate.commandId.trim() === "" ||
+      typeof candidate.runId !== "string" || candidate.runId.trim() === ""
+    ) {
       throw new DomainError("Workflow outbox payload is unsupported", "OUTBOX_PAYLOAD_INVALID");
     }
     return candidate as unknown as StartPayload;
+  }
+
+  private validateIdentity(payload: StartPayload, dedupeKey: string): void {
+    if (dedupeKey !== `mission/${payload.missionId}`) {
+      throw new DomainError("Workflow outbox identity is inconsistent", "OUTBOX_PAYLOAD_INVALID");
+    }
+    const run = this.database.orm
+      .select({ id: runs.id })
+      .from(runs)
+      .where(and(
+        eq(runs.id, payload.runId),
+        eq(runs.missionId, payload.missionId),
+        eq(runs.temporalWorkflowId, `run/${payload.runId}`)
+      ))
+      .get();
+    if (!run) throw new DomainError("Workflow outbox run identity is invalid", "OUTBOX_PAYLOAD_INVALID");
   }
 }

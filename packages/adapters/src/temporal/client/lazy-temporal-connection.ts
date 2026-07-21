@@ -27,7 +27,10 @@ export class LazyTemporalConnection implements RuntimeHealthProbe {
       const connection = await this.connect();
       await connection.withDeadline(
         Date.now() + (this.options.connectTimeoutMs ?? 500),
-        () => connection.workflowService.getSystemInfo({})
+        async () => {
+          await connection.workflowService.getSystemInfo({});
+          await connection.workflowService.describeNamespace({ namespace: this.options.namespace });
+        }
       );
       return { status: "ok" };
     } catch {

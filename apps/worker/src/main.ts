@@ -2,8 +2,8 @@ import {
   migrateDatabase,
   missionWorkflowPath,
   NodraSqliteDatabase,
-  SqliteMissionWorkflowActivity,
-  TemporalMissionActivities,
+  SqliteRunWorkflowActivity,
+  TemporalRunActivities,
   TemporalMissionWorker
 } from "@nodra/adapters";
 import { mkdir } from "node:fs/promises";
@@ -16,7 +16,7 @@ await mkdir(dirname(databaseFile), { recursive: true });
 const database = NodraSqliteDatabase.open(databaseFile);
 await migrateDatabase(database, resolve(root, "packages/adapters/drizzle"));
 
-const activities = new TemporalMissionActivities(new SqliteMissionWorkflowActivity(database));
+const activities = new TemporalRunActivities(new SqliteRunWorkflowActivity(database));
 const worker = new TemporalMissionWorker({
   address: process.env.NODRA_TEMPORAL_ADDRESS ?? "127.0.0.1:7233",
   namespace: process.env.NODRA_TEMPORAL_NAMESPACE ?? "nodra",

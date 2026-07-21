@@ -9,7 +9,12 @@ describe("DispatchWorkflowOutbox", () => {
     const message = {
       id: asId("outbox-1"),
       dedupeKey: "mission/mission-1",
-      input: { missionId: asId("mission-1"), commandId: asId("command-1"), schemaVersion: 1 as const }
+      input: {
+        missionId: asId("mission-1"),
+        commandId: asId("command-1"),
+        runId: asId("run-1"),
+        schemaVersion: 1 as const
+      }
     };
     const store: WorkflowOutboxStore = {
       listPendingStarts: vi.fn(async () => [message]),
@@ -33,7 +38,12 @@ describe("DispatchWorkflowOutbox", () => {
     const message = {
       id: asId("outbox-2"),
       dedupeKey: "mission/mission-2",
-      input: { missionId: asId("mission-2"), commandId: asId("command-2"), schemaVersion: 1 as const }
+      input: {
+        missionId: asId("mission-2"),
+        commandId: asId("command-2"),
+        runId: asId("run-2"),
+        schemaVersion: 1 as const
+      }
     };
     const store: WorkflowOutboxStore = {
       listPendingStarts: vi.fn(async () => [message]),

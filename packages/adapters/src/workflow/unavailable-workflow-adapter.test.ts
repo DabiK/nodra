@@ -6,7 +6,12 @@ describe("UnavailableWorkflowAdapter", () => {
   it("fails explicitly without attempting a Temporal runtime", async () => {
     const adapter = new UnavailableWorkflowAdapter();
     await expect(
-      adapter.start({ missionId: asId("mission-1"), commandId: asId("command-1"), schemaVersion: 1 })
+      adapter.start({
+        missionId: asId("mission-1"),
+        commandId: asId("command-1"),
+        runId: asId("run-1"),
+        schemaVersion: 1
+      })
     ).rejects.toMatchObject({ code: "RUNTIME_UNHEALTHY" });
   });
 });

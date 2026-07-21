@@ -9,7 +9,8 @@ import { migrateDatabase } from "./migrate-database.js";
 import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { SqliteMissionExecutionRepository } from "./sqlite-mission-execution-repository.js";
 import { SqliteMissionRepository } from "./sqlite-mission-repository.js";
-import { SqliteMissionWorkflowActivity } from "./sqlite-mission-workflow-activity.js";
+import { SqliteRunWorkflowActivity } from "./sqlite-run-workflow-activity.js";
+import { SqliteWorkflowOutboxStore } from "./sqlite-workflow-outbox-store.js";
 import { workspaces } from "./schema/core.js";
 import { conversations } from "./schema/conversations.js";
 import { missionAgentConfigs, missions } from "./schema/missions.js";
@@ -147,13 +148,82 @@ describe("SqliteMissionExecutionRepository", () => {
     })).rejects.toMatchObject({ code: "AGENT_CONFIG_REQUIRED" });
   });
 
-  it("applies a duplicated Activity message only once with inbox in the same transaction", async () => {
+  it("rejects incomplete and unsupported workflow outbox payloads", async () => {
+    const store = new SqliteWorkflowOutboxStore(database);
+    database.orm.insert(outbox).values({
+      id: "outbox-incomplete",
+      kind: "workflow.mission.start",
+      aggregateId: "mission-incomplete",
+      payloadJson: JSON.stringify({ schemaVersion: 1, missionId: "mission-incomplete", commandId: "command" }),
+      dedupeKey: "mission/mission-incomplete",
+      createdAt: now,
+      publishedAt: null
+    }).run();
+    await expect(store.listPendingStarts(10)).rejects.toMatchObject({ code: "OUTBOX_PAYLOAD_INVALID" });
+
+    database.orm.delete(outbox).run();
+    database.orm.insert(outbox).values({
+      id: "outbox-unsupported",
+      kind: "workflow.mission.start",
+      aggregateId: "mission-unsupported",
+      payloadJson: JSON.stringify({
+        schemaVersion: 2,
+        missionId: "mission-unsupported",
+        commandId: "command",
+        runId: "run"
+      }),
+      dedupeKey: "mission/mission-unsupported",
+      createdAt: now,
+      publishedAt: null
+    }).run();
+    await expect(store.listPendingStarts(10)).rejects.toMatchObject({ code: "OUTBOX_PAYLOAD_INVALID" });
+
+    database.orm.delete(outbox).run();
+    database.orm.insert(outbox).values({
+      id: "outbox-unknown-run",
+      kind: "workflow.mission.start",
+      aggregateId: "mission-unknown-run",
+      payloadJson: JSON.stringify({
+        schemaVersion: 1,
+        missionId: "mission-unknown-run",
+        commandId: "command",
+        runId: "run-unknown"
+      }),
+      dedupeKey: "mission/mission-unknown-run",
+      createdAt: now,
+      publishedAt: null
+    }).run();
+    await expect(store.listPendingStarts(10)).rejects.toMatchObject({ code: "OUTBOX_PAYLOAD_INVALID" });
+  });
+
+  it("targets exactly one run among multiple attempts and keeps inbox atomic and idempotent", async () => {
     seedReadyAgent();
     await executeStart();
-    const activity = new SqliteMissionWorkflowActivity(database);
+    database.orm.insert(conversations).values({
+      id: "conversation-second-attempt",
+      missionId: "mission-agent",
+      managerId: null,
+      providerId: "provider-configured-not-invoked",
+      state: "open",
+      createdAt: now
+    }).run();
+    database.orm.insert(runs).values({
+      id: "run-second-attempt",
+      missionId: "mission-agent",
+      managerId: null,
+      conversationId: "conversation-second-attempt",
+      userAttempt: 2,
+      state: "QUEUED",
+      temporalWorkflowId: "run/run-second-attempt",
+      providerId: "provider-configured-not-invoked",
+      modelId: "model-configured-not-invoked",
+      createdAt: now
+    }).run();
+    const activity = new SqliteRunWorkflowActivity(database);
     const input = {
       missionId: "mission-agent",
       commandId: "command-start",
+      runId: "run-second-attempt",
       messageId: "message-stable",
       schemaVersion: 1 as const,
       temporalRunId: "temporal-run-first",
@@ -163,9 +233,20 @@ describe("SqliteMissionExecutionRepository", () => {
     await expect(activity.recordStarted({ ...input, temporalRunId: "temporal-run-duplicate" }))
       .resolves.toEqual({ applied: false });
     expect(database.orm.select().from(inbox).all()).toHaveLength(1);
-    expect(database.orm.select().from(runs).get()).toMatchObject({
+    expect(database.orm.select().from(runs).where(eq(runs.id, "run-mission-agent")).get()).toMatchObject({
+      state: "QUEUED",
+      temporalRunId: null
+    });
+    expect(database.orm.select().from(runs).where(eq(runs.id, "run-second-attempt")).get()).toMatchObject({
       state: "STARTING",
       temporalRunId: "temporal-run-first"
     });
+
+    await expect(activity.recordStarted({
+      ...input,
+      runId: "run-missing",
+      messageId: "message-missing-run"
+    })).rejects.toMatchObject({ code: "PERSISTENCE_FAILURE" });
+    expect(database.orm.select().from(inbox).all()).toHaveLength(1);
   });
 });

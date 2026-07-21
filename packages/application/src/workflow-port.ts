@@ -3,6 +3,7 @@ import type { Id } from "@nodra/domain";
 export interface StartMissionInput {
   missionId: Id;
   commandId: Id;
+  runId: Id;
   schemaVersion: 1;
 }
 
