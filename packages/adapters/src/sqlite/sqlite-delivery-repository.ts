@@ -54,7 +54,7 @@ export class SqliteDeliveryRepository implements DeliveryRepository {
   private assertRequiredGatesSatisfied(tx: NodraSqliteDatabase["orm"], missionId: string, runId: string) {
     const bindings = tx.select({ id: gateBindings.id }).from(gateBindings).where(eq(gateBindings.missionId, missionId)).all();
     for (const binding of bindings) {
-      const latest = tx.select().from(gateEvaluations).where(and(eq(gateEvaluations.gateBindingId, binding.id), eq(gateEvaluations.runId, runId))).orderBy(desc(gateEvaluations.evaluatedAt)).limit(1).get();
+      const latest = tx.select().from(gateEvaluations).where(and(eq(gateEvaluations.gateBindingId, binding.id), eq(gateEvaluations.runId, runId))).orderBy(desc(gateEvaluations.evaluatedAt), desc(gateEvaluations.id)).limit(1).get();
       if (!latest) throw new DomainError("Required gate has no evaluation", "GATES_NOT_SATISFIED");
       if (latest.state === "passed") continue;
       const override = tx.select().from(gateOverrides).where(eq(gateOverrides.evaluationId, latest.id)).orderBy(desc(gateOverrides.createdAt)).limit(1).get();

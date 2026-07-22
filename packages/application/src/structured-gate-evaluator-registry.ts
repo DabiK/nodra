@@ -37,10 +37,20 @@ export class StructuredGateEvaluatorRegistry implements GateEvaluatorRegistryPor
     }
     if (payload.timedOut === true) return this.failed("COMMAND_TIMED_OUT");
     if (payload.exitCode !== expectedExitCode) return this.failed("EXIT_CODE_MISMATCH");
-    if (expected.subject.type === "git-tree" && (!payload.gitAfter || typeof payload.gitAfter !== "object" || observation.subjectDigest.length !== 64)) {
-      return this.failed("GIT_OBSERVATION_REQUIRED");
+    if (expected.subject.type === "git-tree") {
+      if (!payload.gitAfter || typeof payload.gitAfter !== "object") return this.failed("GIT_OBSERVATION_REQUIRED");
+      const treeDigest = (payload.gitAfter as Record<string, unknown>).treeDigest;
+      if (!this.isSha256(observation.subjectDigest) || !this.isSha256(treeDigest) || observation.subjectDigest !== treeDigest) {
+        return this.failed("GIT_SUBJECT_DIGEST_MISMATCH");
+      }
     }
-    if (expected.subject.type === "content-digest" && observation.blobs.find((item) => item.role === "stdout")?.blob.sha256 !== payload.stdoutSha256) return this.failed("CONTENT_SUBJECT_DIGEST_MISMATCH");
+    if (expected.subject.type === "content-digest") {
+      const stdoutDigest = observation.blobs.find((item) => item.role === "stdout")?.blob.sha256;
+      if (!this.isSha256(observation.subjectDigest) || !this.isSha256(payload.stdoutSha256) || !this.isSha256(stdoutDigest) ||
+          observation.subjectDigest !== payload.stdoutSha256 || payload.stdoutSha256 !== stdoutDigest) {
+        return this.failed("CONTENT_SUBJECT_DIGEST_MISMATCH");
+      }
+    }
     return { state: "passed", rationale: "STRUCTURED_CRITERIA_SATISFIED", selectedEvidenceIds: [observation.id], gitEvidenceIds: expected.subject.type === "git-tree" ? [observation.id] : [] };
   }
 
@@ -52,4 +62,5 @@ export class StructuredGateEvaluatorRegistry implements GateEvaluatorRegistryPor
 
   private failed(rationale: string): GateEvaluatorResult { return { state: "failed", rationale, selectedEvidenceIds: [], gitEvidenceIds: [] }; }
   private exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean { const keys = Object.keys(value).sort(); return keys.length === expected.length && keys.every((key, index) => key === [...expected].sort()[index]); }
+  private isSha256(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
 }

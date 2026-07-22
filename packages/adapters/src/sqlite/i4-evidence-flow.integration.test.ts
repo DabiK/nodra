@@ -79,6 +79,22 @@ describe("I4 evidence, gates, approvals and delivery", () => {
     expect(database.orm.select().from(runDeliveries).where(eq(runDeliveries.runId, "run")).get()).toMatchObject({ resultState: "delivered", acceptedAt: null });
   });
 
+  it("accepts the latest fresh evaluation without invalidating an older passed history", async () => {
+    const evidenceRepository = new SqliteEvidenceRepository(database); const blobStore = new ContentAddressedBlobStore(root); const git = new ReadOnlyGitObservationAdapter();
+    const collect = new CollectEvidence(evidenceRepository, blobStore, new LocalCommandObservationAdapter(git), git); const gates = new ManageGates(new SqliteGateRepository(database), evidenceRepository, blobStore, new StructuredGateEvaluatorRegistry(), git); const delivery = new ManageDelivery(new SqliteDeliveryRepository(database), gates);
+    await gates.define({ definition: { id: asId("latest-gate"), name: "latest fresh command", evaluatorId: "command-exit", evaluatorVersion: "1", criteriaSchemaVersion: 1, criteria: { schemaVersion: 1, expectedExitCode: 0, requiresGit: true }, expectedEvidence: { schemaVersion: 1, kind: "observation", collectorId: "nodra.command", collectorVersion: "1", requiredBlobRoles: ["stdout", "stderr"], subject: { type: "git-tree" } }, createdAt: at(1) }, missionBindingId: asId("latest-binding"), missionId: asId("mission"), context: context("latest-define", 1) });
+    await collect.command({ evidenceId: asId("observation-a"), runId: asId("run"), argv: [process.execPath, "-e", "process.stdout.write('a')"], cwd: workspace, timeoutMs: 5_000, maxOutputBytes: 1_000, context: context("latest-collect-a", 2) });
+    await gates.evaluate({ evaluationId: asId("evaluation-a"), bindingId: asId("latest-binding"), runId: asId("run"), evidenceIds: [asId("observation-a")], context: context("latest-evaluate-a", 3) });
+    await writeFile(join(workspace, "tracked.txt"), "new tree before replacement proof\n");
+    await collect.command({ evidenceId: asId("observation-b"), runId: asId("run"), argv: [process.execPath, "-e", "process.stdout.write('b')"], cwd: workspace, timeoutMs: 5_000, maxOutputBytes: 1_000, context: context("latest-collect-b", 4) });
+    await gates.evaluate({ evaluationId: asId("evaluation-b"), bindingId: asId("latest-binding"), runId: asId("run"), evidenceIds: [asId("observation-b")], context: context("latest-evaluate-b", 5) });
+    await delivery.declare({ id: asId("latest-delivery"), runId: asId("run"), agentDeclaration: "replacement proof delivered", observationSummary: "latest Git subject", expectedMissionVersion: 2, context: context("latest-declare", 6) });
+    await expect(delivery.decide({ runId: asId("run"), decision: "accept", comment: "latest proof is fresh", expectedMissionVersion: 3, context: context("latest-accept", 7) })).resolves.toMatchObject({ resultState: "accepted" });
+    expect(database.orm.select().from(gateEvaluations).where(eq(gateEvaluations.id, "evaluation-a")).get()).toMatchObject({ state: "passed", staleAt: null });
+    expect(database.orm.select().from(gateEvaluations).where(eq(gateEvaluations.id, "evaluation-b")).get()).toMatchObject({ state: "passed", staleAt: null });
+    expect(database.orm.select().from(missions).where(eq(missions.id, "mission")).get()).toMatchObject({ state: "DONE", version: 4 });
+  });
+
   it("keeps evidence immutable and approvals one-shot", async () => {
     const repository = new SqliteEvidenceRepository(database); const record = { id: asId("immutable"), runId: asId("run"), kind: "declaration" as const, subjectDigest: "a".repeat(64), collectorId: "agent", collectorVersion: "1", payload: { schemaVersion: 1 }, createdAt: at(1), blobs: [] };
     await repository.save(record, context("save-once", 1)); await expect(repository.save(record, context("save-twice", 2))).rejects.toMatchObject({ code: "EVIDENCE_ID_CONFLICT" });

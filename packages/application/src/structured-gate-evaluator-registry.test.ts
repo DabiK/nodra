@@ -41,4 +41,21 @@ describe("StructuredGateEvaluatorRegistry", () => {
   it("selects exactly the expected structured observation and marks its Git subject", () => {
     expect(registry.evaluate(definition, [evidence()], asId("run"))).toEqual({ state: "passed", rationale: "STRUCTURED_CRITERIA_SATISFIED", selectedEvidenceIds: ["evidence"], gitEvidenceIds: ["evidence"] });
   });
+
+  it("rejects forged, non-hexadecimal and mismatched Git subjects", () => {
+    expect(registry.evaluate(definition, [evidence({ subjectDigest: "z".repeat(64), payload: { ...evidence().payload, gitAfter: { treeDigest: "z".repeat(64) } } })], asId("run"))).toMatchObject({ state: "failed", rationale: "GIT_SUBJECT_DIGEST_MISMATCH" });
+    expect(registry.evaluate(definition, [evidence({ payload: { ...evidence().payload, gitAfter: { treeDigest: "d".repeat(64) } } })], asId("run"))).toMatchObject({ state: "failed", rationale: "GIT_SUBJECT_DIGEST_MISMATCH" });
+  });
+
+  it("binds content subjects to both the payload and the stdout blob", () => {
+    const contentDefinition: GateDefinitionRecord = {
+      ...definition,
+      criteria: { ...definition.criteria, requiresGit: false },
+      expectedEvidence: { ...definition.expectedEvidence, subject: { type: "content-digest" } }
+    };
+    const contentEvidence = evidence({ subjectDigest: "b".repeat(64), payload: { ...evidence().payload, gitAfter: null } });
+    expect(registry.evaluate(contentDefinition, [contentEvidence], asId("run"))).toMatchObject({ state: "passed" });
+    expect(registry.evaluate(contentDefinition, [{ ...contentEvidence, subjectDigest: "a".repeat(64) }], asId("run"))).toMatchObject({ state: "failed", rationale: "CONTENT_SUBJECT_DIGEST_MISMATCH" });
+    expect(registry.evaluate(contentDefinition, [{ ...contentEvidence, payload: { ...contentEvidence.payload, stdoutSha256: "d".repeat(64) } }], asId("run"))).toMatchObject({ state: "failed", rationale: "CONTENT_SUBJECT_DIGEST_MISMATCH" });
+  });
 });

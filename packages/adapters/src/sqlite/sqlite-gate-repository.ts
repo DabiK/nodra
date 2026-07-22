@@ -50,14 +50,18 @@ export class SqliteGateRepository implements GateRepository {
 
   async listEvaluations(gateId: Parameters<GateRepository["listEvaluations"]>[0]) {
     try {
-      const rows = this.database.orm.select({ evaluation: gateEvaluations }).from(gateEvaluations).innerJoin(gateBindings, eq(gateBindings.id, gateEvaluations.gateBindingId)).where(eq(gateBindings.gateId, gateId)).orderBy(desc(gateEvaluations.evaluatedAt)).all().map((row) => row.evaluation);
+      const rows = this.database.orm.select({ evaluation: gateEvaluations }).from(gateEvaluations).innerJoin(gateBindings, eq(gateBindings.id, gateEvaluations.gateBindingId)).where(eq(gateBindings.gateId, gateId)).orderBy(desc(gateEvaluations.evaluatedAt), desc(gateEvaluations.id)).all().map((row) => row.evaluation);
       return this.hydrate(rows);
     } catch (error) { throw translateSqliteError(error); }
   }
 
   async listPassedGitEvaluations(runId: Parameters<GateRepository["listPassedGitEvaluations"]>[0]) {
     try {
-      const rows = this.database.orm.select({ evaluation: gateEvaluations, expectedEvidenceJson: gateDefinitions.expectedEvidenceJson }).from(gateEvaluations).innerJoin(gateBindings, eq(gateBindings.id, gateEvaluations.gateBindingId)).innerJoin(gateDefinitions, eq(gateDefinitions.id, gateBindings.gateId)).where(and(eq(gateEvaluations.runId, runId), eq(gateEvaluations.state, "passed"))).all().filter((row) => {
+      const seenBindings = new Set<string>();
+      const rows = this.database.orm.select({ evaluation: gateEvaluations, expectedEvidenceJson: gateDefinitions.expectedEvidenceJson }).from(gateEvaluations).innerJoin(gateBindings, eq(gateBindings.id, gateEvaluations.gateBindingId)).innerJoin(gateDefinitions, eq(gateDefinitions.id, gateBindings.gateId)).where(eq(gateEvaluations.runId, runId)).orderBy(gateEvaluations.gateBindingId, desc(gateEvaluations.evaluatedAt), desc(gateEvaluations.id)).all().filter((row) => {
+        if (seenBindings.has(row.evaluation.gateBindingId)) return false;
+        seenBindings.add(row.evaluation.gateBindingId);
+        if (row.evaluation.state !== "passed") return false;
         const expected = JSON.parse(row.expectedEvidenceJson) as { subject?: { type?: unknown } };
         return expected.subject?.type === "git-tree";
       }).map((row) => row.evaluation);

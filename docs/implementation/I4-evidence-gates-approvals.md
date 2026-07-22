@@ -52,11 +52,11 @@ La définition contient aussi un contrat `expectedEvidence` strict :
 }
 ```
 
-`subject.type` vaut `git-tree` pour une gate Git ou `content-digest` pour une gate indépendante de Git. Critères et preuves attendues refusent les champs inconnus. L’évaluateur sélectionne exactement une preuve conforme ; zéro correspondance, plusieurs correspondances, une preuve supplémentaire, un type/collector/version ou des rôles différents échouent explicitement.
+`subject.type` vaut `git-tree` pour une gate Git ou `content-digest` pour une gate indépendante de Git. Critères et preuves attendues refusent les champs inconnus. Un sujet Git doit être un SHA-256 hexadécimal identique à `gitAfter.treeDigest`; un sujet contenu doit être identique à la fois à `payload.stdoutSha256` et au digest du blob stdout. L’évaluateur sélectionne exactement une preuve conforme ; zéro correspondance, plusieurs correspondances, une preuve supplémentaire, un type/collector/version, un sujet ou des rôles différents échouent explicitement.
 
 L’évaluation lie explicitement ses `evidenceIds`. Elle vérifie identité run/mission/attempt, collector et version, schéma, timestamps, workspace, rôles stdout/stderr, digests, intégrité des blobs, exit code et observation Git requise. Un évaluateur inconnu, une déclaration agent seule, un collector incomplet, un dépôt absent ou un blob invalide produit une évaluation `failed` avec rationale stable ; aucun texte agent et aucune heuristique de commande ne sont interprétés.
 
-`refresh-staleness` recalcule la cible via `GitObservationPort`. Seuls les liens persistés avec le rôle `git-subject`, issus du contrat `expectedEvidence.subject`, participent à la comparaison ; une autre preuve associée ne peut pas rendre la gate stale. Toute évaluation `passed` dépendant de Git dont le `subjectDigest` diffère devient `stale` avec `staleAt`. L’historique et les liens de preuve sont conservés.
+`refresh-staleness` recalcule la cible via `GitObservationPort`. Pour chaque binding, seule la dernière évaluation effective du run est considérée, avec un ordre stable `evaluatedAt DESC, id DESC`, identique à celui utilisé par la transaction de delivery. Une ancienne preuve passée ne peut donc pas invalider une preuve de remplacement plus récente et fraîche. Seuls les liens persistés avec le rôle `git-subject`, issus du contrat `expectedEvidence.subject`, participent à la comparaison ; une autre preuve associée ne peut pas rendre la gate stale. Toute dernière évaluation `passed` dépendant de Git dont le `subjectDigest` diffère devient `stale` avec `staleAt`. L’historique et les liens de preuve sont conservés.
 
 ## Approbations, overrides et delivery
 
