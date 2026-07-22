@@ -44,10 +44,19 @@ describe("architecture boundaries", () => {
     for (const file of [
       "apps/api/src/business-error.filter.ts",
       "apps/api/src/health.controller.ts",
+      "apps/api/src/evidence.controller.ts",
+      "apps/api/src/gate.controller.ts",
+      "apps/api/src/approval.controller.ts",
+      "apps/api/src/delivery.controller.ts",
       "apps/api/src/mission.controller.ts",
       "apps/api/src/relay.controller.ts",
       "apps/api/src/runtime.controller.ts",
-      "apps/cli/src/nodra-cli.ts"
+      "apps/cli/src/nodra-cli.ts",
+      "apps/cli/src/i4-cli.ts",
+      "apps/cli/src/evidence-cli.ts",
+      "apps/cli/src/gate-cli.ts",
+      "apps/cli/src/approval-cli.ts",
+      "apps/cli/src/delivery-cli.ts"
     ]) {
       const imports = importedModules(await readFile(resolve(file), "utf8"));
       expect(imports.filter((imported) => /@nodra\/(?:domain|adapters)/.test(imported)), file).toEqual([]);

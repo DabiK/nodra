@@ -32,9 +32,10 @@ describe("migrateDatabase", () => {
 
     const result = await migrateDatabase(database, migrationsDirectory);
 
-    expect(result).toMatchObject({ version: 1, registeredVersions: [1] });
+    expect(result).toMatchObject({ version: 2, registeredVersions: [1, 2] });
     expect(registeredMigrations(database)).toEqual([
-      expect.objectContaining({ version: 1, checksum: result.checksum })
+      expect.objectContaining({ version: 1 }),
+      expect.objectContaining({ version: 2, checksum: result.checksum })
     ]);
   });
 
@@ -84,24 +85,26 @@ describe("migrateDatabase", () => {
       entries: Array<{ idx: number; version: string; when: number; tag: string; breakpoints: boolean }>;
     };
     const first = journal.entries[0];
-    if (!first) throw new Error("Expected the baseline journal entry");
+    const last = journal.entries.at(-1);
+    if (!first || !last) throw new Error("Expected migration journal entries");
+    const nextIndex = journal.entries.length;
     journal.entries.push({
-      idx: 1,
+      idx: nextIndex,
       version: first.version,
-      when: first.when + 1,
-      tag: "0001_multi_migration_probe",
+      when: last.when + 1,
+      tag: "0002_multi_migration_probe",
       breakpoints: true
     });
     await writeFile(journalFile, `${JSON.stringify(journal, null, 2)}\n`);
     await writeFile(
-      join(migrationsDirectory, "0001_multi_migration_probe.sql"),
+      join(migrationsDirectory, "0002_multi_migration_probe.sql"),
       "CREATE TABLE `migration_probe` (`id` integer PRIMARY KEY NOT NULL);\n"
     );
 
     const result = await migrateDatabase(database, migrationsDirectory);
 
-    expect(result).toMatchObject({ version: 2, registeredVersions: [1, 2] });
-    expect(registeredMigrations(database).map(({ version }) => version)).toEqual([1, 2]);
+    expect(result).toMatchObject({ version: 3, registeredVersions: [1, 2, 3] });
+    expect(registeredMigrations(database).map(({ version }) => version)).toEqual([1, 2, 3]);
     expect(database.connection.prepare("select name from sqlite_master where name = 'migration_probe'").get()).toBeTruthy();
   });
 });

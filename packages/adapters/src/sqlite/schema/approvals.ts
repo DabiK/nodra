@@ -14,6 +14,8 @@ export const approvals = sqliteTable("approval", {
   state: text("state", { enum: ["pending", "approved", "denied", "expired"] }).notNull(),
   expiresAt: text("expires_at"),
   decidedAt: text("decided_at"),
+  decidedBy: text("decided_by"),
+  decisionComment: text("decision_comment"),
   createdAt: text("created_at").notNull()
 }, (table) => [
   check("ck_approval_state", sql`${table.state} in ('pending','approved','denied','expired')`),

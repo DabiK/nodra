@@ -12,13 +12,14 @@ import type {
 } from "@nodra/application";
 import { DomainError, toId } from "@nodra/application";
 import { randomUUID } from "node:crypto";
+import type { I4Cli } from "./i4-cli.js";
 
 export interface CliOutput {
   write(value: string): void;
 }
 
 const usage =
-  "Usage: nodra <health|mission:create [--project <id>] [--command-id <id>] <title>|mission:list [--project <id>|--scratch]|mission:show <id>|mission:start <id> <expectedVersion> [--command-id <id>]|mission:<prepare|pickup|block|resume|close|abandon> <id> <expectedVersion> [reason]|relay [--project <id>|--scratch]|temporal:dispatch|temporal:reconcile>";
+  "Usage: nodra <health|mission:*|relay|temporal:*|evidence:*|gate:*|approval:*|delivery:*>";
 
 export class NodraCli {
   constructor(
@@ -31,7 +32,8 @@ export class NodraCli {
     private readonly startMission: StartMission,
     private readonly dispatchWorkflowOutbox: DispatchWorkflowOutbox,
     private readonly reconcileWorkflows: ReconcileWorkflows,
-    private readonly output: CliOutput
+    private readonly output: CliOutput,
+    private readonly i4?: I4Cli
   ) {}
 
   async run(arguments_: readonly string[]): Promise<number> {
@@ -64,6 +66,10 @@ export class NodraCli {
     }
     if (command === "temporal:reconcile" && parameters.length === 0) {
       return this.write(await this.reconcileWorkflows.execute());
+    }
+    if (command && this.i4) {
+      const result = await this.i4.execute(command, parameters);
+      if (result !== undefined) return this.write(result);
     }
     if (command?.startsWith("mission:")) return this.transition(command.slice("mission:".length), parameters);
     return this.writeUsage();

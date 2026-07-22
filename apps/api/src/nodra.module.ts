@@ -3,10 +3,17 @@ import { dirname } from "node:path";
 import { Module, type DynamicModule } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 import {
-  migrateDatabase,
+  ContentAddressedBlobStore,
   LazyTemporalConnection,
   LazyTemporalWorkflowAdapter,
+  LocalCommandObservationAdapter,
+  migrateDatabase,
   NodraSqliteDatabase,
+  ReadOnlyGitObservationAdapter,
+  SqliteApprovalRepository,
+  SqliteDeliveryRepository,
+  SqliteEvidenceRepository,
+  SqliteGateRepository,
   SqliteHealthProbe,
   SqliteMissionReadModel,
   SqliteMissionRepository,
@@ -16,17 +23,27 @@ import {
 } from "@nodra/adapters";
 import {
   ChangeMissionState,
+  CollectEvidence,
   CreateMission,
   DispatchWorkflowOutbox,
   GetHealth,
   GetRelay,
   ListMissions,
+  ManageApprovals,
+  ManageDelivery,
+  ManageGates,
+  ReadEvidence,
   ReconcileWorkflows,
   ShowMission,
-  StartMission
+  StartMission,
+  StructuredGateEvaluatorRegistry
 } from "@nodra/application";
+import { ApprovalController } from "./approval.controller.js";
 import { BusinessErrorFilter } from "./business-error.filter.js";
 import { DatabaseLifecycle } from "./database-lifecycle.js";
+import { DeliveryController } from "./delivery.controller.js";
+import { EvidenceController } from "./evidence.controller.js";
+import { GateController } from "./gate.controller.js";
 import { HealthController } from "./health.controller.js";
 import { MissionController } from "./mission.controller.js";
 import { RelayController } from "./relay.controller.js";
@@ -43,7 +60,12 @@ import {
   START_MISSION,
   DISPATCH_WORKFLOW_OUTBOX,
   RECONCILE_WORKFLOWS,
-  TEMPORAL_CONNECTION
+  TEMPORAL_CONNECTION,
+  READ_EVIDENCE,
+  COLLECT_EVIDENCE,
+  MANAGE_GATES,
+  MANAGE_APPROVALS,
+  MANAGE_DELIVERY
 } from "./tokens.js";
 
 export interface NodraModuleOptions {
@@ -51,6 +73,7 @@ export interface NodraModuleOptions {
   migrationsDirectory: string;
   temporalAddress?: string;
   temporalNamespace?: string;
+  dataRoot?: string;
 }
 
 @Module({})
@@ -58,7 +81,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, RelayController, RuntimeController],
+      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, ApprovalController, DeliveryController],
       providers: [
         {
           provide: DATABASE,
@@ -74,6 +97,29 @@ export class NodraModule {
             }
           }
         },
+        {
+          provide: READ_EVIDENCE,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ReadEvidence(new SqliteEvidenceRepository(database))
+        },
+        {
+          provide: COLLECT_EVIDENCE,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => {
+            const repository = new SqliteEvidenceRepository(database); const git = new ReadOnlyGitObservationAdapter();
+            return new CollectEvidence(repository, new ContentAddressedBlobStore(options.dataRoot ?? dirname(options.databaseFile)), new LocalCommandObservationAdapter(git), git);
+          }
+        },
+        {
+          provide: MANAGE_GATES,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => {
+            const evidence = new SqliteEvidenceRepository(database); const git = new ReadOnlyGitObservationAdapter();
+            return new ManageGates(new SqliteGateRepository(database), evidence, new ContentAddressedBlobStore(options.dataRoot ?? dirname(options.databaseFile)), new StructuredGateEvaluatorRegistry(), git);
+          }
+        },
+        { provide: MANAGE_APPROVALS, inject: [DATABASE], useFactory: (database: NodraSqliteDatabase) => new ManageApprovals(new SqliteApprovalRepository(database)) },
+        { provide: MANAGE_DELIVERY, inject: [DATABASE], useFactory: (database: NodraSqliteDatabase) => new ManageDelivery(new SqliteDeliveryRepository(database)) },
         {
           provide: TEMPORAL_CONNECTION,
           useFactory: () => new LazyTemporalConnection({

@@ -46,3 +46,13 @@ export type {
   WorkflowSignal,
   WorkflowUpdate
 } from "./workflow-port.js";
+export { CollectEvidence } from "./collect-evidence.js";
+export { ReadEvidence } from "./read-evidence.js";
+export type { BlobRecord, BlobStorePort, CommandObservation, CommandObservationPort, EvidenceBlobRole, EvidenceKind, EvidenceRecord, EvidenceRepository, GitObservation, GitObservationPort, RunEvidenceContext } from "./evidence-model.js";
+export { StructuredGateEvaluatorRegistry } from "./structured-gate-evaluator-registry.js";
+export { ManageGates } from "./manage-gates.js";
+export type { GateBindingRecord, GateDefinitionRecord, GateEvaluationRecord, GateEvaluationState, GateEvaluatorRegistryPort, GateEvaluatorResult, GateRepository } from "./gate-model.js";
+export { ManageApprovals } from "./manage-approvals.js";
+export type { ApprovalRecord, ApprovalRepository, ApprovalSubject } from "./approval-model.js";
+export { ManageDelivery } from "./manage-delivery.js";
+export type { DeliveryRecord, DeliveryRepository } from "./delivery-model.js";

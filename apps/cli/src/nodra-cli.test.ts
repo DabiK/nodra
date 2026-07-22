@@ -1,4 +1,6 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -11,6 +13,8 @@ import {
   SqliteWorkflowOutboxStore,
   SqliteWorkflowReconciliationStore,
   UnavailableWorkflowAdapter
+  ,ContentAddressedBlobStore, ReadOnlyGitObservationAdapter, LocalCommandObservationAdapter,
+  SqliteEvidenceRepository, SqliteGateRepository, SqliteApprovalRepository, SqliteDeliveryRepository
 } from "@nodra/adapters";
 import {
   ChangeMissionState,
@@ -23,6 +27,7 @@ import {
   ShowMission,
   StartMission,
   toId
+  ,CollectEvidence, ReadEvidence, ManageGates, StructuredGateEvaluatorRegistry, ManageApprovals, ManageDelivery
 } from "@nodra/application";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
@@ -31,6 +36,15 @@ import { workspaces } from "../../../packages/adapters/src/sqlite/schema/core.js
 import { missionAgentConfigs, missions } from "../../../packages/adapters/src/sqlite/schema/missions.js";
 import { outbox } from "../../../packages/adapters/src/sqlite/schema/operations.js";
 import { runs } from "../../../packages/adapters/src/sqlite/schema/runs.js";
+import { conversations } from "../../../packages/adapters/src/sqlite/schema/conversations.js";
+import { runConfigSnapshots } from "../../../packages/adapters/src/sqlite/schema/runs.js";
+import { I4Cli } from "./i4-cli.js";
+import { EvidenceCli } from "./evidence-cli.js";
+import { GateCli } from "./gate-cli.js";
+import { ApprovalCli } from "./approval-cli.js";
+import { DeliveryCli } from "./delivery-cli.js";
+
+const exec = promisify(execFile);
 
 class MemoryOutput implements CliOutput {
   readonly values: string[] = [];
@@ -48,14 +62,16 @@ describe("NodraCli", () => {
   let database: NodraSqliteDatabase;
   let output: MemoryOutput;
   let cli: NodraCli;
+  let directory: string;
 
   beforeEach(async () => {
-    const directory = await mkdtemp(join(tmpdir(), "nodra-cli-"));
+    directory = await mkdtemp(join(tmpdir(), "nodra-cli-"));
     database = NodraSqliteDatabase.open(join(directory, "nodra.db"));
     await migrateDatabase(database, resolve("packages/adapters/drizzle"));
     const repository = new SqliteMissionRepository(database);
     const readModel = new SqliteMissionReadModel(database);
     output = new MemoryOutput();
+    const evidence = new SqliteEvidenceRepository(database); const git = new ReadOnlyGitObservationAdapter(); const blobs = new ContentAddressedBlobStore(directory);
     cli = new NodraCli(
       new GetHealth(new SqliteHealthProbe(database), { check: async () => ({ status: "ok" }) }),
       new CreateMission(repository),
@@ -68,7 +84,8 @@ describe("NodraCli", () => {
       }),
       new DispatchWorkflowOutbox(new SqliteWorkflowOutboxStore(database), new UnavailableWorkflowAdapter()),
       new ReconcileWorkflows(new SqliteWorkflowReconciliationStore(database), new UnavailableWorkflowAdapter()),
-      output
+      output,
+      new I4Cli([new EvidenceCli(new ReadEvidence(evidence), new CollectEvidence(evidence, blobs, new LocalCommandObservationAdapter(git), git)), new GateCli(new ManageGates(new SqliteGateRepository(database), evidence, blobs, new StructuredGateEvaluatorRegistry(), git)), new ApprovalCli(new ManageApprovals(new SqliteApprovalRepository(database))), new DeliveryCli(new ManageDelivery(new SqliteDeliveryRepository(database)))])
     );
   });
 
@@ -192,5 +209,12 @@ describe("NodraCli", () => {
       .toBeNull();
     expect(await unavailableCli.run(["temporal:reconcile"])).toBe(1);
     expect(output.lastJson()).toMatchObject({ code: "RUNTIME_UNHEALTHY" });
+  });
+
+  it("drives the I4 proof, staleness, override and acceptance flow with JSON output", async () => {
+    const workspace = join(directory, "workspace-i4"); await exec("git", ["init", workspace]); await writeFile(join(workspace, "tracked"), "initial"); await exec("git", ["-C", workspace, "add", "tracked"]); await exec("git", ["-C", workspace, "-c", "user.name=Nodra", "-c", "user.email=nodra@local", "commit", "-m", "seed"]); const now = new Date().toISOString();
+    database.orm.insert(workspaces).values({ id: "workspace-cli-i4", projectId: null, kind: "repo", path: workspace, state: "in_use", createdAt: now }).run(); database.orm.insert(missions).values({ id: "mission-cli-i4", projectId: null, title: "I4 CLI", executionKind: "agent", state: "ACTIVE", version: 2, createdAt: now, updatedAt: now }).run(); database.orm.insert(conversations).values({ id: "conversation-cli-i4", missionId: "mission-cli-i4", managerId: null, providerId: "none", state: "open", createdAt: now }).run(); database.orm.insert(runs).values({ id: "run-cli-i4", missionId: "mission-cli-i4", managerId: null, conversationId: "conversation-cli-i4", userAttempt: 1, state: "STARTING", temporalWorkflowId: "run/run-cli-i4", providerId: "none", modelId: "none", createdAt: now }).run(); database.orm.insert(runConfigSnapshots).values({ runId: "run-cli-i4", resolutionSchemaVersion: 1, providerIdRequested: "none", providerIdResolved: "none", modelIdRequested: "none", modelIdResolved: "none", providerOptionsSchemaVersion: 1, providerOptionsJson: "{}", providerCapabilitiesJson: "{}", promptKind: "mission", promptCompositionSchemaVersion: 1, promptEffective: "", permissionPreset: "read_only", budgetSnapshotJson: "{}", workspaceId: "workspace-cli-i4", cwd: workspace, createdAt: now }).run();
+    expect(await cli.run(["gate:define", "mission-cli-i4", "tests", "--requires-git"])).toBe(0); const gate = output.lastJson(); expect(await cli.run(["evidence:collect-command", "run-cli-i4", "--cwd", workspace, "--", process.execPath, "-e", "process.stdout.write('ok')"])).toBe(0); const evidenceId = output.lastJson().id as string; expect(await cli.run(["gate:evaluate", gate.binding.id, "run-cli-i4", evidenceId])).toBe(0); const evaluationId = output.lastJson().id as string; expect(output.lastJson().rationale).toBe("STRUCTURED_CRITERIA_SATISFIED");
+    await writeFile(join(workspace, "tracked"), "changed"); expect(await cli.run(["gate:refresh-staleness", "run-cli-i4"])).toBe(0); expect(output.lastJson().stale).toEqual([evaluationId]); expect(await cli.run(["delivery:declare", "run-cli-i4", "2", "done", "observed"])).toBe(0); expect(await cli.run(["approval:request", "run", "run-cli-i4", "override"])).toBe(0); const approvalId = output.lastJson().id as string; expect(await cli.run(["approval:decide", approvalId, "approved", "human", "reviewed"])).toBe(0); expect(await cli.run(["gate:override", evaluationId, approvalId, "accept", "reviewed stale proof"])).toBe(0); expect(await cli.run(["delivery:accept", "run-cli-i4", "3", "accepted"])).toBe(0); expect(output.lastJson().resultState).toBe("accepted");
   });
 });

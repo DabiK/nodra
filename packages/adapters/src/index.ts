@@ -32,3 +32,10 @@ export {
 } from "./temporal/temporal-settings.js";
 export { TemporalMissionWorker, type TemporalMissionWorkerOptions } from "./temporal/worker/temporal-mission-worker.js";
 export { missionWorkflowPath } from "./temporal/workflow-path.js";
+export { ContentAddressedBlobStore } from "./fs/content-addressed-blob-store.js";
+export { ReadOnlyGitObservationAdapter } from "./git/read-only-git-observation-adapter.js";
+export { LocalCommandObservationAdapter } from "./process/local-command-observation-adapter.js";
+export { SqliteEvidenceRepository } from "./sqlite/sqlite-evidence-repository.js";
+export { SqliteGateRepository } from "./sqlite/sqlite-gate-repository.js";
+export { SqliteApprovalRepository } from "./sqlite/sqlite-approval-repository.js";
+export { SqliteDeliveryRepository } from "./sqlite/sqlite-delivery-repository.js";

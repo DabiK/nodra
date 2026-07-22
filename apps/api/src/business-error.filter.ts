@@ -18,12 +18,17 @@ const statusFor = (code: string): number => {
     code === "MISSION_VERSION_CONFLICT" ||
     code === "TRANSITION_FORBIDDEN" ||
     code === "COMMAND_ID_CONFLICT" ||
-    code === "MISSION_ALREADY_EXISTS"
+    code === "MISSION_ALREADY_EXISTS" || code === "EVIDENCE_STALE" || code === "APPROVAL_ALREADY_DECIDED" ||
+    code === "DELIVERY_ALREADY_DECIDED" || code === "EVIDENCE_ID_CONFLICT" || code === "GATES_NOT_SATISFIED" ||
+    code === "APPROVAL_TARGET_MISMATCH" || code === "BLOB_DIGEST_MISMATCH"
   ) return 409;
   if (code === "MISSION_TITLE_REQUIRED" || code === "BLOCK_REASON_REQUIRED") return 422;
   if (code === "PERSISTENCE_FAILURE") return 500;
   if (code === "RUNTIME_UNHEALTHY" || code === "WORKFLOW_UNAVAILABLE") return 503;
   if (code === "AGENT_CONFIG_REQUIRED") return 422;
+  if (code.endsWith("_NOT_FOUND")) return 404;
+  if (code === "CAPABILITY_UNAVAILABLE") return 422;
+  if (code === "APPROVAL_REQUIRED") return 428;
   return 400;
 };
 
