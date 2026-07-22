@@ -63,6 +63,7 @@ export const runCli = async (
     const git = new ReadOnlyGitObservationAdapter();
     const blobs = new ContentAddressedBlobStore(dataRoot);
     const gates = new SqliteGateRepository(database);
+    const manageGates = new ManageGates(gates, evidenceRepository, blobs, new StructuredGateEvaluatorRegistry(), git);
     const cli = new NodraCli(
       new GetHealth(new SqliteHealthProbe(database), temporal),
       new CreateMission(repository),
@@ -82,9 +83,9 @@ export const runCli = async (
       new ConsoleOutput(),
       new I4Cli([
         new EvidenceCli(new ReadEvidence(evidenceRepository), new CollectEvidence(evidenceRepository, blobs, new LocalCommandObservationAdapter(git), git)),
-        new GateCli(new ManageGates(gates, evidenceRepository, blobs, new StructuredGateEvaluatorRegistry(), git)),
+        new GateCli(manageGates),
         new ApprovalCli(new ManageApprovals(new SqliteApprovalRepository(database))),
-        new DeliveryCli(new ManageDelivery(new SqliteDeliveryRepository(database)))
+        new DeliveryCli(new ManageDelivery(new SqliteDeliveryRepository(database), manageGates))
       ])
     );
     return await cli.run(arguments_);

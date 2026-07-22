@@ -8,7 +8,7 @@ I4 livre uniquement le backend, l’API et la CLI. Aucun frontend, provider, pip
 
 ## Contradiction documentaire résolue
 
-Le baseline normatif de `02-domain-sqlite.md` contient les tables I4, mais `approval` n’y porte ni acteur ni commentaire de décision. Le mandat I4 les exige explicitement. La migration Drizzle générée `0001_wakeful_pete_wisdom.sql` ajoute donc `decided_by` et `decision_comment`, sans DDL métier ad hoc ni modification de la baseline déjà appliquée. Toutes les autres structures I4 utilisent les tables du baseline.
+Le baseline normatif de `02-domain-sqlite.md` contient les tables I4, mais `approval` n’y porte ni acteur ni commentaire de décision. Le mandat I4 les exige explicitement. La migration Drizzle générée `0001_wakeful_pete_wisdom.sql` ajoute donc `decided_by` et `decision_comment`, sans DDL métier ad hoc ni modification de la baseline déjà appliquée. Le correctif de revue `0002_boring_ultimates.sql` ajoute l’unicité de `gate_override.approval_id`; le checksum de `0001` reste `034522dbf6cd33aee96f28f47a5144c974b271a9add1052e925c7ea2e34351dc`.
 
 ## Contrats de preuve
 
@@ -25,7 +25,7 @@ Le collecteur command `nodra.command@1` expose :
 
 Le collecteur Git read-only `nodra.git@1` expose `head`, `treeDigest`, `diffDigest`, `dirty` et `capturedAt`. Le digest de cible couvre HEAD, statut, diff binaire et contenu des fichiers non suivis. Il n’exécute aucune écriture, aucun commit et refuse un dépôt sortant du workspace ou un fichier non suivi symlinké.
 
-Les blobs sont adressés par SHA-256 sous `artifacts/<préfixe>/<sha256>`. L’écriture passe par un fichier temporaire borné, `fsync`, puis rename atomique. SQLite ne reçoit que digest, taille, MIME et chemin relatif. La lecture de validation refuse chemin absolu, traversal, symlink escape, taille incohérente, blob absent ou digest corrompu. Un même contenu converge vers le même identifiant et chemin.
+Les blobs sont adressés par SHA-256 sous `artifacts/<préfixe>/<sha256>`. L’écriture passe par un fichier temporaire borné et `fsync`, puis une publication atomique sans écrasement par hard-link. En cas de cible concurrente (`EEXIST`, ou `EPERM` avec cible existante), le blob canonique est relu et doit correspondre exactement avant suppression du temporaire. Une cible corrompue n’est jamais écrasée. SQLite ne reçoit que digest, taille, MIME et chemin relatif. La lecture vérifie aussi la correspondance exacte `id ↔ path ↔ sha256`, et refuse chemin absolu, traversal, symlink escape, taille incohérente, blob absent ou digest corrompu.
 
 ## Gates et staleness
 
@@ -39,17 +39,32 @@ Les blobs sont adressés par SHA-256 sous `artifacts/<préfixe>/<sha256>`. L’�
 }
 ```
 
+La définition contient aussi un contrat `expectedEvidence` strict :
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "observation",
+  "collectorId": "nodra.command",
+  "collectorVersion": "1",
+  "requiredBlobRoles": ["stdout", "stderr"],
+  "subject": { "type": "git-tree" }
+}
+```
+
+`subject.type` vaut `git-tree` pour une gate Git ou `content-digest` pour une gate indépendante de Git. Critères et preuves attendues refusent les champs inconnus. L’évaluateur sélectionne exactement une preuve conforme ; zéro correspondance, plusieurs correspondances, une preuve supplémentaire, un type/collector/version ou des rôles différents échouent explicitement.
+
 L’évaluation lie explicitement ses `evidenceIds`. Elle vérifie identité run/mission/attempt, collector et version, schéma, timestamps, workspace, rôles stdout/stderr, digests, intégrité des blobs, exit code et observation Git requise. Un évaluateur inconnu, une déclaration agent seule, un collector incomplet, un dépôt absent ou un blob invalide produit une évaluation `failed` avec rationale stable ; aucun texte agent et aucune heuristique de commande ne sont interprétés.
 
-`refresh-staleness` recalcule la cible via `GitObservationPort`. Toute évaluation `passed` dépendant de Git dont le `subjectDigest` diffère devient `stale` avec `staleAt`. L’historique et les liens de preuve sont conservés. Une gate stale ne satisfait pas l’acceptation.
+`refresh-staleness` recalcule la cible via `GitObservationPort`. Seuls les liens persistés avec le rôle `git-subject`, issus du contrat `expectedEvidence.subject`, participent à la comparaison ; une autre preuve associée ne peut pas rendre la gate stale. Toute évaluation `passed` dépendant de Git dont le `subjectDigest` diffère devient `stale` avec `staleAt`. L’historique et les liens de preuve sont conservés.
 
 ## Approbations, overrides et delivery
 
-Une approbation cible exactement un run, une mission ou un manager. `pending` ne peut devenir qu’une seule fois `approved`, `denied` ou `expired`. La décision optimiste persiste dans la même transaction état, date, acteur, commentaire et audit. Une course ou une seconde décision retourne `APPROVAL_ALREADY_DECIDED`.
+Une approbation cible exactement un run, une mission ou un manager. `expiresAt` est normalisé en UTC canonique avec `toISOString`; les comparaisons de décision portent sur les instants parsés et la frontière exacte est expirée. `pending` ne peut devenir qu’une seule fois `approved`, `denied` ou `expired`. La décision optimiste persiste dans la même transaction état, date, acteur, commentaire et audit. Une course ou une seconde décision retourne `APPROVAL_ALREADY_DECIDED`.
 
-Un override `accept|reject|waive` exige une approbation `approved`, non expirée, ciblant le run ou la mission de l’évaluation, ainsi qu’un commentaire non vide. Il ajoute une ligne `gate_override` et un audit. Il ne modifie pas la ligne `gate_evaluation` historique ; l’état stale/failed original reste visible.
+Un override `accept|reject|waive` exige une approbation `approved`, non expirée, ciblant exactement le run de l’évaluation, de kind exact `gate_override:<evaluationId>`, ainsi qu’un commentaire non vide. L’approbation est consommable une seule fois, garantie par contrôle transactionnel et index SQLite unique. Il ajoute une ligne `gate_override` et un audit sans modifier la ligne `gate_evaluation` historique ; l’état stale/failed original reste visible.
 
-`run_delivery` sépare `agentDeclaration`, `observationSummary`, `resultState` et décision humaine. `declare` fait passer atomiquement une mission agent `ACTIVE` à `VALIDATION`, jamais à `DONE`. `accept` exige, pour chaque binding mission, la dernière évaluation du run `passed`, ou un override explicite `accept|waive`. L’acceptation fait passer `VALIDATION` à `DONE` avec contrôle de version, delivery, Relais et audit dans une transaction. `request-changes` et `reject` restent deux résultats delivery distincts et ramènent la mission à `READY`.
+`run_delivery` sépare `agentDeclaration`, `observationSummary`, `resultState` et décision humaine. `declare` fait passer atomiquement une mission agent `ACTIVE` à `VALIDATION`, jamais à `DONE`. Le chemin `accept` appelle obligatoirement `GateFreshnessPort` avant la transaction finale : toute mutation Git postérieure marque l’évaluation `stale` avec un audit propre, retourne `EVIDENCE_STALE` et laisse mission/delivery en `VALIDATION/delivered`. La transaction d’acceptation relit ensuite les dernières évaluations du run et exige chaque gate `passed`, ou un override explicite `accept|waive`, avant de mettre à jour mission, delivery, Relais et audit. `request-changes` et `reject` restent distincts et ramènent la mission à `READY`.
 
 ## API et CLI
 
@@ -65,9 +80,9 @@ La CLI expose les familles équivalentes `evidence:*`, `gate:*`, `approval:*` et
 
 ## Preuves automatisées
 
-- application : déclaration distincte d’une observation, registre/version de l’évaluateur, collector inconnu, preuve incomplète et exit structuré ;
-- SQLite : FK et run exact, transaction/rollback/audit, evidence immuable, blob absent ou corrompu, décision d’approbation one-shot et concurrente, override refusé puis autorisé, acceptation bloquée puis atomique ;
-- filesystem/process/Git : argv sans shell, métacaractères littéraux, cwd escape, symlink escape, timeout avec kill final, cap stdout/stderr, environnement redacted, rename atomique/déduplication, dépôt sale et changement post-collecte stale ;
+- application : schémas stricts critères/expected evidence, déclaration distincte d’une observation, sélection exacte, mauvais collector/version/type/rôles, ambiguïté, preuve incomplète et exit structuré ;
+- SQLite : FK et run exact, transaction/rollback/audit, evidence immuable, blob absent ou corrompu, expiration UTC avec offsets, décision d’approbation one-shot, mauvais kind/cible, consommation unique et concurrente, accept direct fail-closed après mutation Git ;
+- filesystem/process/Git : argv sans shell, métacaractères littéraux, cwd escape, symlink escape, timeout avec kill final, cap stdout/stderr, environnement redacted, publication atomique/déduplication concurrente, cible corrompue non écrasée, dépôt sale et changement post-collecte stale ;
 - API et CLI : parcours `failed → observation structurée → passed → changement Git → stale → approval → override → accept humain` ;
 - régression : suite complète I1–I3, reprise, parent/child et replay Temporal conservés.
 
@@ -81,8 +96,9 @@ Les évaluateurs supplémentaires devront recevoir un nouvel `evaluatorId` ou un
 
 - `npm run lint` : réussi ;
 - `npm run typecheck` : réussi ;
-- `npm test` : 18 fichiers et 65 tests réussis, incluant parent/child, reprise et replay Temporal I3 ;
+- `npm test` : 18 fichiers et 70 tests réussis, incluant parent/child, reprise et replay Temporal I3 ;
 - `npm run build` : six workspaces construits ;
-- `npm run db:setup -- <base-neuve>` : migrations 1 et 2 enregistrées, FK et WAL valides ;
+- `npm run db:setup -- <base-neuve>` : versions de migration 1, 2 et 3 (`0000`, `0001`, `0002`) enregistrées, FK et WAL valides ;
+- upgrade automatisé depuis une base arrêtée après `0001` vers `0002` : version 3 seule appliquée et index unique de consommation présent ;
 - second `db:setup` sur la même base : aucune migration réappliquée ;
 - `git diff --check` : réussi.

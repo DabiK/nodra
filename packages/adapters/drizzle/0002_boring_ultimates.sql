@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `gate_override_approval_id_unique` ON `gate_override` (`approval_id`);

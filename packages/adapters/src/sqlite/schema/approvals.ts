@@ -34,7 +34,7 @@ export const managerCreationRequests = sqliteTable("manager_creation_request", {
 export const gateOverrides = sqliteTable("gate_override", {
   id: text("id").primaryKey(),
   evaluationId: text("evaluation_id").notNull().references(() => gateEvaluations.id),
-  approvalId: text("approval_id").notNull().references(() => approvals.id),
+  approvalId: text("approval_id").notNull().unique().references(() => approvals.id),
   decision: text("decision", { enum: ["accept", "reject", "waive"] }).notNull(),
   comment: text("comment").notNull(),
   createdAt: text("created_at").notNull()

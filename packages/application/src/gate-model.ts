@@ -26,10 +26,26 @@ export interface GateEvaluationRecord {
   staleAt: string | null;
   rationale: string;
   evidenceIds: readonly Id[];
+  gitEvidenceIds: readonly Id[];
 }
 
-export interface GateEvaluatorResult { state: "passed" | "failed"; rationale: string; gitDependent: boolean; }
+export interface ExpectedEvidenceV1 {
+  schemaVersion: 1;
+  kind: "observation";
+  collectorId: string;
+  collectorVersion: string;
+  requiredBlobRoles: readonly string[];
+  subject: { type: "git-tree" | "content-digest" };
+}
+
+export interface GateEvaluatorResult {
+  state: "passed" | "failed";
+  rationale: string;
+  selectedEvidenceIds: readonly Id[];
+  gitEvidenceIds: readonly Id[];
+}
 export interface GateEvaluatorRegistryPort {
+  validateDefinition(definition: GateDefinitionRecord): string | null;
   evaluate(definition: GateDefinitionRecord, evidence: readonly EvidenceRecord[], runId: Id): GateEvaluatorResult;
 }
 
@@ -46,4 +62,8 @@ export interface GateRepository {
 export interface StalenessDependencies {
   gates: GateRepository;
   git: GitObservationPort;
+}
+
+export interface GateFreshnessPort {
+  refreshStaleness(input: { runId: Id; context: CommandContext }): Promise<{ runId: Id; treeDigest: string; stale: readonly Id[] }>;
 }

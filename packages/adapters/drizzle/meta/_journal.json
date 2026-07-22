@@ -15,6 +15,13 @@
       "when": 1784677224815,
       "tag": "0001_wakeful_pete_wisdom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784681025436,
+      "tag": "0002_boring_ultimates",
+      "breakpoints": true
     }
   ]
 }

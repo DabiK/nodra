@@ -30,7 +30,8 @@ export class SqliteApprovalRepository implements ApprovalRepository {
         const current = tx.select().from(approvals).where(eq(approvals.id, input.id)).get();
         if (!current) throw new DomainError("Approval was not found", "APPROVAL_NOT_FOUND");
         if (current.state !== "pending") throw new DomainError("Approval has already been decided", "APPROVAL_ALREADY_DECIDED");
-        if (current.expiresAt && current.expiresAt <= input.context.occurredAt) {
+        const expiry = current.expiresAt === null ? null : Date.parse(current.expiresAt);
+        if (expiry !== null && (!Number.isFinite(expiry) || expiry <= Date.parse(input.context.occurredAt))) {
           tx.update(approvals).set({ state: "expired", decidedAt: input.context.occurredAt, decidedBy: input.actor, decisionComment: input.comment }).where(and(eq(approvals.id, input.id), eq(approvals.state, "pending"))).run();
           this.audit(tx, input.context, input.id, "APPROVAL_EXPIRED", { actor: input.actor, comment: input.comment });
           return { expired: true as const, record: this.record({ ...current, state: "expired" as const, decidedAt: input.context.occurredAt, decidedBy: input.actor, decisionComment: input.comment }) };

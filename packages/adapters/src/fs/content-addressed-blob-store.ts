@@ -1,7 +1,7 @@
 import type { BlobRecord, BlobStorePort } from "@nodra/application";
 import { DomainError, toId } from "@nodra/application";
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, open, readFile, realpath, rename, unlink } from "node:fs/promises";
+import { link, lstat, mkdir, open, readFile, realpath, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 export class ContentAddressedBlobStore implements BlobStorePort {
@@ -23,19 +23,27 @@ export class ContentAddressedBlobStore implements BlobStorePort {
     } finally {
       await handle.close();
     }
-    try { await rename(temporary, target); }
-    finally { await unlink(temporary).catch(() => undefined); }
-    const stored = await readFile(target);
-    if (stored.byteLength !== content.byteLength || createHash("sha256").update(stored).digest("hex") !== sha256) {
-      throw new DomainError("Stored blob digest mismatch", "BLOB_DIGEST_MISMATCH");
+    const record = { id: toId(`blob/${sha256}`), sha256, relativePath, mimeType, byteSize: content.byteLength, createdAt: occurredAt };
+    try {
+      await link(temporary, target);
+    } catch (error) {
+      if (!this.isPublicationCollision(error)) throw new DomainError("Blob could not be published atomically", "BLOB_WRITE_FAILED");
+      const targetExists = await lstat(target).then(() => true).catch(() => false);
+      if (!targetExists) throw new DomainError("Blob could not be published atomically", "BLOB_WRITE_FAILED");
+      if (!(await this.verify(record))) throw new DomainError("Existing blob does not match its content address", "BLOB_DIGEST_MISMATCH");
+    } finally {
+      await unlink(temporary).catch(() => undefined);
     }
-    return { id: toId(`blob/${sha256}`), sha256, relativePath, mimeType, byteSize: content.byteLength, createdAt: occurredAt };
+    if (!(await this.verify(record))) throw new DomainError("Stored blob digest mismatch", "BLOB_DIGEST_MISMATCH");
+    return record;
   }
 
   async verify(blob: BlobRecord): Promise<boolean> {
     try {
       const root = await this.safeArtifactRoot();
-      if (isAbsolute(blob.relativePath) || !blob.relativePath.startsWith("artifacts/")) return false;
+      if (!/^[a-f0-9]{64}$/.test(blob.sha256) || blob.id !== `blob/${blob.sha256}`) return false;
+      const expectedPath = `artifacts/${blob.sha256.slice(0, 2)}/${blob.sha256}`;
+      if (isAbsolute(blob.relativePath) || blob.relativePath !== expectedPath) return false;
       const target = this.resolveRelative(root, blob.relativePath.slice("artifacts/".length));
       await this.assertNoSymlink(dirname(target), root);
       const stat = await lstat(target);
@@ -68,5 +76,9 @@ export class ContentAddressedBlobStore implements BlobStorePort {
   private within(root: string, target: string) {
     const path = relative(root, target);
     return path === "" || (!path.startsWith(`..${sep}`) && path !== ".." && !isAbsolute(path));
+  }
+
+  private isPublicationCollision(error: unknown): boolean {
+    return !!error && typeof error === "object" && "code" in error && (error.code === "EEXIST" || error.code === "EPERM");
   }
 }

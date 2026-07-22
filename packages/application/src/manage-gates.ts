@@ -1,4 +1,4 @@
-import { DomainError, type Id } from "@nodra/domain";
+import { asId, DomainError, type Id } from "@nodra/domain";
 import type { CommandContext } from "./command-context.js";
 import type { BlobStorePort, EvidenceRepository, GitObservationPort } from "./evidence-model.js";
 import type { GateDefinitionRecord, GateEvaluatorRegistryPort, GateRepository } from "./gate-model.js";
@@ -14,6 +14,8 @@ export class ManageGates {
 
   async define(input: { definition: GateDefinitionRecord; missionBindingId: Id; missionId: Id; context: CommandContext }) {
     if (!input.definition.name.trim()) throw new DomainError("Gate name is required", "REQUEST_INVALID");
+    const definitionError = this.evaluators.validateDefinition(input.definition);
+    if (definitionError) throw new DomainError(`Invalid gate definition: ${definitionError}`, "GATE_DEFINITION_INVALID");
     const binding = { id: input.missionBindingId, gateId: input.definition.id, missionId: input.missionId };
     await this.gates.defineMissionGate(input.definition, binding, input.context);
     return { definition: input.definition, binding };
@@ -27,10 +29,10 @@ export class ManageGates {
     for (const record of records) for (const linked of record.blobs) blobValid &&= await this.blobs.verify(linked.blob);
     const invalid = this.validateEvidence(records, run);
     const result = invalid
-      ? { state: "failed" as const, rationale: invalid, gitDependent: false }
+      ? { state: "failed" as const, rationale: invalid, selectedEvidenceIds: [], gitEvidenceIds: [] }
       : blobValid
       ? this.evaluators.evaluate(definition, records, input.runId)
-      : { state: "failed" as const, rationale: "BLOB_MISSING_OR_CORRUPT", gitDependent: false };
+      : { state: "failed" as const, rationale: "BLOB_MISSING_OR_CORRUPT", selectedEvidenceIds: [], gitEvidenceIds: [] };
     const evaluation = {
       id: input.evaluationId,
       gateBindingId: input.bindingId,
@@ -41,7 +43,8 @@ export class ManageGates {
       evaluatedAt: input.context.occurredAt,
       staleAt: null,
       rationale: result.rationale,
-      evidenceIds: input.evidenceIds
+      evidenceIds: input.evidenceIds,
+      gitEvidenceIds: result.gitEvidenceIds
     } as const;
     await this.gates.saveEvaluation(evaluation, input.context);
     return evaluation;
@@ -51,13 +54,17 @@ export class ManageGates {
 
   async refreshStaleness(input: { runId: Id; context: CommandContext }) {
     const run = await this.evidence.getRunContext(input.runId);
-    const current = await this.git.observe(run.snapshotCwd, run.workspaceRoot);
     const evaluations = await this.gates.listPassedGitEvaluations(input.runId);
+    if (evaluations.length === 0) return { runId: input.runId, treeDigest: "not-required", stale: [] };
+    const current = await this.git.observe(run.snapshotCwd, run.workspaceRoot);
     const stale: Id[] = [];
     for (const evaluation of evaluations) {
-      const linked = await Promise.all(evaluation.evidenceIds.map((id) => this.evidence.show(id)));
+      const linked = await Promise.all(evaluation.gitEvidenceIds.map((id) => this.evidence.show(id)));
       if (linked.some((item) => item.subjectDigest !== current.treeDigest)) {
-        await this.gates.markStale(evaluation.id, input.context.occurredAt, input.context);
+        await this.gates.markStale(evaluation.id, input.context.occurredAt, {
+          ...input.context,
+          commandId: asId(`${input.context.commandId}/stale/${evaluation.id}`)
+        });
         stale.push(evaluation.id);
       }
     }

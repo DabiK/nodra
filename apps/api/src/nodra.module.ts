@@ -119,7 +119,7 @@ export class NodraModule {
           }
         },
         { provide: MANAGE_APPROVALS, inject: [DATABASE], useFactory: (database: NodraSqliteDatabase) => new ManageApprovals(new SqliteApprovalRepository(database)) },
-        { provide: MANAGE_DELIVERY, inject: [DATABASE], useFactory: (database: NodraSqliteDatabase) => new ManageDelivery(new SqliteDeliveryRepository(database)) },
+        { provide: MANAGE_DELIVERY, inject: [DATABASE, MANAGE_GATES], useFactory: (database: NodraSqliteDatabase, gates: ManageGates) => new ManageDelivery(new SqliteDeliveryRepository(database), gates) },
         {
           provide: TEMPORAL_CONNECTION,
           useFactory: () => new LazyTemporalConnection({

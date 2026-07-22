@@ -15,7 +15,7 @@ export class ManageApprovals {
       subject: input.subject,
       kind: input.kind,
       state: "pending",
-      expiresAt: input.expiresAt ?? null,
+      expiresAt: input.expiresAt === undefined ? null : new Date(input.expiresAt).toISOString(),
       decidedAt: null,
       decidedBy: null,
       decisionComment: null,
