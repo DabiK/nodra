@@ -74,3 +74,40 @@ Les variantes historiques `commandExecution/requestApproval` et `fileChange/requ
 - Fixture JSONL : handshake et ordre des requêtes, modèle, nouveau thread, reprise, stream d'items, succès, erreur, interruption et steer.
 - Tests négatifs : JSON malformé, réponse corrélée inconnue, fermeture de processus, notification inattendue, capability absente et aucune auto-approbation.
 - Le seul test qui appelle un vrai `codex app-server` est opt-in. La suite standard ne dépend ni d'un login Codex, ni d'une consommation de tokens.
+
+## Forme certifiée par I6
+
+La première version certifiée par l'adaptateur I6 est exactement
+`codex_cli_rs/0.145.0`, valeur retournée par `initialize`. Les types stables ont
+été générés localement avec `codex app-server generate-ts --out <temp>` depuis
+le paquet `codex-cli 0.145.0`; ils ne sont pas recopiés dans le domaine Nodra.
+Les fixtures versionnées de l'adaptateur couvrent les formes retenues.
+
+- `ThreadStartParams` et `ThreadResumeParams` acceptent `approvalPolicy:
+  "on-request"`, `approvalsReviewer: "user"` et `sandbox:
+  "read-only"|"workspace-write"|"danger-full-access"`.
+- I6 envoie `approvalsReviewer: "user"` afin qu'une demande reste une décision
+  humaine Nodra; les valeurs générées `auto_review` et `guardian_subagent` ne
+  sont jamais sélectionnées.
+- Le schéma `ThreadResumeParams` généré par 0.145.0 ne contient pas
+  `excludeTurns`, contrairement à l'exemple Context7 ci-dessus. I6 omet donc ce
+  champ. Une future version différente reste utilisable comme
+  `compatible_unverified` si les invariants consommés passent; elle devra être
+  exportée et recertifiée pour redevenir `certified`.
+- Les décisions stables observées pour les anciennes demandes commande/fichier
+  incluent `accept` et `decline`. I6 ne renvoie jamais `acceptForSession`.
+- `thread/tokenUsage/updated` possède une fixture de projection, mais le probe
+  volontairement sans tour ne peut pas en prouver l'émission réelle. Le
+  catalogue publie donc `usage: none` avec la raison
+  `usage_not_observed_by_explicit_probe`; un run ne passe à `reported` que lors
+  de la réception effective d'un payload valide.
+- Pièces jointes et liaison MCP restent indisponibles avec une raison explicite,
+  faute de forme 0.145.0 probée et couverte de bout en bout.
+
+Politique de compatibilité : une propriété optionnelle ajoutée, une
+notification inconnue ou un nouveau modèle ne bloque pas. I6 conserve ces
+notifications comme événements et valide seulement le consumer contract
+effectivement utilisé. Une rupture de ce contrat devient
+`protocol_incompatible`; le run échoue, le health passe `incompatible` et les
+nouveaux starts Codex sont refusés. Le diff structurel automatique complet des
+schémas exportés est hors I6 et prévu pour I6.1.

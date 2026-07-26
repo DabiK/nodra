@@ -79,3 +79,30 @@ export type {
   WorkspaceRecord,
   WorkspaceState
 } from "./workspace-model.js";
+export type {
+  ProviderCapabilities,
+  ProviderCapability,
+  ProviderCatalogSnapshot,
+  ProviderContractCapability,
+  ProviderEventInput,
+  ProviderExecutionResult,
+  ProviderExecutionSink,
+  ProviderHealth,
+  ProviderModel,
+  ProviderPermissionPreset,
+  ProviderPermissionRequest,
+  ProviderProbeResult,
+  ProviderReasoningEffort,
+  ProviderRunConfiguration
+} from "./provider-model.js";
+export type { ProviderPort } from "./provider-port.js";
+export { deriveProviderHealth } from "./provider-health.js";
+export { ProviderProtocolIncompatibleError } from "./provider-protocol-incompatible-error.js";
+export type { ProviderCatalogRepository } from "./provider-catalog-repository.js";
+export { ProbeProvider } from "./probe-provider.js";
+export { GetProviderStatus } from "./get-provider-status.js";
+export type { ControllableRun, RunControlRepository } from "./run-control-repository.js";
+export { CancelRun } from "./cancel-run.js";
+export { ResumeRun } from "./resume-run.js";
+export { SteerRun } from "./steer-run.js";
+export { canonicalTarget, targetDigest } from "./exact-target.js";

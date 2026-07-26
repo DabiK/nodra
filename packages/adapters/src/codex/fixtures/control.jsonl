@@ -1,0 +1,3 @@
+{"direction":"client","message":{"method":"thread/resume","id":2,"params":{"threadId":"thr_fixture","model":"model-1","cwd":"/workspace","approvalPolicy":"on-request","approvalsReviewer":"user","sandbox":"workspace-write"}}}
+{"direction":"client","message":{"method":"turn/steer","id":4,"params":{"threadId":"thr_fixture","expectedTurnId":"turn_fixture","clientUserMessageId":"run-1/steer/<dynamic>","input":[{"type":"text","text":"more"}]}}}
+{"direction":"client","message":{"method":"turn/interrupt","id":5,"params":{"threadId":"thr_fixture","turnId":"turn_fixture"}}}

@@ -3,6 +3,7 @@ export interface MissionWorkflowInput {
   commandId: string;
   runId: string;
   schemaVersion: 1;
+  executeProvider?: boolean;
 }
 
 export interface RunWorkflowInput {
@@ -11,6 +12,7 @@ export interface RunWorkflowInput {
   runId: string;
   snapshotVersion: 1;
   schemaVersion: 1;
+  executeProvider?: boolean;
 }
 
 export interface RunWorkflowStartedRequest {
@@ -53,6 +55,8 @@ export interface RunWorkflowTerminalResult {
 export interface RunWorkflowActivities {
   recordStarted(input: RunWorkflowStartedRequest): Promise<RunWorkflowStartedResult>;
   recordTerminal(input: RunWorkflowTerminalRequest): Promise<RunWorkflowTerminalResult>;
+  executeProvider(input: { runId: string }): Promise<{ state: RunTerminalState }>;
+  steerProvider(input: { runId: string; text: string }): Promise<void>;
 }
 
 export interface MissionWorkflowStatus {

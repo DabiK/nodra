@@ -1,0 +1,2 @@
+{"direction":"server","message":{"method":"item/permissions/requestApproval","id":61,"params":{"threadId":"thr_fixture","turnId":"turn_fixture","itemId":"item_permission","environmentId":"local","startedAtMs":1,"cwd":"/workspace","reason":"write fixture","permissions":{"fileSystem":{"write":["/workspace"]},"network":null}}}}
+{"direction":"client","message":{"id":61,"result":{"scope":"turn","permissions":{"fileSystem":{"write":["/workspace"]},"network":null}}}}

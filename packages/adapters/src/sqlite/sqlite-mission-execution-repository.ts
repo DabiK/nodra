@@ -5,6 +5,8 @@ import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { conversations } from "./schema/conversations.js";
 import { workspaces } from "./schema/core.js";
 import { missionAgentConfigs, missions } from "./schema/missions.js";
+import { missionInputAttachments } from "./schema/missions.js";
+import { mcpSelections } from "./schema/access-control.js";
 import { businessAuditEvents, outbox, relayItems } from "./schema/operations.js";
 import { runConfigSnapshots, runs } from "./schema/runs.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
@@ -12,7 +14,7 @@ import { translateSqliteError } from "./sqlite-error-translation.js";
 export class SqliteMissionExecutionRepository implements MissionExecutionRepository {
   constructor(private readonly database: NodraSqliteDatabase) {}
 
-  async validateStart(missionId: Parameters<MissionExecutionRepository["validateStart"]>[0]): Promise<void> {
+  async validateStart(missionId: Parameters<MissionExecutionRepository["validateStart"]>[0]) {
     try {
       const config = this.database.orm
         .select()
@@ -34,6 +36,24 @@ export class SqliteMissionExecutionRepository implements MissionExecutionReposit
           "WORKSPACE_STATE_CONFLICT"
         );
       }
+      const attachment = this.database.orm.select({ ordinal: missionInputAttachments.ordinal })
+        .from(missionInputAttachments)
+        .where(eq(missionInputAttachments.missionId, missionId))
+        .limit(1)
+        .get();
+      const mcp = this.database.orm.select({ mode: mcpSelections.selectionMode })
+        .from(mcpSelections)
+        .where(and(eq(mcpSelections.ownerKind, "mission"), eq(mcpSelections.ownerId, missionId)))
+        .get();
+      return {
+        providerId: config.providerId,
+        modelId: config.modelId,
+        reasoningEffort: config.reasoningEffort,
+        providerOptionsSchemaVersion: config.providerOptionsSchemaVersion,
+        providerOptionsJson: config.providerOptionsJson,
+        attachmentsRequested: Boolean(attachment),
+        mcpRequested: Boolean(mcp && mcp.mode !== "none")
+      };
     } catch (error) {
       throw translateSqliteError(error);
     }
@@ -134,7 +154,10 @@ export class SqliteMissionExecutionRepository implements MissionExecutionReposit
           reasoningEffortResolved: config.reasoningEffort,
           providerOptionsSchemaVersion: config.providerOptionsSchemaVersion,
           providerOptionsJson: config.providerOptionsJson,
-          providerCapabilitiesJson: JSON.stringify({ schemaVersion: 1, status: "not_probed", reason: "provider_out_of_scope_i3" }),
+          providerCapabilitiesJson: JSON.stringify(
+            input.providerCatalogSnapshot?.capabilities
+              ?? { schemaVersion: 1, status: "not_probed", reason: "provider_out_of_scope_i3" }
+          ),
           promptKind: "mission",
           promptCompositionSchemaVersion: 1,
           promptEffective: config.missionPrompt,
@@ -191,7 +214,8 @@ export class SqliteMissionExecutionRepository implements MissionExecutionReposit
             schemaVersion: 1,
             missionId: mission.id,
             commandId: input.context.commandId,
-            runId: input.runId
+            runId: input.runId,
+            executeProvider: Boolean(input.providerCatalogSnapshot)
           }),
           dedupeKey: input.workflowId,
           createdAt: input.context.occurredAt,

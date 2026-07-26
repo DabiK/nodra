@@ -21,6 +21,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "codex:schema:export": "tsx scripts/export-codex-app-server-schema.ts",
     "db:generate": "drizzle-kit generate --config packages/adapters/drizzle.config.ts",
     "db:setup": "tsx packages/adapters/scripts/setup-database.ts"
   },

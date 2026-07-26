@@ -30,6 +30,8 @@ export type {
 } from "./temporal/contracts.js";
 export {
   MISSION_CANCEL_SIGNAL,
+  MISSION_RESUME_SIGNAL,
+  MISSION_STEER_SIGNAL,
   MISSION_STATUS_QUERY,
   MISSION_TASK_QUEUE,
   MISSION_WORKFLOW_NAME
@@ -47,3 +49,17 @@ export { SqliteConfirmationRepository } from "./sqlite/sqlite-confirmation-repos
 export { LocalWorkspaceAdapter } from "./git/local-workspace-adapter.js";
 export { SqliteWorkspaceRepository } from "./sqlite/sqlite-workspace-repository.js";
 export { SqliteWorkspaceDeletionReservation } from "./sqlite/sqlite-workspace-deletion-reservation.js";
+export { SqliteProviderCatalogRepository } from "./sqlite/sqlite-provider-catalog-repository.js";
+export { SqliteRunControlRepository } from "./sqlite/sqlite-run-control-repository.js";
+export { CodexProviderAdapter } from "./codex/codex-provider-adapter.js";
+export { CodexJsonRpcClient } from "./codex/codex-json-rpc-client.js";
+export { CodexEventMapper } from "./codex/codex-event-mapper.js";
+export { CodexProcessSupervisor } from "./codex/codex-process-supervisor.js";
+export { CodexProtocolError } from "./codex/codex-protocol-error.js";
+export { CodexRedactor } from "./codex/codex-redactor.js";
+export {
+  LocalCodexProcessLauncher,
+  type CodexProcessLauncher
+} from "./codex/codex-process-launcher.js";
+export { SqliteProviderRunStore } from "./sqlite/sqlite-provider-run-store.js";
+export { SqliteProviderPermissionHandler } from "./sqlite/sqlite-provider-permission-handler.js";

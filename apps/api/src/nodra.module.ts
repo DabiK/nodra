@@ -4,6 +4,7 @@ import { Module, type DynamicModule } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 import {
   ContentAddressedBlobStore,
+  CodexProviderAdapter,
   LazyTemporalConnection,
   LazyTemporalWorkflowAdapter,
   LocalCommandObservationAdapter,
@@ -19,6 +20,8 @@ import {
   SqliteMissionReadModel,
   SqliteMissionRepository,
   SqliteMissionExecutionRepository,
+  SqliteProviderCatalogRepository,
+  SqliteRunControlRepository,
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
   SqliteWorkspaceDeletionReservation,
@@ -27,6 +30,7 @@ import {
 } from "@nodra/adapters";
 import {
   ChangeMissionState,
+  CancelRun,
   CommitWorkspace,
   CollectEvidence,
   CreateMission,
@@ -34,6 +38,7 @@ import {
   DeleteWorkspace,
   DispatchWorkflowOutbox,
   GetHealth,
+  GetProviderStatus,
   GetRelay,
   ListMissions,
   ManageApprovals,
@@ -42,10 +47,13 @@ import {
   ManageGates,
   ReadEvidence,
   ReadWorkspace,
+  ResumeRun,
   ReconcileWorkflows,
   ShowMission,
   SnapshotWorkspace,
   StartMission,
+  SteerRun,
+  ProbeProvider,
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
   RestoreWorkspace
@@ -63,32 +71,41 @@ import { RelayController } from "./relay.controller.js";
 import { RuntimeController } from "./runtime.controller.js";
 import { RuntimeLifecycle } from "./runtime-lifecycle.js";
 import { WorkspaceController } from "./workspace.controller.js";
+import { ProviderController } from "./provider.controller.js";
+import { RunController } from "./run.controller.js";
 import {
+  CANCEL_RUN,
   CHANGE_MISSION_STATE,
+  CODEX_PROVIDER,
+  COLLECT_EVIDENCE,
+  COMMIT_WORKSPACE,
+  CREATE_WORKSPACE,
   CREATE_MISSION,
   DATABASE,
-  GET_HEALTH,
-  GET_RELAY,
-  LIST_MISSIONS,
-  SHOW_MISSION,
-  START_MISSION,
-  DISPATCH_WORKFLOW_OUTBOX,
-  RECONCILE_WORKFLOWS,
-  TEMPORAL_CONNECTION,
-  READ_EVIDENCE,
-  COLLECT_EVIDENCE,
-  MANAGE_GATES,
-  MANAGE_APPROVALS,
-  MANAGE_DELIVERY,
-  WORKSPACE_PORT,
-  MANAGE_CONFIRMATIONS,
-  CREATE_WORKSPACE,
-  READ_WORKSPACE,
-  SNAPSHOT_WORKSPACE,
-  COMMIT_WORKSPACE,
-  INTEGRATE_WORKSPACE,
   DELETE_WORKSPACE,
-  RESTORE_WORKSPACE
+  DISPATCH_WORKFLOW_OUTBOX,
+  GET_HEALTH,
+  GET_PROVIDER_STATUS,
+  GET_RELAY,
+  INTEGRATE_WORKSPACE,
+  LIST_MISSIONS,
+  MANAGE_APPROVALS,
+  MANAGE_CONFIRMATIONS,
+  MANAGE_DELIVERY,
+  MANAGE_GATES,
+  PROBE_PROVIDER,
+  PROVIDER_CATALOG,
+  READ_EVIDENCE,
+  READ_WORKSPACE,
+  RECONCILE_WORKFLOWS,
+  RESTORE_WORKSPACE,
+  RESUME_RUN,
+  SHOW_MISSION,
+  SNAPSHOT_WORKSPACE,
+  START_MISSION,
+  STEER_RUN,
+  TEMPORAL_CONNECTION,
+  WORKSPACE_PORT
 } from "./tokens.js";
 
 export interface NodraModuleOptions {
@@ -104,7 +121,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController],
+      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController],
       providers: [
         {
           provide: DATABASE,
@@ -212,6 +229,26 @@ export class NodraModule {
         { provide: MANAGE_APPROVALS, inject: [DATABASE], useFactory: (database: NodraSqliteDatabase) => new ManageApprovals(new SqliteApprovalRepository(database)) },
         { provide: MANAGE_DELIVERY, inject: [DATABASE, MANAGE_GATES], useFactory: (database: NodraSqliteDatabase, gates: ManageGates) => new ManageDelivery(new SqliteDeliveryRepository(database), gates) },
         {
+          provide: CODEX_PROVIDER,
+          useFactory: () => new CodexProviderAdapter()
+        },
+        {
+          provide: PROVIDER_CATALOG,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new SqliteProviderCatalogRepository(database)
+        },
+        {
+          provide: PROBE_PROVIDER,
+          inject: [CODEX_PROVIDER, PROVIDER_CATALOG],
+          useFactory: (provider: CodexProviderAdapter, catalog: SqliteProviderCatalogRepository) =>
+            new ProbeProvider(provider, catalog)
+        },
+        {
+          provide: GET_PROVIDER_STATUS,
+          inject: [PROVIDER_CATALOG],
+          useFactory: (catalog: SqliteProviderCatalogRepository) => new GetProviderStatus(catalog)
+        },
+        {
           provide: TEMPORAL_CONNECTION,
           useFactory: () => new LazyTemporalConnection({
             address: options.temporalAddress ?? "127.0.0.1:7233",
@@ -226,11 +263,29 @@ export class NodraModule {
         },
         {
           provide: START_MISSION,
-          inject: [DATABASE, TEMPORAL_CONNECTION],
-          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection) => {
+          inject: [DATABASE, TEMPORAL_CONNECTION, PROVIDER_CATALOG],
+          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection, catalog: SqliteProviderCatalogRepository) => {
             const repository = new SqliteMissionRepository(database);
-            return new StartMission(repository, new SqliteMissionExecutionRepository(database), temporal);
+            return new StartMission(repository, new SqliteMissionExecutionRepository(database), temporal, catalog);
           }
+        },
+        {
+          provide: CANCEL_RUN,
+          inject: [DATABASE, TEMPORAL_CONNECTION],
+          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection) =>
+            new CancelRun(new SqliteRunControlRepository(database), new LazyTemporalWorkflowAdapter(temporal))
+        },
+        {
+          provide: RESUME_RUN,
+          inject: [DATABASE, TEMPORAL_CONNECTION],
+          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection) =>
+            new ResumeRun(new SqliteRunControlRepository(database), new LazyTemporalWorkflowAdapter(temporal))
+        },
+        {
+          provide: STEER_RUN,
+          inject: [DATABASE, TEMPORAL_CONNECTION],
+          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection) =>
+            new SteerRun(new SqliteRunControlRepository(database), new LazyTemporalWorkflowAdapter(temporal))
         },
         {
           provide: DISPATCH_WORKFLOW_OUTBOX,

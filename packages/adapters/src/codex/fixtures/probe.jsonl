@@ -1,0 +1,3 @@
+{"direction":"server","message":{"id":1,"result":{"userAgent":"codex_cli_rs/0.145.0","codexHome":"/redacted","platformFamily":"unix","platformOs":"macos"}}}
+{"direction":"server","message":{"id":2,"result":{"account":{"type":"chatgpt","email":"not-persisted@example.test","planType":"test"},"requiresOpenaiAuth":true}}}
+{"direction":"server","message":{"id":3,"result":{"data":[{"id":"model-1","model":"model-1","displayName":"Model One","description":"fixture","hidden":false,"supportedReasoningEfforts":[{"reasoningEffort":"medium"}],"defaultReasoningEffort":"medium","inputModalities":["text"],"supportsPersonality":false,"additionalSpeedTiers":[],"serviceTiers":[],"defaultServiceTier":null,"isDefault":true}],"nextCursor":null}}}

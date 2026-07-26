@@ -12,17 +12,26 @@ import type {
   MissionWorkflowInput,
   MissionWorkflowStatus
 } from "../contracts.js";
-import { MISSION_CANCEL_SIGNAL, MISSION_STATUS_QUERY } from "../temporal-settings.js";
+import {
+  MISSION_CANCEL_SIGNAL,
+  MISSION_RESUME_SIGNAL,
+  MISSION_STATUS_QUERY,
+  MISSION_STEER_SIGNAL
+} from "../temporal-settings.js";
 import { RunWorkflow } from "./run-workflow.js";
 
 export { RunWorkflow } from "./run-workflow.js";
 
 export const missionStatusQuery = defineQuery<MissionWorkflowStatus>(MISSION_STATUS_QUERY);
 export const cancelMissionSignal = defineSignal(MISSION_CANCEL_SIGNAL);
+export const steerMissionSignal = defineSignal<[string]>(MISSION_STEER_SIGNAL);
+export const resumeMissionSignal = defineSignal(MISSION_RESUME_SIGNAL);
 
 export async function MissionWorkflow(input: MissionWorkflowInput): Promise<void> {
   let phase: MissionWorkflowStatus["phase"] = "starting";
   let cancelled = false;
+  const steerQueue: string[] = [];
+  let resumeRequested = false;
   const childWorkflowId = `run/${input.runId}`;
   setHandler(missionStatusQuery, () => ({
     phase,
@@ -36,6 +45,12 @@ export async function MissionWorkflow(input: MissionWorkflowInput): Promise<void
     cancelled = true;
     phase = "cancelled";
   });
+  setHandler(steerMissionSignal, (text) => {
+    steerQueue.push(text);
+  });
+  setHandler(resumeMissionSignal, () => {
+    resumeRequested = true;
+  });
 
   let childStarted = false;
   const childScope = new CancellationScope();
@@ -48,11 +63,25 @@ export async function MissionWorkflow(input: MissionWorkflowInput): Promise<void
         commandId: input.commandId,
         runId: input.runId,
         snapshotVersion: 1,
-        schemaVersion: input.schemaVersion
+        schemaVersion: input.schemaVersion,
+        ...(input.executeProvider === undefined ? {} : { executeProvider: input.executeProvider })
       }]
     });
     childStarted = true;
-    await child.result();
+    let childDone = false;
+    const result = child.result().finally(() => { childDone = true; });
+    while (!childDone && !cancelled) {
+      await condition(() => childDone || cancelled || steerQueue.length > 0 || resumeRequested);
+      while (steerQueue.length > 0) {
+        const text = steerQueue.shift();
+        if (text) await child.signal(MISSION_STEER_SIGNAL, text);
+      }
+      if (resumeRequested) {
+        resumeRequested = false;
+        await child.signal(MISSION_RESUME_SIGNAL);
+      }
+    }
+    await result;
   });
   await condition(() => childStarted || cancelled);
   if (!cancelled) {

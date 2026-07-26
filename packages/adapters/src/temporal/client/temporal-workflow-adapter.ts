@@ -5,6 +5,8 @@ import { WorkflowExecutionAlreadyStartedError, WorkflowNotFoundError } from "@te
 import { WorkflowIdConflictPolicy, WorkflowIdReusePolicy } from "@temporalio/common";
 import {
   MISSION_CANCEL_SIGNAL,
+  MISSION_RESUME_SIGNAL,
+  MISSION_STEER_SIGNAL,
   MISSION_STATUS_QUERY,
   MISSION_TASK_QUEUE,
   MISSION_WORKFLOW_NAME
@@ -38,9 +40,20 @@ export class TemporalWorkflowAdapter implements WorkflowPort {
   }
 
   async signal(id: string, signal: WorkflowSignal): Promise<void> {
-    if (signal.type !== "cancel") throw new DomainError("Workflow signal is not implemented in I3", "CAPABILITY_UNAVAILABLE");
+    if (
+      signal.type === "approval"
+      || (signal.type === "steer" && signal.mode !== "immediate")
+    ) {
+      throw new DomainError("Workflow signal capability is unavailable", "CAPABILITY_UNAVAILABLE");
+    }
     try {
-      await this.client.getHandle(id).signal(MISSION_CANCEL_SIGNAL);
+      if (signal.type === "cancel") {
+        await this.client.getHandle(id).signal(MISSION_CANCEL_SIGNAL);
+      } else if (signal.type === "resume") {
+        await this.client.getHandle(id).signal(MISSION_RESUME_SIGNAL);
+      } else {
+        await this.client.getHandle(id).signal(MISSION_STEER_SIGNAL, signal.text);
+      }
     } catch (error) {
       throw this.translateLookupError(error);
     }

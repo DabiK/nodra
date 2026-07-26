@@ -43,6 +43,13 @@
       "when": 1785055528387,
       "tag": "0005_workspace_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785058062789,
+      "tag": "0006_shocking_thing",
+      "breakpoints": true
     }
   ]
 }

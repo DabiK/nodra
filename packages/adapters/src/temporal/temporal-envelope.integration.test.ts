@@ -1,7 +1,14 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { DispatchWorkflowOutbox, GetHealth, StartMission, type RuntimeHealthProbe } from "@nodra/application";
+import {
+  DispatchWorkflowOutbox,
+  GetHealth,
+  ProviderProtocolIncompatibleError,
+  StartMission,
+  type ProviderPort,
+  type RuntimeHealthProbe
+} from "@nodra/application";
 import { asId } from "@nodra/domain";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
 import { Worker } from "@temporalio/worker";
@@ -13,6 +20,10 @@ import { SqliteHealthProbe } from "../sqlite/sqlite-health-probe.js";
 import { SqliteMissionExecutionRepository } from "../sqlite/sqlite-mission-execution-repository.js";
 import { SqliteMissionRepository } from "../sqlite/sqlite-mission-repository.js";
 import { SqliteRunWorkflowActivity } from "../sqlite/sqlite-run-workflow-activity.js";
+import { SqliteProviderCatalogRepository } from "../sqlite/sqlite-provider-catalog-repository.js";
+import { SqliteProviderRunStore } from "../sqlite/sqlite-provider-run-store.js";
+import type { SqliteProviderPermissionHandler } from "../sqlite/sqlite-provider-permission-handler.js";
+import { providerEvents } from "../sqlite/schema/provider-events.js";
 import { SqliteWorkflowOutboxStore } from "../sqlite/sqlite-workflow-outbox-store.js";
 import { workspaces } from "../sqlite/schema/core.js";
 import { conversations } from "../sqlite/schema/conversations.js";
@@ -108,7 +119,9 @@ describe.sequential("Temporal durable envelope", () => {
       workflowsPath,
       activities: {
         recordStarted: activities.recordStarted.bind(activities),
-        recordTerminal: activities.recordTerminal.bind(activities)
+        recordTerminal: activities.recordTerminal.bind(activities),
+        executeProvider: activities.executeProvider.bind(activities),
+        steerProvider: activities.steerProvider.bind(activities)
       }
     });
   };
@@ -247,5 +260,220 @@ describe.sequential("Temporal durable envelope", () => {
     expect(database.orm.select().from(workspaces).where(eq(workspaces.id, "workspace-normal")).get())
       .toMatchObject({ state: "ready" });
     expect(normalParent.workflowId).toBe("mission/normal");
+  }, 120_000);
+
+  it("runs a real provider Activity envelope and projects its persisted session, events, result and reported usage", async () => {
+    const missionId = "provider-success";
+    const incompatibleMissionId = "provider-incompatible";
+    seed(missionId);
+    seed(incompatibleMissionId);
+    for (const configuredMissionId of [missionId, incompatibleMissionId]) {
+      database.orm.update(missionAgentConfigs).set({
+        providerId: "codex",
+        modelId: "model-1",
+        reasoningEffort: "medium",
+        missionPrompt: "fixture provider work",
+        permissionPreset: "workspace"
+      }).where(eq(missionAgentConfigs.missionId, configuredMissionId)).run();
+    }
+    const catalog = new SqliteProviderCatalogRepository(database);
+    const available = { available: true, reason: null };
+    await catalog.save({
+      providerId: "codex",
+      adapterVersion: "fixture-v1",
+      binaryVersion: "codex_cli_rs/0.145.0",
+      authenticated: true,
+      authKind: "chatgpt",
+      health: { status: "ready", reason: null, actionRequired: null },
+      capabilities: {
+        schemaVersion: 1,
+        providerId: "codex",
+        version: "fixture-v1",
+        availability: available,
+        authentication: available,
+        models: available,
+        contract: {
+          ...available,
+          status: "certified",
+          expectedVersion: "fixture-v1",
+          currentVersion: "fixture-v1",
+          action: null
+        },
+        start: available,
+        events: available,
+        cancel: available,
+        resume: available,
+        steer: { ...available, mode: "immediate" },
+        usage: {
+          available: false,
+          reason: "usage_not_observed_by_explicit_probe",
+          kind: "none"
+        },
+        attachments: { available: false, reason: "not_fixture_proven" },
+        mcp: { available: false, reason: "not_fixture_proven" },
+        permissionInterception: available,
+        optionsSchemaVersion: 1
+      },
+      models: [{
+        id: "model-1",
+        displayName: "Model One",
+        description: "fixture",
+        hidden: false,
+        isDefault: true,
+        supportedReasoningEfforts: ["medium"],
+        defaultReasoningEffort: "medium"
+      }],
+      probedAt: "2026-07-22T12:01:00.000Z"
+    });
+    await new StartMission(
+      new SqliteMissionRepository(database),
+      new SqliteMissionExecutionRepository(database),
+      existingRuntime,
+      catalog
+    ).execute({
+      missionId: asId(missionId),
+      expectedVersion: 1,
+      runId: asId(`run-${missionId}`),
+      conversationId: asId(`conversation-${missionId}`),
+      auditId: asId(`audit-${missionId}`),
+      outboxId: asId(`outbox-${missionId}`),
+      context: { commandId: asId(`command-${missionId}`), actor: "user", occurredAt: now }
+    });
+    await new StartMission(
+      new SqliteMissionRepository(database),
+      new SqliteMissionExecutionRepository(database),
+      existingRuntime,
+      catalog
+    ).execute({
+      missionId: asId(incompatibleMissionId),
+      expectedVersion: 1,
+      runId: asId(`run-${incompatibleMissionId}`),
+      conversationId: asId(`conversation-${incompatibleMissionId}`),
+      auditId: asId(`audit-${incompatibleMissionId}`),
+      outboxId: asId(`outbox-${incompatibleMissionId}`),
+      context: {
+        commandId: asId(`command-${incompatibleMissionId}`),
+        actor: "user",
+        occurredAt: now
+      }
+    });
+    const provider: ProviderPort = {
+      providerId: "codex",
+      probe: async () => { throw new Error("probe must remain opt-in"); },
+      cancel: async () => undefined,
+      steer: async () => undefined,
+      execute: async (configuration, sink) => {
+        if (configuration.runId === `run-${incompatibleMissionId}`) {
+          await sink.event({
+            type: "provider/protocolIncompatible",
+            payload: {
+              code: "protocol_incompatible",
+              reason: "fixture_terminal_shape"
+            },
+            occurredAt: "2026-07-22T12:01:30.000Z"
+          });
+          throw new ProviderProtocolIncompatibleError(
+            "fixture_terminal_shape",
+            "codex",
+            "codex_cli_rs/0.146.0"
+          );
+        }
+        await sink.session("thr_integration");
+        await sink.runRef("turn_integration");
+        await sink.event({
+          type: "turn/started",
+          payload: { turn: { id: "turn_integration", status: "inProgress" } },
+          occurredAt: "2026-07-22T12:02:00.000Z"
+        });
+        await sink.event({
+          type: "thread/tokenUsage/updated",
+          payload: {
+            tokenUsage: {
+              total: {
+                inputTokens: 12,
+                outputTokens: 4,
+                cachedInputTokens: 3,
+                cacheWriteInputTokens: 0
+              }
+            }
+          },
+          occurredAt: "2026-07-22T12:02:01.000Z"
+        });
+        await sink.event({
+          type: "item/completed",
+          payload: { item: { id: "answer-1", type: "agentMessage", text: "finished" } },
+          occurredAt: "2026-07-22T12:02:02.000Z"
+        });
+        await sink.event({
+          type: "turn/completed",
+          payload: { turn: { id: "turn_integration", status: "completed" } },
+          occurredAt: "2026-07-22T12:02:03.000Z"
+        });
+        return {
+          state: "SUCCEEDED",
+          externalSessionId: "thr_integration",
+          externalRunId: "turn_integration"
+        };
+      }
+    };
+    const providerRuns = new SqliteProviderRunStore(database);
+    const activities = new TemporalRunActivities(
+      new SqliteRunWorkflowActivity(database),
+      provider,
+      providerRuns,
+      {} as SqliteProviderPermissionHandler,
+      catalog
+    );
+    const worker = await Worker.create({
+      connection: environment.nativeConnection,
+      namespace: "default",
+      taskQueue: MISSION_TASK_QUEUE,
+      workflowsPath,
+      activities: {
+        recordStarted: activities.recordStarted.bind(activities),
+        recordTerminal: activities.recordTerminal.bind(activities),
+        executeProvider: activities.executeProvider.bind(activities),
+        steerProvider: activities.steerProvider.bind(activities)
+      }
+    });
+    const adapter = new TemporalWorkflowAdapter(environment.client.workflow);
+    await worker.runUntil(async () => {
+      await new DispatchWorkflowOutbox(new SqliteWorkflowOutboxStore(database), adapter)
+        .execute({ limit: 10, occurredAt: now });
+      await Promise.all([
+        environment.client.workflow.getHandle(`mission/${missionId}`).result(),
+        environment.client.workflow.getHandle(`mission/${incompatibleMissionId}`).result()
+      ]);
+    });
+
+    expect(database.orm.select().from(conversations)
+      .where(eq(conversations.id, `conversation-${missionId}`)).get()).toMatchObject({
+      providerSessionRef: "thr_integration"
+    });
+    expect(database.orm.select().from(runs).where(eq(runs.id, `run-${missionId}`)).get()).toMatchObject({
+      state: "SUCCEEDED",
+      providerRunRef: "turn_integration",
+      usageKind: "reported",
+      inputTokens: 12,
+      outputTokens: 4,
+      cacheReadTokens: 3,
+      cacheWriteTokens: 0
+    });
+    expect(database.orm.select().from(providerEvents)
+      .where(eq(providerEvents.runId, `run-${missionId}`)).all().map((event) => event.sequence))
+      .toEqual([0, 1, 2, 3]);
+    expect(database.orm.select().from(workspaces)
+      .where(eq(workspaces.id, `workspace-${missionId}`)).get()).toMatchObject({ state: "ready" });
+    expect(database.orm.select().from(runs)
+      .where(eq(runs.id, `run-${incompatibleMissionId}`)).get()).toMatchObject({
+      state: "FAILED"
+    });
+    expect(database.orm.select().from(providerEvents)
+      .where(eq(providerEvents.runId, `run-${incompatibleMissionId}`)).all()).toHaveLength(1);
+    expect((await catalog.latest("codex"))?.health).toEqual({
+      status: "degraded",
+      reason: "protocol_incompatible",
+      actionRequired: "update_required"
+    });
   }, 120_000);
 });

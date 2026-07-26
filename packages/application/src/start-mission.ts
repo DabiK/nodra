@@ -3,6 +3,7 @@ import type { CommandContext } from "./command-context.js";
 import type { MissionExecutionRepository } from "./mission-execution-repository.js";
 import type { MissionRepository } from "./mission-repository.js";
 import type { RuntimeHealthProbe } from "./runtime-health-probe.js";
+import type { ProviderCatalogRepository } from "./provider-catalog-repository.js";
 
 export interface StartMissionCommand {
   missionId: Id;
@@ -27,7 +28,8 @@ export class StartMission {
   constructor(
     private readonly missions: MissionRepository,
     private readonly executions: MissionExecutionRepository,
-    private readonly runtime: RuntimeHealthProbe
+    private readonly runtime: RuntimeHealthProbe,
+    private readonly providers?: ProviderCatalogRepository
   ) {}
 
   async execute(command: StartMissionCommand): Promise<StartMissionResult> {
@@ -38,12 +40,76 @@ export class StartMission {
     }
 
     mission.startAgent(command.context.occurredAt);
-    await this.executions.validateStart(command.missionId);
+    const requestedProvider = await this.executions.validateStart(command.missionId);
     const runtime = await this.runtime.check();
     if (runtime.status !== "ok") {
       throw new DomainError("Temporal runtime is unavailable", "RUNTIME_UNHEALTHY");
     }
-
+    let providerCatalogSnapshot;
+    if (this.providers) {
+      if (!requestedProvider) {
+        throw new DomainError("Provider configuration could not be resolved", "CONFIG_RESOLUTION_FAILED");
+      }
+      providerCatalogSnapshot = await this.providers.latest(requestedProvider.providerId);
+      if (!providerCatalogSnapshot) {
+        throw new DomainError(
+          `Provider ${requestedProvider.providerId} has not been explicitly probed`,
+          "CAPABILITY_UNAVAILABLE"
+        );
+      }
+      if (!providerCatalogSnapshot.capabilities.start.available) {
+        throw new DomainError(
+          providerCatalogSnapshot.capabilities.start.reason ?? "Provider start is unavailable",
+          "CAPABILITY_UNAVAILABLE"
+        );
+      }
+      if (!providerCatalogSnapshot.models.some((model) => model.id === requestedProvider.modelId)) {
+        throw new DomainError(
+          `Model ${requestedProvider.modelId} was not returned by the provider probe`,
+          "CAPABILITY_UNAVAILABLE"
+        );
+      }
+      const model = providerCatalogSnapshot.models.find((candidate) => candidate.id === requestedProvider.modelId);
+      if (
+        requestedProvider.reasoningEffort
+        && requestedProvider.reasoningEffort !== "provider_default"
+        && !model?.supportedReasoningEfforts.includes(
+          requestedProvider.reasoningEffort as typeof model.supportedReasoningEfforts[number]
+        )
+      ) {
+        throw new DomainError(
+          `Reasoning effort ${requestedProvider.reasoningEffort} was not returned for ${requestedProvider.modelId}`,
+          "CAPABILITY_UNAVAILABLE"
+        );
+      }
+      let providerOptions: unknown;
+      try {
+        providerOptions = JSON.parse(requestedProvider.providerOptionsJson);
+      } catch {
+        throw new DomainError("Provider options JSON is invalid", "CONFIG_SCHEMA_UNSUPPORTED");
+      }
+      if (
+        requestedProvider.providerOptionsSchemaVersion !== providerCatalogSnapshot.capabilities.optionsSchemaVersion
+        || typeof providerOptions !== "object"
+        || providerOptions === null
+        || Array.isArray(providerOptions)
+        || Object.keys(providerOptions as Record<string, unknown>).length > 0
+      ) {
+        throw new DomainError("Provider options are unsupported by the capability snapshot", "CONFIG_SCHEMA_UNSUPPORTED");
+      }
+      if (requestedProvider.attachmentsRequested && !providerCatalogSnapshot.capabilities.attachments.available) {
+        throw new DomainError(
+          providerCatalogSnapshot.capabilities.attachments.reason ?? "Attachments are unavailable",
+          "CAPABILITY_UNAVAILABLE"
+        );
+      }
+      if (requestedProvider.mcpRequested && !providerCatalogSnapshot.capabilities.mcp.available) {
+        throw new DomainError(
+          providerCatalogSnapshot.capabilities.mcp.reason ?? "MCP is unavailable",
+          "CAPABILITY_UNAVAILABLE"
+        );
+      }
+    }
     const workflowId = `mission/${command.missionId}`;
     await this.executions.persistStart({
       mission,
@@ -53,7 +119,8 @@ export class StartMission {
       workflowId,
       auditId: command.auditId,
       outboxId: command.outboxId,
-      context: command.context
+      context: command.context,
+      ...(providerCatalogSnapshot ? { providerCatalogSnapshot } : {})
     });
     return {
       commandId: command.context.commandId,

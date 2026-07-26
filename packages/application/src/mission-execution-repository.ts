@@ -1,5 +1,6 @@
 import type { Id, Mission } from "@nodra/domain";
 import type { CommandContext } from "./command-context.js";
+import type { ProviderCatalogSnapshot } from "./provider-model.js";
 
 export interface PersistMissionStartInput {
   mission: Mission;
@@ -10,9 +11,18 @@ export interface PersistMissionStartInput {
   auditId: Id;
   outboxId: Id;
   context: CommandContext;
+  providerCatalogSnapshot?: ProviderCatalogSnapshot;
 }
 
 export interface MissionExecutionRepository {
-  validateStart(missionId: Id): Promise<void>;
+  validateStart(missionId: Id): Promise<void | {
+    providerId: string;
+    modelId: string;
+    reasoningEffort: string | null;
+    providerOptionsSchemaVersion: number;
+    providerOptionsJson: string;
+    attachmentsRequested: boolean;
+    mcpRequested: boolean;
+  }>;
   persistStart(input: PersistMissionStartInput): Promise<void>;
 }

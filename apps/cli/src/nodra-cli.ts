@@ -13,13 +13,14 @@ import type {
 import { ConfirmationRequiredError, DomainError, toId } from "@nodra/application";
 import { randomUUID } from "node:crypto";
 import type { I4Cli } from "./i4-cli.js";
+import type { I6Cli } from "./i6-cli.js";
 
 export interface CliOutput {
   write(value: string): void;
 }
 
 const usage =
-  "Usage: nodra <health|mission:*|relay|temporal:*|evidence:*|gate:*|approval:*|delivery:*|workspace:*|confirmation:*>";
+  "Usage: nodra <health|mission:*|relay|temporal:*|run:*|provider:*|evidence:*|gate:*|approval:*|delivery:*|workspace:*|confirmation:*>";
 
 export class NodraCli {
   constructor(
@@ -33,7 +34,8 @@ export class NodraCli {
     private readonly dispatchWorkflowOutbox: DispatchWorkflowOutbox,
     private readonly reconcileWorkflows: ReconcileWorkflows,
     private readonly output: CliOutput,
-    private readonly i4?: I4Cli
+    private readonly i4?: I4Cli,
+    private readonly i6?: I6Cli
   ) {}
 
   async run(arguments_: readonly string[]): Promise<number> {
@@ -75,6 +77,10 @@ export class NodraCli {
     }
     if (command && this.i4) {
       const result = await this.i4.execute(command, parameters);
+      if (result !== undefined) return this.write(result);
+    }
+    if (command && this.i6) {
+      const result = await this.i6.execute(command, parameters);
       if (result !== undefined) return this.write(result);
     }
     if (command?.startsWith("mission:")) return this.transition(command.slice("mission:".length), parameters);

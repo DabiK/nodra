@@ -1,0 +1,4 @@
+{"direction":"server","message":{"method":"item/commandExecution/requestApproval","id":62,"params":{"threadId":"thr_fixture","turnId":"turn_fixture","itemId":"command_1","startedAtMs":1,"environmentId":"local","reason":"run fixture","command":"npm test","cwd":"/workspace","commandActions":[]}}}
+{"direction":"client","message":{"id":62,"result":{"decision":"accept"}}}
+{"direction":"server","message":{"method":"item/fileChange/requestApproval","id":63,"params":{"threadId":"thr_fixture","turnId":"turn_fixture","itemId":"patch_1","startedAtMs":1,"reason":"apply fixture"}}}
+{"direction":"client","message":{"id":63,"result":{"decision":"accept"}}}

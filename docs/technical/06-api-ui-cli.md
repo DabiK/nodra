@@ -13,7 +13,7 @@ NestJS utilise `NestExpressApplication`; REST/JSON valide les DTO à la frontiè
 | `POST /api/missions/:id/dependencies` | créer/supprimer dépendance avec contrôle de cycle |
 | `GET` / `POST` / `PUT /api/managers` | manager first-class, configuration, instruction/brief versionnés et supervision |
 | `POST /api/managers/:id/start` / `preview` | composition global→instruction→brief, sans fake mission |
-| `POST /api/runs/:id/steer` / `cancel` / `retry` | Update/Signal, `202` |
+| `POST /api/runs/:id/steer` / `cancel` / `resume` / `retry` | Update/Signal, `202`; `resume` réutilise obligatoirement la session externe persistée |
 | `GET /api/relay`, `/missions/:id`, `/projects` | projections SQLite |
 | `GET /api/runs/:id/events` | SSE `id: sequence`, reprise `Last-Event-ID` |
 | `GET /api/runs/:id/config-snapshot` | snapshot immuable complet, secrets redacted |
@@ -31,7 +31,8 @@ NestJS utilise `NestExpressApplication`; REST/JSON valide les DTO à la frontiè
 | `GET /api/search?q=` | FTS titres/briefs/messages admis, jamais secrets/logs bruts |
 | `GET /api/audit` | historique métier append-only, filtres agrégat/commande |
 | `POST /api/relay/:id/{read,snooze,resolve}` | état d'attention persistant |
-| `GET /api/providers/capabilities` | snapshot réel par provider |
+| `GET /api/providers/capabilities` / `GET /api/providers/:providerId/health` | dernier snapshot réel; aucune sonde ou dépense implicite |
+| `POST /api/providers/:providerId/probe` | probe processus explicite avec `{optIn:true}`, sans thread ni turn |
 | `POST /api/runtime/temporal/{start,stop,update}` | confirmation sensible, état superviseur |
 
 La prévisualisation répond `{resolved, provenance, requested, capabilities, blockingErrors}`. Chaque valeur de `resolved` porte `project|mission|launch`; provider/modèle/réflexion, permissions, budget, workspace, MCP et attachments sont inspectables avant le bouton Lancer. L'UI affiche un résumé contrôlable et le diff avec le défaut projet, jamais une valeur secrète. Après lancement, la vue d'audit montre uniquement le snapshot du run, ses digests et l'origine historique — pas la configuration mutable actuelle. SSE est un canal de projection : événements persistés `provider_event` ou domaine, jamais la source d'une commande. Message : `{id,type,occurredAt,aggregateId,sequence,payload}`. Reconnexion relit SQLite depuis sequence; si gap purgé, client recharge l'endpoint ressource. Auth absente en V1, mais bind loopback, Origin contrôlé et token local éphémère de CLI pour éviter un autre processus local non autorisé.

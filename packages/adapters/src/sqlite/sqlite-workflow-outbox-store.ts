@@ -11,6 +11,7 @@ interface StartPayload {
   missionId: string;
   commandId: string;
   runId: string;
+  executeProvider?: boolean;
 }
 
 export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
@@ -35,7 +36,8 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
             missionId: asId(payload.missionId),
             commandId: asId(payload.commandId),
             runId: asId(payload.runId),
-            schemaVersion: 1
+            schemaVersion: 1,
+            executeProvider: payload.executeProvider === true
           }
         };
       });
@@ -71,7 +73,8 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
       candidate.schemaVersion !== 1 ||
       typeof candidate.missionId !== "string" || candidate.missionId.trim() === "" ||
       typeof candidate.commandId !== "string" || candidate.commandId.trim() === "" ||
-      typeof candidate.runId !== "string" || candidate.runId.trim() === ""
+      typeof candidate.runId !== "string" || candidate.runId.trim() === "" ||
+      (candidate.executeProvider !== undefined && typeof candidate.executeProvider !== "boolean")
     ) {
       throw new DomainError("Workflow outbox payload is unsupported", "OUTBOX_PAYLOAD_INVALID");
     }

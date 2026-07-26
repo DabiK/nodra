@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
   ContentAddressedBlobStore,
+  CodexProviderAdapter,
   LazyTemporalConnection,
   LazyTemporalWorkflowAdapter,
   LocalCommandObservationAdapter,
@@ -17,6 +18,8 @@ import {
   SqliteMissionReadModel,
   SqliteMissionRepository,
   SqliteMissionExecutionRepository,
+  SqliteProviderCatalogRepository,
+  SqliteRunControlRepository,
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
   SqliteWorkspaceDeletionReservation,
@@ -25,6 +28,7 @@ import {
 } from "@nodra/adapters";
 import {
   ChangeMissionState,
+  CancelRun,
   CommitWorkspace,
   CollectEvidence,
   CreateMission,
@@ -32,6 +36,7 @@ import {
   DeleteWorkspace,
   DispatchWorkflowOutbox,
   GetHealth,
+  GetProviderStatus,
   GetRelay,
   ListMissions,
   ManageApprovals,
@@ -40,10 +45,13 @@ import {
   ManageGates,
   ReadEvidence,
   ReadWorkspace,
+  ResumeRun,
   ReconcileWorkflows,
   ShowMission,
   SnapshotWorkspace,
   StartMission,
+  SteerRun,
+  ProbeProvider,
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
   RestoreWorkspace
@@ -57,6 +65,7 @@ import { ApprovalCli } from "./approval-cli.js";
 import { DeliveryCli } from "./delivery-cli.js";
 import { ConfirmationCli } from "./confirmation-cli.js";
 import { WorkspaceCli } from "./workspace-cli.js";
+import { I6Cli } from "./i6-cli.js";
 
 export const runCli = async (
   arguments_: readonly string[],
@@ -81,6 +90,9 @@ export const runCli = async (
     const workspace = new LocalWorkspaceAdapter(`${dataRoot}/workspaces`);
     await workspace.initialize();
     const workspaceRepository = new SqliteWorkspaceRepository(database);
+    const provider = new CodexProviderAdapter();
+    const providerCatalog = new SqliteProviderCatalogRepository(database);
+    const workflow = new LazyTemporalWorkflowAdapter(temporal);
     const confirmations = new ManageConfirmations(new SqliteConfirmationRepository(database), workspace);
     const cli = new NodraCli(
       new GetHealth(new SqliteHealthProbe(database), temporal),
@@ -89,14 +101,14 @@ export const runCli = async (
       new ListMissions(readModel),
       new ShowMission(readModel),
       new GetRelay(readModel),
-      new StartMission(repository, new SqliteMissionExecutionRepository(database), temporal),
+      new StartMission(repository, new SqliteMissionExecutionRepository(database), temporal, providerCatalog),
       new DispatchWorkflowOutbox(
         new SqliteWorkflowOutboxStore(database),
-        new LazyTemporalWorkflowAdapter(temporal)
+        workflow
       ),
       new ReconcileWorkflows(
         new SqliteWorkflowReconciliationStore(database),
-        new LazyTemporalWorkflowAdapter(temporal)
+        workflow
       ),
       new ConsoleOutput(),
       new I4Cli([
@@ -118,7 +130,14 @@ export const runCli = async (
           ),
           new RestoreWorkspace(workspaceRepository, workspace)
         )
-      ])
+      ]),
+      new I6Cli(
+        new GetProviderStatus(providerCatalog),
+        new ProbeProvider(provider, providerCatalog),
+        new CancelRun(new SqliteRunControlRepository(database), workflow),
+        new ResumeRun(new SqliteRunControlRepository(database), workflow),
+        new SteerRun(new SqliteRunControlRepository(database), workflow)
+      )
     );
     return await cli.run(arguments_);
   } finally {

@@ -5,10 +5,12 @@ export interface StartMissionInput {
   commandId: Id;
   runId: Id;
   schemaVersion: 1;
+  executeProvider?: boolean;
 }
 
 export type WorkflowSignal =
   | { type: "cancel" }
+  | { type: "resume" }
   | { type: "steer"; text: string; mode: "immediate" | "enqueue" }
   | { type: "approval"; approvalId: Id; decision: "approved" | "denied" };
 

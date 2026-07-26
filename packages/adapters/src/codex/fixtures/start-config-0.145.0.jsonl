@@ -1,0 +1,2 @@
+{"direction":"client","message":{"method":"thread/start","id":2,"params":{"model":"model-1","cwd":"/workspace","approvalPolicy":"on-request","approvalsReviewer":"user","sandbox":"workspace-write"}}}
+{"direction":"client","message":{"method":"turn/start","id":3,"params":{"threadId":"thr_fixture","clientUserMessageId":"run-1/prompt","input":[{"type":"text","text":"work"}],"cwd":"/workspace","model":"model-1","effort":"medium"}}}

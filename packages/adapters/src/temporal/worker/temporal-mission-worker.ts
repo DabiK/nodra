@@ -26,7 +26,9 @@ export class TemporalMissionWorker {
       workflowsPath: this.options.workflowsPath,
       activities: {
         recordStarted: this.activities.recordStarted.bind(this.activities),
-        recordTerminal: this.activities.recordTerminal.bind(this.activities)
+        recordTerminal: this.activities.recordTerminal.bind(this.activities),
+        executeProvider: this.activities.executeProvider.bind(this.activities),
+        steerProvider: this.activities.steerProvider.bind(this.activities)
       }
     });
     await this.worker.run();
