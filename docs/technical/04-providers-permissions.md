@@ -16,6 +16,10 @@ type ProviderEvent = {sequence:number; type:string; payload:unknown; occurredAt:
 
 Chaque capacité est découverte, versionnée et conservée au lancement; UI désactive une action absente en indiquant la raison. `usage:none` n'est jamais remplacé par une valeur inventée; la limite porte alors sur unités configurées/temps, marquées estimées.
 
+### Frontière anti-couplage provider
+
+`mission`, `manager`, `conversation` et `run` ne portent aucun champ nommé d'après un provider (`codexPrompt`, `codexProfile`, etc.). Le domaine connaît seulement un prompt, une sélection `providerId`/`modelId`, un niveau de raisonnement générique et un `providerOptions` versionné/opaque. Le catalogue de profils, la validation du schéma d'options, les identifiants de session et les détails de protocole appartiennent à l'adaptateur du provider et à son snapshot de run, jamais au modèle de tâche mutable. L'ajout ou le retrait d'un provider ne requiert donc ni colonne, ni endpoint, ni règle métier spécifique à ce provider.
+
 ## Configuration mutable, résolution et snapshot
 
 Une mission `human` ne possède pas de `mission_agent_config` et ne peut pas lancer de provider. Une mission `agent` a une configuration éditable tant qu'aucun lancement n'est en cours. Un `manager` distinct porte sa propre configuration et ses instructions/briefs versionnés. Une édition n'altère jamais un run existant.
