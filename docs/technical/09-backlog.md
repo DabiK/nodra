@@ -10,4 +10,10 @@
 8. **Pipelines/manager/budgets** — dependencies, child workflows, policies; critères : retry ciblé et confirmation dépassement.
 9. **Packaging/recovery** — runtime temporal, backup/restore/update; critères : matrice OS POC satisfaite.
 
+## Dette technique planifiée — frontière HTTP Nest
+
+La fondation et I2–I5 utilisent encore `@Body() value: unknown` puis des helpers impératifs (`objectBody`, `assertKeys`, conversions manuelles) dans les contrôleurs Nest. Cette validation reste correctement cantonnée à la frontière HTTP et les use cases ne doivent pas être modifiés pour cette dette, mais elle duplique les règles et rend les contrats moins lisibles.
+
+Avant d'étendre substantiellement l'API (providers/pipelines), remplacer ce mécanisme par des DTO par endpoint, classes dédiées et `ValidationPipe` global Nest (`whitelist`, `forbidNonWhitelisted`, transformation explicite). Les DTO portent les validations de forme et d'énumération; les règles métier, autorisations, canonicalisation et contrôles de concurrence restent dans l'application. Ajouter des tests de rejet homogènes `application/problem+json` et supprimer `http-validation.ts` seulement après migration complète.
+
 Chaque tranche inclut migration, API/CLI/UI, tests et observabilité; aucun lot horizontal provider avant les fondamentaux de cohérence.
