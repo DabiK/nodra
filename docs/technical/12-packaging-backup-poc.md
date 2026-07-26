@@ -39,7 +39,9 @@ Backup cohérent : mode maintenance (nouveaux starts refusés), attendre ou sign
 
 ## Spécification du POC (seul dossier autorisable ultérieurement : `poc/temporal/`)
 
-Précondition : gate humain + ADR-004/005/008/010. Le POC est isolé, sans import MVP ni modification de Nodra application. Il teste :
+Le harness I6.2 placé dans `poc/temporal/` est une validation de développement pré-I7 : binaire déjà installé, `start-dev`, vrai worker, provider déterministe, idempotence et reprise. Il ne satisfait pas à lui seul la matrice packaging/recovery I10 ci-dessous.
+
+Précondition : gate humain + ADR-004/005/008/010. Le POC I10 est isolé, sans import MVP ni modification de Nodra application. Il teste :
 
 1. installer un runtime piné avec checksum sur macOS arm64/x64, Linux x64/arm64, Windows x64; démarrer et arrêter sans admin, ports auto, health/logs;
 2. persister un Workflow, arrêter brutalement Nodra/worker puis reprendre sans perte et sans duplication Activity marquée idempotente;
