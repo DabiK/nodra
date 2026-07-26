@@ -1,0 +1,38 @@
+# Référence I6 — Codex app-server (Context7)
+
+Date : 26 juillet 2026. Cette note est une aide d'implémentation pour I6, pas un contrat métier : le contrat Nodra reste `04-providers-permissions.md`. Source Context7 résolue : `/openai/codex`, issue du README app-server OpenAI. Complément officiel : <https://learn.chatgpt.com/docs/app-server>.
+
+## Transport et handshake
+
+- Utiliser `codex app-server` sur **stdio** : une requête JSON-RPC par ligne JSONL. Ne pas parser la sortie d'un CLI ni employer WebSocket, qui est expérimental.
+- Envoyer exactement une requête `initialize` après ouverture du transport, puis la notification `initialized`. Toute requête antérieure est rejetée.
+- Identifier Nodra dans `clientInfo`; ne demander `experimentalApi` que pour une capacité explicitement nécessaire et isolée.
+- Les schémas changent avec la version Codex. Le serveur peut générer les artefacts compatibles : `codex app-server generate-ts --out …` ou `generate-json-schema --out …`. I6 doit conserver la version observée du binaire/capacités avec le probe et ne jamais deviner un champ.
+
+## Séquence nominale
+
+1. Probe explicite : démarrer le processus, handshake, `account/read` et `model/list`, puis arrêter. Le probe ne crée ni thread ni turn.
+2. Pour une mission : `thread/start` avec la configuration résolue, ou `thread/resume` avec l'identifiant externe Nodra déjà persisté.
+3. Envoyer `turn/start` avec `threadId` et l'input textuel. Les overrides de modèle, `cwd` et sandbox/permissions appartiennent à l'adaptateur et doivent venir du snapshot de run.
+4. Consommer les notifications jusqu'à `turn/completed`. Persister les événements Nodra dans l'ordre; `item/completed` est l'état final autoritatif d'un item.
+5. Annuler uniquement par `turn/interrupt`; reprendre seulement par `thread/resume` de la session externe connue; `turn/steer` est disponible pour un tour actif.
+
+## Événements et données à conserver
+
+- Notifications de base : `turn/started`, `item/started`, `item/completed`, `item/agentMessage/delta`, `turn/completed`.
+- `turn/completed` indique notamment `completed`, `interrupted` ou `failed`. Une erreur doit devenir un résultat/provider event explicite, jamais un succès implicite.
+- `model/list` expose le modèle, les efforts de raisonnement supportés, valeur par défaut et modalités d'entrée. Ne rendre disponible qu'une valeur réellement renvoyée par le binaire.
+- L'usage ne doit être persisté que lorsqu'un payload le rapporte réellement (`turn/completed`/événement documenté); sinon `usage:none` reste visible.
+- Les items peuvent représenter messages, commandes, changements de fichiers et appels MCP. Les logs/preuves Nodra doivent appliquer la politique de redaction existante : aucun token, secret ni valeur d'environnement.
+
+## Permissions, MCP et pièces jointes
+
+- `item/permissions/requestApproval` est une **requête serveur → client** JSON-RPC. Elle inclut thread, turn, item, `cwd`, raison et sous-ensemble de permissions demandé.
+- I6 doit traduire cette requête en confirmation Nodra exacte, afficher la cible/risk, et répondre au serveur seulement après décision humaine. Ne jamais répondre par une approbation générale ou persistante sans une nouvelle confirmation Nodra compatible.
+- MCP, pièces jointes, options avancées et permissions par profil sont capability-gated. Si la forme app-server exacte n'est pas validée par un fixture et la version probée, déclarer la capability indisponible avec raison; ne pas créer de fallback ou de fausse prise en charge.
+
+## Tests attendus
+
+- Fixture JSONL : handshake et ordre des requêtes, modèle, nouveau thread, reprise, stream d'items, succès, erreur, interruption et steer.
+- Tests négatifs : JSON malformé, réponse corrélée inconnue, fermeture de processus, notification inattendue, capability absente et aucune auto-approbation.
+- Le seul test qui appelle un vrai `codex app-server` est opt-in. La suite standard ne dépend ni d'un login Codex, ni d'une consommation de tokens.
