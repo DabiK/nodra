@@ -110,4 +110,5 @@ notifications comme événements et valide seulement le consumer contract
 effectivement utilisé. Une rupture de ce contrat devient
 `protocol_incompatible`; le run échoue, le health passe `incompatible` et les
 nouveaux starts Codex sont refusés. Le diff structurel automatique complet des
-schémas exportés est hors I6 et prévu pour I6.1.
+schémas exportés reste hors I6/I6.1 et relève d'un futur incrément de
+recertification.

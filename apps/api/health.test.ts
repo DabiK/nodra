@@ -26,8 +26,10 @@ describe("GET /health", () => {
             detail: "Temporal runtime is unavailable"
           },
           providers: {
-            status: "disabled",
-            detail: "Provider runtimes are deliberately absent from this increment"
+            providerId: "codex",
+            status: "unconfigured",
+            reason: "no_explicit_probe",
+            action: null
           }
         }
       });

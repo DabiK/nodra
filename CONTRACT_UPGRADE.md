@@ -68,7 +68,8 @@ disponible.
    sont tolérés et conservés comme données brutes ou warnings lorsqu'utile.
    Une rupture utilisée produit `protocol_incompatible`, préserve les événements,
    échoue le run et marque le health `incompatible`. Un diff structurel
-   automatique exhaustif des schémas est reporté à I6.1.
+   automatique exhaustif des schémas reste un incrément de recertification
+   futur; I6.1 n'ajoute aucun JSON Schema dynamique.
 
 5. Modifier seulement ce qui est prouvé par l'export et une fixture
    déterministe. Mettre à jour l'adaptateur Codex, les fixtures, leurs tests et

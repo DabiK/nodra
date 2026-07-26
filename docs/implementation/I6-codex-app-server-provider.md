@@ -49,6 +49,37 @@ l'appel au sink SQLite. Une écriture lente ne peut donc pas laisser une
 notification ultérieure obtenir une séquence antérieure. La terminaison vient
 exclusivement de `turn/completed`.
 
+## I6.1 — Smoke app-server explicite
+
+Le diagnostic CLI suivant est distinct du domaine mission/run et de
+l'orchestration Temporal :
+
+```text
+nodra provider:smoke codex --allow-turn --model gpt-5.4-mini --effort low
+```
+
+`--allow-turn` est obligatoire car le smoke crée réellement un thread et un
+tour Codex. Sans ce flag, aucune méthode de création n'est appelée. Le modèle
+est obligatoire; l'effort est optionnel. Toute valeur fournie doit exister dans
+le dernier snapshot persistant du probe pour ce modèle, sans fallback. En
+l'absence d'effort, le champ app-server est omis et le résultat indique
+`provider_default`.
+
+La commande passe par `ProviderPort.execute`, sans mission, run métier,
+conversation, agent-config, outbox ou workflow Temporal. Elle crée un dossier
+temporaire vide sous `NODRA_DATA_ROOT`, le supprime en sortie et applique le
+preset provider-neutral `read_only`. Le prompt demande exactement
+`NODRA_SMOKE_OK` et interdit les outils. Une demande de permission ou un
+événement d'activité outil fait échouer le diagnostic.
+
+Le smoke attend un terminal provider, exige `SUCCEEDED`, puis vérifie
+`NODRA_SMOKE_OK` comme message assistant complet. Sa sortie JSON redacted
+contient seulement `provider`, `model`, `effort`, `terminalState`, le message
+tronqué et une liste bornée de types d'événements utiles. Les références
+externes de thread/tour et les payloads bruts restent en mémoire et ne sont pas
+persistés. Une absence de terminal, une rupture de protocole ou un marqueur
+incorrect produit une erreur stable et explicite.
+
 ## Probe et capacités
 
 Le probe réel exige un opt-in explicite :
@@ -76,6 +107,14 @@ Pièces jointes et MCP restent indisponibles avec une raison explicite.
 événement `thread/tokenUsage/updated` effectivement reçu avec des compteurs
 valides fait passer la projection du run à `reported`.
 
+Le health global ne lance jamais de probe ou de processus provider. Il projette
+uniquement le dernier snapshot déjà persistant sous une forme provider-neutral :
+`ok`, `degraded` ou `unconfigured`, avec `reason` et `action`. Sans snapshot,
+il rend `unconfigured/no_explicit_probe`. Un contrat
+`compatible_unverified` rend `degraded/update_required`. Cette projection ne
+masque pas Temporal : un runtime Temporal absent reste
+`workflow.status=error` avec `Temporal runtime is unavailable`.
+
 ## Permissions humaines
 
 Les requêtes serveur stables
@@ -97,8 +136,9 @@ reviewer automatique.
   `POST /api/providers/:providerId/probe`,
   `POST /api/runs/:id/{cancel,resume,steer}`.
 - CLI : `provider:health`, `provider:capabilities`,
-  `provider:probe codex --allow-process`, `run:cancel`, `run:resume`,
-  `run:steer`.
+  `provider:probe codex --allow-process`,
+  `provider:smoke codex --allow-turn --model <modelId> [--effort <effort>]`,
+  `run:cancel`, `run:resume`, `run:steer`.
 - Le lancement reste la commande mission existante et exige désormais un
   snapshot de probe compatible pour une mission agent.
 
@@ -107,3 +147,12 @@ usage reçu, terminaison, reprise, steer, interruption et permissions. Les tests
 de client couvrent aussi réponse non corrélée, JSON malformé, erreur distante et
 arrêt de processus. Le test qui lance le vrai binaire est ignoré sauf si
 `NODRA_TEST_REAL_CODEX_PROBE=1`.
+
+Le test de tour réel I6.1 est lui aussi ignoré par défaut. Il consomme
+volontairement un tour réel `gpt-5.4-mini` avec effort `low` :
+
+```text
+NODRA_TEST_REAL_CODEX_TURN=1 npx vitest run apps/cli/src/provider-smoke-real.test.ts
+```
+
+Ne pas l'inclure dans une boucle ni une suite CI automatique.

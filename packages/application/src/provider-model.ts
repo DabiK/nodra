@@ -96,6 +96,8 @@ export interface ProviderEventInput {
   type: string;
   payload: unknown;
   occurredAt: string;
+  assistantMessage?: string;
+  toolActivity?: boolean;
 }
 
 export interface ProviderPermissionRequest {
@@ -118,4 +120,13 @@ export interface ProviderExecutionResult {
   state: "SUCCEEDED" | "FAILED" | "CANCELLED";
   externalSessionId: string;
   externalRunId: string;
+}
+
+export interface ProviderSmokeResult {
+  provider: string;
+  model: string;
+  effort: ProviderReasoningEffort;
+  terminalState: ProviderExecutionResult["state"];
+  message: string;
+  events: string[];
 }

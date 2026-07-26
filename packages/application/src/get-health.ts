@@ -1,4 +1,8 @@
 import type { HealthProbe } from "./health-probe.js";
+import type {
+  ProviderComponentHealth,
+  ProviderHealthProbe
+} from "./provider-health-probe.js";
 import type { RuntimeHealthProbe } from "./runtime-health-probe.js";
 
 export interface HealthReport {
@@ -7,28 +11,37 @@ export interface HealthReport {
   components: {
     sqlite: { status: "ok" | "error"; detail?: string };
     workflow: { status: "ok" | "error"; detail?: string };
-    providers: { status: "disabled"; detail: string };
+    providers: ProviderComponentHealth;
   };
 }
 
 export class GetHealth {
   constructor(
     private readonly database: HealthProbe,
-    private readonly workflow: RuntimeHealthProbe
+    private readonly workflow: RuntimeHealthProbe,
+    private readonly providers?: ProviderHealthProbe
   ) {}
 
   async execute(): Promise<HealthReport> {
-    const [sqlite, workflow] = await Promise.all([this.database.check(), this.workflow.check()]);
+    const [sqlite, workflow, providers] = await Promise.all([
+      this.database.check(),
+      this.workflow.check(),
+      this.providers?.check() ?? Promise.resolve({
+        providerId: "unconfigured",
+        status: "unconfigured" as const,
+        reason: "no_explicit_probe",
+        action: null
+      })
+    ]);
     return {
       service: "nodra",
-      status: sqlite.status === "ok" && workflow.status === "ok" ? "ok" : "degraded",
+      status: sqlite.status === "ok" && workflow.status === "ok" && providers.status === "ok"
+        ? "ok"
+        : "degraded",
       components: {
         sqlite,
         workflow,
-        providers: {
-          status: "disabled",
-          detail: "Provider runtimes are deliberately absent from this increment"
-        }
+        providers
       }
     };
   }

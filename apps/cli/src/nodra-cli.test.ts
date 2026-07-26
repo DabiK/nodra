@@ -10,6 +10,7 @@ import {
   SqliteMissionReadModel,
   SqliteMissionRepository,
   SqliteMissionExecutionRepository,
+  SqliteProviderCatalogRepository,
   SqliteWorkflowOutboxStore,
   SqliteWorkflowReconciliationStore,
   UnavailableWorkflowAdapter
@@ -18,6 +19,7 @@ import {
 } from "@nodra/adapters";
 import {
   ChangeMissionState,
+  CatalogProviderHealthProbe,
   CreateMission,
   DispatchWorkflowOutbox,
   GetHealth,
@@ -74,7 +76,11 @@ describe("NodraCli", () => {
     const evidence = new SqliteEvidenceRepository(database); const git = new ReadOnlyGitObservationAdapter(); const blobs = new ContentAddressedBlobStore(directory);
     const gates = new ManageGates(new SqliteGateRepository(database), evidence, blobs, new StructuredGateEvaluatorRegistry(), git);
     cli = new NodraCli(
-      new GetHealth(new SqliteHealthProbe(database), { check: async () => ({ status: "ok" }) }),
+      new GetHealth(
+        new SqliteHealthProbe(database),
+        { check: async () => ({ status: "ok" }) },
+        new CatalogProviderHealthProbe(new SqliteProviderCatalogRepository(database), "codex")
+      ),
       new CreateMission(repository),
       new ChangeMissionState(repository),
       new ListMissions(readModel),
@@ -94,7 +100,60 @@ describe("NodraCli", () => {
 
   it("runs the shared health use case", async () => {
     expect(await cli.run(["health"])).toBe(0);
-    expect(output.lastJson()).toMatchObject({ service: "nodra", status: "ok" });
+    expect(output.lastJson()).toEqual({
+      service: "nodra",
+      status: "degraded",
+      components: {
+        sqlite: { status: "ok" },
+        workflow: { status: "ok" },
+        providers: {
+          providerId: "codex",
+          status: "unconfigured",
+          reason: "no_explicit_probe",
+          action: null
+        }
+      }
+    });
+  });
+
+  it("reads a persisted compatible provider snapshot in CLI health without probing", async () => {
+    await new SqliteProviderCatalogRepository(database).save({
+      providerId: "codex",
+      adapterVersion: "codex-app-server-stdio-v1",
+      binaryVersion: "codex_cli_rs/future",
+      authenticated: true,
+      authKind: "chatgpt",
+      health: {
+        status: "degraded",
+        reason: "codex_binary_version_not_certified",
+        actionRequired: "update_required"
+      },
+      capabilities: {
+        availability: { available: true, reason: null },
+        authentication: { available: true, reason: null },
+        models: { available: true, reason: null },
+        contract: {
+          status: "compatible_unverified",
+          reason: "codex_binary_version_not_certified"
+        }
+      },
+      models: [],
+      probedAt: "2026-07-26T10:00:00.000Z"
+    } as never);
+
+    expect(await cli.run(["health"])).toBe(0);
+    expect(output.lastJson()).toMatchObject({
+      status: "degraded",
+      components: {
+        workflow: { status: "ok" },
+        providers: {
+          providerId: "codex",
+          status: "degraded",
+          reason: "codex_binary_version_not_certified",
+          action: "update_required"
+        }
+      }
+    });
   });
 
   it("drives the primary human flow and exposes list, show and Relay", async () => {

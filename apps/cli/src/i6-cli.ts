@@ -6,6 +6,7 @@ import type {
   SteerRun
 } from "@nodra/application";
 import { toId } from "@nodra/application";
+import type { ProviderSmokeCli } from "./provider-smoke-cli.js";
 
 export class I6Cli {
   constructor(
@@ -13,7 +14,8 @@ export class I6Cli {
     private readonly probe: ProbeProvider,
     private readonly cancel: CancelRun,
     private readonly resume: ResumeRun,
-    private readonly steer: SteerRun
+    private readonly steer: SteerRun,
+    private readonly smoke?: ProviderSmokeCli
   ) {}
 
   async execute(command: string, parameters: readonly string[]): Promise<unknown | undefined> {
@@ -26,6 +28,9 @@ export class I6Cli {
         return undefined;
       }
       return this.probe.execute({ providerId: "codex", optIn: true });
+    }
+    if (command === "provider:smoke" && this.smoke) {
+      return this.smoke.execute(command, parameters);
     }
     if (command === "run:cancel" && parameters.length === 1 && parameters[0]) {
       return this.cancel.execute(toId(parameters[0]));

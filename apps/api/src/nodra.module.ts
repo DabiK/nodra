@@ -31,6 +31,7 @@ import {
 import {
   ChangeMissionState,
   CancelRun,
+  CatalogProviderHealthProbe,
   CommitWorkspace,
   CollectEvidence,
   CreateMission,
@@ -257,9 +258,16 @@ export class NodraModule {
         },
         {
           provide: GET_HEALTH,
-          inject: [DATABASE, TEMPORAL_CONNECTION],
-          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection) =>
-            new GetHealth(new SqliteHealthProbe(database), temporal)
+          inject: [DATABASE, TEMPORAL_CONNECTION, PROVIDER_CATALOG],
+          useFactory: (
+            database: NodraSqliteDatabase,
+            temporal: LazyTemporalConnection,
+            catalog: SqliteProviderCatalogRepository
+          ) => new GetHealth(
+            new SqliteHealthProbe(database),
+            temporal,
+            new CatalogProviderHealthProbe(catalog, "codex")
+          )
         },
         {
           provide: START_MISSION,

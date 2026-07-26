@@ -22,4 +22,18 @@ Les contrôleurs et DTO Nest sont actuellement des fichiers correctement petits,
 
 Cette dette est un déplacement mécanique sans modification de contrat HTTP, de use case, de base SQLite ni de comportement. La réaliser dans un commit dédié après mise à jour des imports et des tests, avec typecheck, lint, suite complète, build et `git diff --check`.
 
+## Dette technique planifiée — résolution runtime multi-provider
+
+`ProviderPort`, le catalogue et les snapshots restent provider-neutral, mais le
+wiring I6 injecte encore explicitement `CodexProviderAdapter` dans
+`NodraModule`, la CLI et `TemporalRunActivities`. Avant d'implémenter OpenCode,
+introduire un `ProviderRegistry`/resolver par `providerId` pour sélectionner
+l'adaptateur au runtime et injecter le bon provider dans le worker.
+
+L'adaptateur OpenCode utilisera son serveur HTTP local décrit par OpenAPI, ses
+événements SSE, ses sessions, son catalogue de providers/modèles et son
+protocole de permissions. Aucun nom de méthode, DTO, événement ou invariant
+spécifique à Codex ou OpenCode ne doit entrer dans `packages/application` ou
+`packages/domain`. Cette note ne fait pas partie de l'implémentation I6.1.
+
 Chaque tranche inclut migration, API/CLI/UI, tests et observabilité; aucun lot horizontal provider avant les fondamentaux de cohérence.

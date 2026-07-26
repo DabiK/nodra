@@ -35,6 +35,7 @@ import {
   CreateWorkspace,
   DeleteWorkspace,
   DispatchWorkflowOutbox,
+  CatalogProviderHealthProbe,
   GetHealth,
   GetProviderStatus,
   GetRelay,
@@ -52,6 +53,7 @@ import {
   StartMission,
   SteerRun,
   ProbeProvider,
+  SmokeProvider,
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
   RestoreWorkspace
@@ -66,6 +68,7 @@ import { DeliveryCli } from "./delivery-cli.js";
 import { ConfirmationCli } from "./confirmation-cli.js";
 import { WorkspaceCli } from "./workspace-cli.js";
 import { I6Cli } from "./i6-cli.js";
+import { ProviderSmokeCli } from "./provider-smoke-cli.js";
 
 export const runCli = async (
   arguments_: readonly string[],
@@ -95,7 +98,11 @@ export const runCli = async (
     const workflow = new LazyTemporalWorkflowAdapter(temporal);
     const confirmations = new ManageConfirmations(new SqliteConfirmationRepository(database), workspace);
     const cli = new NodraCli(
-      new GetHealth(new SqliteHealthProbe(database), temporal),
+      new GetHealth(
+        new SqliteHealthProbe(database),
+        temporal,
+        new CatalogProviderHealthProbe(providerCatalog, provider.providerId)
+      ),
       new CreateMission(repository),
       new ChangeMissionState(repository),
       new ListMissions(readModel),
@@ -136,7 +143,11 @@ export const runCli = async (
         new ProbeProvider(provider, providerCatalog),
         new CancelRun(new SqliteRunControlRepository(database), workflow),
         new ResumeRun(new SqliteRunControlRepository(database), workflow),
-        new SteerRun(new SqliteRunControlRepository(database), workflow)
+        new SteerRun(new SqliteRunControlRepository(database), workflow),
+        new ProviderSmokeCli(
+          new SmokeProvider(provider, providerCatalog),
+          dataRoot
+        )
       )
     );
     return await cli.run(arguments_);

@@ -10,6 +10,13 @@ export { GetRelay } from "./get-relay.js";
 export { GetHealth, type HealthReport } from "./get-health.js";
 export type { HealthProbe } from "./health-probe.js";
 export type { RuntimeHealthProbe } from "./runtime-health-probe.js";
+export {
+  CatalogProviderHealthProbe
+} from "./catalog-provider-health-probe.js";
+export type {
+  ProviderComponentHealth,
+  ProviderHealthProbe
+} from "./provider-health-probe.js";
 export { ListMissions } from "./list-missions.js";
 export type {
   MissionAuditRecord,
@@ -93,13 +100,15 @@ export type {
   ProviderPermissionRequest,
   ProviderProbeResult,
   ProviderReasoningEffort,
-  ProviderRunConfiguration
+  ProviderRunConfiguration,
+  ProviderSmokeResult
 } from "./provider-model.js";
 export type { ProviderPort } from "./provider-port.js";
 export { deriveProviderHealth } from "./provider-health.js";
 export { ProviderProtocolIncompatibleError } from "./provider-protocol-incompatible-error.js";
 export type { ProviderCatalogRepository } from "./provider-catalog-repository.js";
 export { ProbeProvider } from "./probe-provider.js";
+export { SmokeProvider, type SmokeProviderInput } from "./smoke-provider.js";
 export { GetProviderStatus } from "./get-provider-status.js";
 export type { ControllableRun, RunControlRepository } from "./run-control-repository.js";
 export { CancelRun } from "./cancel-run.js";

@@ -14,6 +14,19 @@ export class CodexEventMapper {
   map(method: string, params: unknown): MappedCodexEvent {
     let terminalState: MappedCodexEvent["terminalState"] = null;
     let incompatibleReason: string | null = null;
+    const item = isRecord(params) && isRecord(params.item) ? params.item : null;
+    const assistantMessageText = method === "item/completed"
+      && item?.type === "agentMessage"
+      && typeof item.text === "string"
+      ? item.text
+      : undefined;
+    const assistantMessage = assistantMessageText === undefined
+      ? undefined
+      : this.redactor.redact(assistantMessageText) as string;
+    const toolActivity = (method === "item/started" || method === "item/completed")
+      && item !== null
+      && typeof item.type === "string"
+      && this.isToolItem(item.type);
     if (method === "turn/completed" && isRecord(params) && isRecord(params.turn)) {
       const status = params.turn.status;
       terminalState = status === "completed"
@@ -31,10 +44,23 @@ export class CodexEventMapper {
       event: {
         type: method,
         payload: this.redactor.redact(params),
-        occurredAt: new Date().toISOString()
+        occurredAt: new Date().toISOString(),
+        ...(assistantMessage === undefined ? {} : { assistantMessage }),
+        ...(toolActivity ? { toolActivity: true } : {})
       },
       terminalState,
       incompatibleReason
     };
+  }
+
+  private isToolItem(type: string): boolean {
+    return [
+      "commandExecution",
+      "fileChange",
+      "mcpToolCall",
+      "dynamicToolCall",
+      "webSearch",
+      "imageGeneration"
+    ].includes(type);
   }
 }

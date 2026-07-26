@@ -30,4 +30,27 @@ Au boot : verrou singleton data-root; intégrité SQLite; migrations; supervisor
 
 Chaque bug de crash/duplication devient un scénario deterministe de replay. Les tests providers ne dépensent pas de crédits par défaut; une suite contractuelle opt-in est manuelle et produit une preuve.
 
+## Diagnostic provider I6.1
+
+`health` et `GET /health` lisent exclusivement le dernier snapshot provider
+déjà persistant. Cette lecture ne démarre aucun binaire : `unconfigured` avec
+`reason=no_explicit_probe` signifie qu'aucun probe explicite n'existe encore;
+`degraded` conserve le `reason` et l'`action` du snapshot, notamment
+`update_required` pour un contrat compatible mais non certifié. Le composant
+workflow reste indépendant et doit continuer à rendre `error` si Temporal est
+absent.
+
+Après un probe vert, un opérateur peut autoriser exactement un tour de
+diagnostic app-server :
+
+```text
+npm run cli -- provider:smoke codex --allow-turn --model gpt-5.4-mini --effort low
+```
+
+Cette commande consomme un vrai tour. Elle n'est ni une mission ni un run
+métier, n'écrit aucun outbox Temporal, utilise un cwd temporaire sous
+`NODRA_DATA_ROOT` et le preset `read_only`, puis exige le message assistant
+exact `NODRA_SMOKE_OK`. Le test équivalent
+`NODRA_TEST_REAL_CODEX_TURN=1` est opt-in et ignoré par défaut.
+
 Le test de drift est obligatoire : une base neuve créée par les migrations Drizzle (et leurs patchs SQL ciblés) doit satisfaire le DDL contractuel et [11-schema-validation.sql](11-schema-validation.sql). Aucun repository ne doit exécuter de DDL métier ad hoc.

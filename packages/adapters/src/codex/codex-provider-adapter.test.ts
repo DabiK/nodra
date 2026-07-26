@@ -439,6 +439,7 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
         text: "token=[REDACTED] and [REDACTED]"
       }
     });
+    expect(mapped.event.assistantMessage).toBe("token=[REDACTED] and [REDACTED]");
   });
 
   it("preserves the breaking terminal event then fails with protocol_incompatible", async () => {
