@@ -1,0 +1,1 @@
+ALTER TABLE `provider_catalog_snapshot` ADD `contract_digest` text;

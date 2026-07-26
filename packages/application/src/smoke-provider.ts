@@ -6,7 +6,7 @@ import type {
   ProviderReasoningEffort,
   ProviderSmokeResult
 } from "./provider-model.js";
-import type { ProviderPort } from "./provider-port.js";
+import type { ProviderRegistry } from "./provider-registry.js";
 
 const marker = "NODRA_SMOKE_OK";
 const prompt = "Reply with exactly NODRA_SMOKE_OK. Do not use tools.";
@@ -22,7 +22,7 @@ export interface SmokeProviderInput {
 
 export class SmokeProvider {
   constructor(
-    private readonly provider: ProviderPort,
+    private readonly providers: ProviderRegistry,
     private readonly catalog: ProviderCatalogRepository,
     private readonly timeoutMs = 120_000
   ) {}
@@ -34,9 +34,7 @@ export class SmokeProvider {
         "PROVIDER_SMOKE_OPT_IN_REQUIRED"
       );
     }
-    if (input.providerId !== this.provider.providerId) {
-      throw new DomainError(`Provider ${input.providerId} is unavailable`, "CAPABILITY_UNAVAILABLE");
-    }
+    const provider = this.providers.resolve(input.providerId);
     const snapshot = await this.catalog.latest(input.providerId);
     if (!snapshot) {
       throw new DomainError(
@@ -60,7 +58,7 @@ export class SmokeProvider {
     const reasoningEffort = this.resolveEffort(input.reasoningEffort, model.supportedReasoningEfforts);
     const events: ProviderEventInput[] = [];
     const runId = asId(`provider-smoke/${randomUUID()}`);
-    const execution = this.provider.execute({
+    const execution = provider.execute({
       runId,
       providerId: input.providerId,
       modelId: input.modelId,
@@ -84,7 +82,7 @@ export class SmokeProvider {
     });
     let result;
     try {
-      result = await this.withTimeout(execution, runId);
+      result = await this.withTimeout(execution, runId, provider);
     } catch (error) {
       if (error instanceof DomainError) throw error;
       throw new DomainError(
@@ -141,7 +139,11 @@ export class SmokeProvider {
     return requested as ProviderReasoningEffort;
   }
 
-  private async withTimeout<T>(execution: Promise<T>, runId: ReturnType<typeof asId>): Promise<T> {
+  private async withTimeout<T>(
+    execution: Promise<T>,
+    runId: ReturnType<typeof asId>,
+    provider: ReturnType<ProviderRegistry["resolve"]>
+  ): Promise<T> {
     let timeout: NodeJS.Timeout | undefined;
     const expired = new Promise<never>((_, reject) => {
       timeout = setTimeout(() => {
@@ -155,7 +157,7 @@ export class SmokeProvider {
       return await Promise.race([execution, expired]);
     } catch (error) {
       if (error instanceof DomainError && error.code === "PROVIDER_SMOKE_TERMINAL_TIMEOUT") {
-        await this.provider.cancel(runId).catch(() => undefined);
+        await provider.cancel(runId).catch(() => undefined);
         void execution.catch(() => undefined);
       }
       throw error;

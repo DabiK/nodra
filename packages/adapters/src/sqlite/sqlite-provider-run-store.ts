@@ -103,7 +103,7 @@ export class SqliteProviderRunStore {
 
   private project(tx: NodraSqliteDatabase["orm"], runId: string, input: ProviderEventInput): void {
     const payload = this.record(input.payload);
-    if (input.type === "turn/started") {
+    if (input.type === "turn/started" || input.type === "provider/executionStarted") {
       tx.update(runs).set({ state: "RUNNING", startedAt: input.occurredAt })
         .where(and(eq(runs.id, runId), eq(runs.state, "STARTING"))).run();
     }
@@ -120,7 +120,7 @@ export class SqliteProviderRunStore {
         }).where(eq(runs.id, runId)).run();
       }
     }
-    if (input.type === "item/completed") {
+    if (input.type === "item/completed" || input.type === "provider/assistantMessage") {
       const item = this.record(payload?.item);
       if (item?.type === "agentMessage" && typeof item.text === "string") {
         const run = tx.select({ conversationId: runs.conversationId })

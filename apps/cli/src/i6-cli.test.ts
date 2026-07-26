@@ -17,4 +17,21 @@ describe("I6Cli", () => {
     await cli.execute("provider:probe", ["codex", "--allow-process"]);
     expect(probe.execute).toHaveBeenCalledWith({ providerId: "codex", optIn: true });
   });
+
+  it("reads the requested provider status without probing", async () => {
+    const status = { execute: vi.fn(async () => ({ providerId: "opencode" })) };
+    const probe = { execute: vi.fn() };
+    const cli = new I6Cli(
+      status as never,
+      probe as never,
+      { execute: vi.fn() } as never,
+      { execute: vi.fn() } as never,
+      { execute: vi.fn() } as never
+    );
+
+    await expect(cli.execute("provider:status", ["opencode"]))
+      .resolves.toEqual({ providerId: "opencode" });
+    expect(status.execute).toHaveBeenCalledWith("opencode");
+    expect(probe.execute).not.toHaveBeenCalled();
+  });
 });

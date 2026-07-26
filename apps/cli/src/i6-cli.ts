@@ -19,15 +19,19 @@ export class I6Cli {
   ) {}
 
   async execute(command: string, parameters: readonly string[]): Promise<unknown | undefined> {
-    if (command === "provider:health" || command === "provider:capabilities") {
+    if (
+      command === "provider:health"
+      || command === "provider:capabilities"
+      || command === "provider:status"
+    ) {
       if (parameters.length > 1) return undefined;
       return this.status.execute(parameters[0] ?? "codex");
     }
     if (command === "provider:probe") {
-      if (parameters.length !== 2 || parameters[0] !== "codex" || parameters[1] !== "--allow-process") {
+      if (parameters.length !== 2 || !parameters[0] || parameters[1] !== "--allow-process") {
         return undefined;
       }
-      return this.probe.execute({ providerId: "codex", optIn: true });
+      return this.probe.execute({ providerId: parameters[0], optIn: true });
     }
     if (command === "provider:smoke" && this.smoke) {
       return this.smoke.execute(command, parameters);

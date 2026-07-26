@@ -26,7 +26,10 @@
     "test:poc:temporal": "tsx poc/temporal/i6-2-poc.ts",
     "test:e2e:i7": "vitest run apps/api/i7-temporal.e2e.test.ts",
     "test:e2e:i7:codex": "NODRA_I7_PROVIDER=codex vitest run apps/api/i7-temporal.e2e.test.ts",
+    "test:e2e:i8:opencode": "NODRA_I8_PROVIDER=opencode vitest run apps/api/i8-opencode.e2e.test.ts",
+    "test:e2e:i8:deterministic": "NODRA_TEST_I8_DETERMINISTIC=1 vitest run apps/api/i7-temporal.e2e.test.ts",
     "codex:schema:export": "tsx scripts/export-codex-app-server-schema.ts",
+    "opencode:schema:export": "tsx scripts/export-opencode-server-schema.ts",
     "db:generate": "drizzle-kit generate --config packages/adapters/drizzle.config.ts",
     "db:setup": "tsx packages/adapters/scripts/setup-database.ts"
   },

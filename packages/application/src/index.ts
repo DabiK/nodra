@@ -97,6 +97,7 @@ export type {
   ProviderHealth,
   ProviderModel,
   ProviderPermissionPreset,
+  ProviderPermissionDecision,
   ProviderPermissionRequest,
   ProviderProbeResult,
   ProviderReasoningEffort,
@@ -104,6 +105,7 @@ export type {
   ProviderSmokeResult
 } from "./provider-model.js";
 export type { ProviderPort } from "./provider-port.js";
+export { ProviderRegistry } from "./provider-registry.js";
 export { deriveProviderHealth } from "./provider-health.js";
 export { ProviderProtocolIncompatibleError } from "./provider-protocol-incompatible-error.js";
 export type { ProviderCatalogRepository } from "./provider-catalog-repository.js";

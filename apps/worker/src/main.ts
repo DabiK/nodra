@@ -2,6 +2,7 @@ import {
   migrateDatabase,
   missionWorkflowPath,
   CodexProviderAdapter,
+  OpenCodeProviderAdapter,
   LocalWorkspaceAdapter,
   NodraSqliteDatabase,
   SqliteConfirmationRepository,
@@ -12,7 +13,7 @@ import {
   TemporalRunActivities,
   TemporalMissionWorker
 } from "@nodra/adapters";
-import { ManageConfirmations } from "@nodra/application";
+import { ManageConfirmations, ProviderRegistry } from "@nodra/application";
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,7 +35,12 @@ const permissions = new SqliteProviderPermissionHandler(
 );
 const activities = new TemporalRunActivities(
   new SqliteRunWorkflowActivity(database),
-  new CodexProviderAdapter(),
+  new ProviderRegistry([
+    new CodexProviderAdapter(),
+    new OpenCodeProviderAdapter({
+      baseUrl: process.env.NODRA_OPENCODE_URL ?? "http://127.0.0.1:4096"
+    })
+  ]),
   providerRuns,
   permissions,
   providerCatalog

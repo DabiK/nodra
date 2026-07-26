@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import {
   ContentAddressedBlobStore,
   CodexProviderAdapter,
+  OpenCodeProviderAdapter,
   LazyTemporalConnection,
   LazyTemporalWorkflowAdapter,
   LocalCommandObservationAdapter,
@@ -56,6 +57,7 @@ import {
   StartMission,
   SteerRun,
   ProbeProvider,
+  ProviderRegistry,
   PreviewAgentConfig,
   ResolveAgentConfig,
   SmokeProvider,
@@ -100,7 +102,13 @@ export const runCli = async (
     const workspace = new LocalWorkspaceAdapter(`${dataRoot}/workspaces`);
     await workspace.initialize();
     const workspaceRepository = new SqliteWorkspaceRepository(database);
-    const provider = new CodexProviderAdapter();
+    const codex = new CodexProviderAdapter();
+    const providers = new ProviderRegistry([
+      codex,
+      new OpenCodeProviderAdapter({
+        baseUrl: process.env.NODRA_OPENCODE_URL ?? "http://127.0.0.1:4096"
+      })
+    ]);
     const providerCatalog = new SqliteProviderCatalogRepository(database);
     const agentConfigs = new SqliteAgentConfigRepository(database);
     const agentResolver = new ResolveAgentConfig(agentConfigs, providerCatalog);
@@ -110,7 +118,7 @@ export const runCli = async (
       new GetHealth(
         new SqliteHealthProbe(database),
         temporal,
-        new CatalogProviderHealthProbe(providerCatalog, provider.providerId)
+        new CatalogProviderHealthProbe(providerCatalog, codex.providerId)
       ),
       new CreateMission(repository),
       new ChangeMissionState(repository, agentResolver),
@@ -154,13 +162,13 @@ export const runCli = async (
         )
       ]),
       new I6Cli(
-        new GetProviderStatus(providerCatalog),
-        new ProbeProvider(provider, providerCatalog),
+        new GetProviderStatus(providerCatalog, providers),
+        new ProbeProvider(providers, providerCatalog),
         new CancelRun(new SqliteRunControlRepository(database), workflow),
         new ResumeRun(new SqliteRunControlRepository(database), workflow),
         new SteerRun(new SqliteRunControlRepository(database), workflow),
         new ProviderSmokeCli(
-          new SmokeProvider(provider, providerCatalog),
+          new SmokeProvider(providers, providerCatalog),
           dataRoot
         )
       ),

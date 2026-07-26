@@ -17,6 +17,7 @@ export class SqliteProviderCatalogRepository implements ProviderCatalogRepositor
       .update(JSON.stringify({
         adapterVersion: result.adapterVersion,
         binaryVersion: result.binaryVersion,
+        contractDigest: result.contractDigest ?? null,
         capabilities: result.capabilities,
         models: result.models
       }))
@@ -27,6 +28,7 @@ export class SqliteProviderCatalogRepository implements ProviderCatalogRepositor
       catalogVersion,
       adapterVersion: result.adapterVersion,
       binaryVersion: result.binaryVersion,
+      contractDigest: result.contractDigest ?? null,
       authenticated: result.authenticated ? 1 : 0,
       authKind: result.authKind,
       capabilitiesJson: JSON.stringify(result.capabilities),
@@ -48,6 +50,7 @@ export class SqliteProviderCatalogRepository implements ProviderCatalogRepositor
       catalogVersion: row.catalogVersion,
       adapterVersion: row.adapterVersion,
       binaryVersion: row.binaryVersion,
+      contractDigest: row.contractDigest,
       authenticated: row.authenticated === 1,
       authKind: row.authKind,
       capabilities: JSON.parse(row.capabilitiesJson),
@@ -70,6 +73,7 @@ export class SqliteProviderCatalogRepository implements ProviderCatalogRepositor
       providerId: current.providerId,
       adapterVersion: current.adapterVersion,
       binaryVersion: input.currentVersion ?? current.binaryVersion,
+      contractDigest: current.contractDigest ?? null,
       authenticated: current.authenticated,
       authKind: current.authKind,
       health: {

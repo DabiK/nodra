@@ -5,6 +5,7 @@ import {
   type ProviderExecutionResult,
   type ProviderExecutionSink,
   type ProviderModel,
+  type ProviderPermissionDecision,
   type ProviderPermissionRequest,
   type ProviderPort,
   type ProviderProbeResult,
@@ -128,7 +129,8 @@ export class CodexProviderAdapter implements ProviderPort {
     client.onFailure(terminalReject);
     client.onServerRequest(async (request) => {
       try {
-        return await sink.permission(this.permissionRequest(request));
+        const permission = this.permissionRequest(request);
+        return this.permissionResponse(permission, await sink.permission(permission));
       } catch (error) {
         const incompatible = this.incompatibleError(error, active.binaryVersion);
         if (incompatible) {
@@ -267,6 +269,28 @@ export class CodexProviderAdapter implements ProviderPort {
           : "provider_permission_expansion",
       providerRequest: request
     };
+  }
+
+  private permissionResponse(
+    request: ProviderPermissionRequest,
+    decision: ProviderPermissionDecision
+  ): unknown {
+    if (request.action === "item/permissions/requestApproval") {
+      return {
+        scope: "turn",
+        permissions: decision === "approved"
+          ? this.requestedPermissions(request.providerRequest)
+          : {}
+      };
+    }
+    return { decision: decision === "approved" ? "accept" : "decline" };
+  }
+
+  private requestedPermissions(providerRequest: unknown): Record<string, unknown> {
+    if (!isRecord(providerRequest) || !isRecord(providerRequest.params)) return {};
+    return isRecord(providerRequest.params.permissions)
+      ? providerRequest.params.permissions
+      : {};
   }
 
   private models(result: unknown): ProviderModel[] {

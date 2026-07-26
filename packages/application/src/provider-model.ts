@@ -67,6 +67,7 @@ export interface ProviderProbeResult {
   providerId: string;
   adapterVersion: string;
   binaryVersion: string | null;
+  contractDigest?: string | null;
   authenticated: boolean;
   authKind: string | null;
   health: ProviderHealth;
@@ -109,11 +110,13 @@ export interface ProviderPermissionRequest {
   providerRequest: unknown;
 }
 
+export type ProviderPermissionDecision = "approved" | "denied";
+
 export interface ProviderExecutionSink {
   session(externalId: string): Promise<void>;
   runRef(externalId: string): Promise<void>;
   event(event: ProviderEventInput): Promise<void>;
-  permission(request: ProviderPermissionRequest): Promise<unknown>;
+  permission(request: ProviderPermissionRequest): Promise<ProviderPermissionDecision>;
 }
 
 export interface ProviderExecutionResult {

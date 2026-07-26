@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { DomainError, type SmokeProvider } from "@nodra/application";
 
 const usage =
-  "Usage: nodra provider:smoke codex --allow-turn --model <modelId> [--effort <effort>]";
+  "Usage: nodra provider:smoke <providerId> --allow-turn --model <modelId> [--effort <effort>]";
 
 export class ProviderSmokeCli {
   constructor(
@@ -44,9 +44,10 @@ export class ProviderSmokeCli {
     reasoningEffort?: string;
     allowTurn: boolean;
   } {
-    if (parameters[0] !== "codex") {
+    if (!parameters[0]) {
       throw new DomainError(usage, "CLI_USAGE_ERROR");
     }
+    const providerId = parameters[0];
     let modelId: string | undefined;
     let reasoningEffort: string | undefined;
     let allowTurn = false;
@@ -70,7 +71,7 @@ export class ProviderSmokeCli {
     }
     if (!modelId) throw new DomainError(usage, "CLI_USAGE_ERROR");
     return {
-      providerId: "codex",
+      providerId,
       modelId,
       ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
       allowTurn

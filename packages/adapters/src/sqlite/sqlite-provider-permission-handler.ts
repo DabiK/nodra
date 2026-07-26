@@ -1,5 +1,6 @@
 import type {
   ManageConfirmations,
+  ProviderPermissionDecision,
   ProviderPermissionRequest
 } from "@nodra/application";
 import {
@@ -17,7 +18,10 @@ export class SqliteProviderPermissionHandler {
     private readonly pollIntervalMs = 250
   ) {}
 
-  async handle(runId: string, request: ProviderPermissionRequest): Promise<unknown> {
+  async handle(
+    runId: string,
+    request: ProviderPermissionRequest
+  ): Promise<ProviderPermissionDecision> {
     const configuration = this.runs.loadConfiguration(runId);
     const stableTarget = JSON.parse(canonicalTarget(request.target)) as Record<string, unknown>;
     const suffix = createHash("sha256")
@@ -72,37 +76,14 @@ export class SqliteProviderPermissionHandler {
           }
         });
         await this.runs.markRunning(runId);
-        return this.approvedResponse(request);
+        return "approved";
       }
       if (["denied", "expired", "consumed"].includes(current.state)) {
         await this.runs.markRunning(runId);
-        return this.deniedResponse(request);
+        return "denied";
       }
       await new Promise((resolve) => setTimeout(resolve, this.pollIntervalMs));
     }
   }
 
-  private requestedPermissions(providerRequest: unknown): Record<string, unknown> {
-    if (typeof providerRequest !== "object" || providerRequest === null) return {};
-    const params = (providerRequest as Record<string, unknown>).params;
-    if (typeof params !== "object" || params === null) return {};
-    const permissions = (params as Record<string, unknown>).permissions;
-    return typeof permissions === "object" && permissions !== null
-      ? permissions as Record<string, unknown>
-      : {};
-  }
-
-  private approvedResponse(request: ProviderPermissionRequest): unknown {
-    if (request.action === "item/permissions/requestApproval") {
-      return { scope: "turn", permissions: this.requestedPermissions(request.providerRequest) };
-    }
-    return { decision: "accept" };
-  }
-
-  private deniedResponse(request: ProviderPermissionRequest): unknown {
-    if (request.action === "item/permissions/requestApproval") {
-      return { scope: "turn", permissions: {} };
-    }
-    return { decision: "decline" };
-  }
 }

@@ -5,6 +5,7 @@ import {
   DispatchWorkflowOutbox,
   GetHealth,
   ProviderProtocolIncompatibleError,
+  ProviderRegistry,
   StartMission,
   type ProviderPort,
   type RuntimeHealthProbe
@@ -419,7 +420,7 @@ describe.sequential("Temporal durable envelope", () => {
     const providerRuns = new SqliteProviderRunStore(database);
     const activities = new TemporalRunActivities(
       new SqliteRunWorkflowActivity(database),
-      provider,
+      new ProviderRegistry([provider]),
       providerRuns,
       {} as SqliteProviderPermissionHandler,
       catalog

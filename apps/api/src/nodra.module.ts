@@ -5,6 +5,7 @@ import { APP_FILTER } from "@nestjs/core";
 import {
   ContentAddressedBlobStore,
   CodexProviderAdapter,
+  OpenCodeProviderAdapter,
   LazyTemporalConnection,
   LazyTemporalWorkflowAdapter,
   LocalCommandObservationAdapter,
@@ -58,6 +59,7 @@ import {
   StartMission,
   SteerRun,
   ProbeProvider,
+  ProviderRegistry,
   PreviewAgentConfig,
   ResolveAgentConfig,
   StructuredGateEvaluatorRegistry,
@@ -84,7 +86,6 @@ import {
   AGENT_CONFIG_REPOSITORY,
   CANCEL_RUN,
   CHANGE_MISSION_STATE,
-  CODEX_PROVIDER,
   COLLECT_EVIDENCE,
   COMMIT_WORKSPACE,
   CREATE_WORKSPACE,
@@ -103,6 +104,7 @@ import {
   MANAGE_GATES,
   PROBE_PROVIDER,
   PROVIDER_CATALOG,
+  PROVIDER_REGISTRY,
   READ_EVIDENCE,
   READ_WORKSPACE,
   RECONCILE_WORKFLOWS,
@@ -127,6 +129,7 @@ export interface NodraModuleOptions {
   temporalAddress?: string;
   temporalNamespace?: string;
   dataRoot?: string;
+  opencodeBaseUrl?: string;
 }
 
 @Module({})
@@ -242,8 +245,15 @@ export class NodraModule {
         { provide: MANAGE_APPROVALS, inject: [DATABASE], useFactory: (database: NodraSqliteDatabase) => new ManageApprovals(new SqliteApprovalRepository(database)) },
         { provide: MANAGE_DELIVERY, inject: [DATABASE, MANAGE_GATES], useFactory: (database: NodraSqliteDatabase, gates: ManageGates) => new ManageDelivery(new SqliteDeliveryRepository(database), gates) },
         {
-          provide: CODEX_PROVIDER,
-          useFactory: () => new CodexProviderAdapter()
+          provide: PROVIDER_REGISTRY,
+          useFactory: () => new ProviderRegistry([
+            new CodexProviderAdapter(),
+            new OpenCodeProviderAdapter({
+              baseUrl: options.opencodeBaseUrl
+                ?? process.env.NODRA_OPENCODE_URL
+                ?? "http://127.0.0.1:4096"
+            })
+          ])
         },
         {
           provide: PROVIDER_CATALOG,
@@ -286,14 +296,17 @@ export class NodraModule {
         },
         {
           provide: PROBE_PROVIDER,
-          inject: [CODEX_PROVIDER, PROVIDER_CATALOG],
-          useFactory: (provider: CodexProviderAdapter, catalog: SqliteProviderCatalogRepository) =>
-            new ProbeProvider(provider, catalog)
+          inject: [PROVIDER_REGISTRY, PROVIDER_CATALOG],
+          useFactory: (providers: ProviderRegistry, catalog: SqliteProviderCatalogRepository) =>
+            new ProbeProvider(providers, catalog)
         },
         {
           provide: GET_PROVIDER_STATUS,
-          inject: [PROVIDER_CATALOG],
-          useFactory: (catalog: SqliteProviderCatalogRepository) => new GetProviderStatus(catalog)
+          inject: [PROVIDER_CATALOG, PROVIDER_REGISTRY],
+          useFactory: (
+            catalog: SqliteProviderCatalogRepository,
+            providers: ProviderRegistry
+          ) => new GetProviderStatus(catalog, providers)
         },
         {
           provide: TEMPORAL_CONNECTION,

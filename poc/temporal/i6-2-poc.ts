@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import {
   DispatchWorkflowOutbox,
   ManageConfirmations,
+  ProviderRegistry,
   ReconcileWorkflows
 } from "@nodra/application";
 import {
@@ -97,7 +98,7 @@ try {
   );
   const activities = new TemporalRunActivities(
     new SqliteRunWorkflowActivity(database),
-    provider,
+    new ProviderRegistry([provider]),
     providerRuns,
     permissions,
     catalog

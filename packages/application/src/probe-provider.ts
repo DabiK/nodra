@@ -1,10 +1,10 @@
 import { DomainError } from "@nodra/domain";
 import type { ProviderCatalogRepository } from "./provider-catalog-repository.js";
-import type { ProviderPort } from "./provider-port.js";
+import type { ProviderRegistry } from "./provider-registry.js";
 
 export class ProbeProvider {
   constructor(
-    private readonly provider: ProviderPort,
+    private readonly providers: ProviderRegistry,
     private readonly catalog: ProviderCatalogRepository
   ) {}
 
@@ -15,9 +15,6 @@ export class ProbeProvider {
         "PROVIDER_PROBE_OPT_IN_REQUIRED"
       );
     }
-    if (input.providerId !== this.provider.providerId) {
-      throw new DomainError(`Provider ${input.providerId} is unavailable`, "CAPABILITY_UNAVAILABLE");
-    }
-    return this.catalog.save(await this.provider.probe());
+    return this.catalog.save(await this.providers.resolve(input.providerId).probe());
   }
 }

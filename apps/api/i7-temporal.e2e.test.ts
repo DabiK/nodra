@@ -16,7 +16,7 @@ import {
   SqliteRunWorkflowActivity,
   TemporalRunActivities
 } from "@nodra/adapters";
-import { ManageConfirmations } from "@nodra/application";
+import { ManageConfirmations, ProviderRegistry } from "@nodra/application";
 import type { ProviderPort } from "@nodra/application";
 import { createApp } from "./src/create-app.js";
 import { outbox } from "../../packages/adapters/src/sqlite/schema/operations.js";
@@ -31,15 +31,19 @@ import { TemporalDevServer } from "../../poc/temporal/temporal-dev-server.js";
 import { TemporalWorkerHarness } from "../../poc/temporal/temporal-worker-harness.js";
 
 const realCodex = process.env.NODRA_I7_PROVIDER === "codex";
+const deterministicI8 = process.env.NODRA_TEST_I8_DETERMINISTIC === "1";
+const e2eLabel = deterministicI8 ? "I8 deterministic E2E" : "I7 E2E";
 const enabled = realCodex
   ? process.env.NODRA_TEST_REAL_CODEX_I7 === "1"
-  : process.env.NODRA_TEST_I7_TEMPORAL === "1";
+  : process.env.NODRA_TEST_I7_TEMPORAL === "1" || deterministicI8;
 
 const root = resolve(".");
 let dataRoot = "";
 let databaseFile = "";
 const migrationsDirectory = resolve(root, "packages/adapters/drizzle");
-const deterministicProvider = realCodex ? null : new DeterministicProvider();
+const deterministicProvider = realCodex
+  ? null
+  : new DeterministicProvider(deterministicI8 ? "opencode" : undefined);
 const provider: ProviderPort = realCodex ? new CodexProviderAdapter() : deterministicProvider!;
 const providerId = provider.providerId;
 const modelId = realCodex ? "gpt-5.4-mini" : "fixture-model";
@@ -53,7 +57,7 @@ let worker: TemporalWorkerHarness | undefined;
 let app: Awaited<ReturnType<typeof createApp>> | undefined;
 
 const invariant: (value: unknown, detail: string) => asserts value = (value, detail) => {
-  if (!value) throw new Error(`I7 E2E invariant failed: ${detail}`);
+  if (!value) throw new Error(`${e2eLabel} invariant failed: ${detail}`);
 };
 
 const waitFor = async (predicate: () => boolean, detail: string): Promise<void> => {
@@ -117,7 +121,7 @@ try {
     resolve(root, "packages/adapters/src/temporal/workflows/mission-workflow.ts"),
     new TemporalRunActivities(
       new SqliteRunWorkflowActivity(workerDatabase),
-      provider,
+      new ProviderRegistry([provider]),
       providerRuns,
       permissions,
       new SqliteProviderCatalogRepository(workerDatabase)
@@ -125,7 +129,7 @@ try {
   );
 
   const http = request(app.getHttpServer());
-  process.stdout.write("\nI7 E2E: API initialized\n");
+  process.stdout.write(`\n${e2eLabel}: API initialized\n`);
   const workspaceId = "i7-workspace";
   const missionWorkspace = join(dataRoot, "workspaces", "scratch");
   const workspaceResponse = await http.post("/api/workspaces").send({
@@ -138,13 +142,13 @@ try {
     workspaceResponse.status === 201,
     `workspace API returned ${workspaceResponse.status}: ${JSON.stringify(workspaceResponse.body)}`
   );
-  process.stdout.write("I7 E2E: workspace created\n");
+  process.stdout.write(`${e2eLabel}: workspace created\n`);
   const created = await http.post("/api/missions").send({
     title: "I7 deterministic vertical",
     commandId: "i7-mission-create"
   }).expect(201);
   const missionId = created.body.id as string;
-  process.stdout.write("I7 E2E: mission created\n");
+  process.stdout.write(`${e2eLabel}: mission created\n`);
   invariant(created.body.executionKind === "human", "title-only mission remains human");
   await http.post(`/api/missions/${missionId}/agent-config/enable`).send({
     expectedVersion: 0,
@@ -186,19 +190,19 @@ try {
     commandId: "i7-start"
   }).expect(202);
   worker.start();
-  process.stdout.write("I7 E2E: worker initialized\n");
+  process.stdout.write(`${e2eLabel}: worker initialized\n`);
   await new Promise((resolveWait) => setTimeout(resolveWait, 1_000));
   const dispatch = await http.post("/api/runtime/temporal/dispatch").send({ limit: 10 });
   invariant(
     dispatch.status === 202,
     `dispatch API returned ${dispatch.status}: ${JSON.stringify(dispatch.body)}`
   );
-  process.stdout.write("I7 E2E: outbox dispatched\n");
+  process.stdout.write(`${e2eLabel}: outbox dispatched\n`);
   await waitFor(
     () => workerDatabase!.orm.select().from(runs).where(eq(runs.id, started.body.runId)).get()?.state === "SUCCEEDED",
     "deterministic provider terminal state"
   );
-  process.stdout.write("I7 E2E: terminal persisted\n");
+  process.stdout.write(`${e2eLabel}: terminal persisted\n`);
   const terminalRun = workerDatabase.orm.select().from(runs).where(eq(runs.id, started.body.runId)).get();
   invariant(terminalRun?.state === "SUCCEEDED", "run terminal state is SUCCEEDED");
   const mission = workerDatabase.orm.select().from(missions).where(eq(missions.id, missionId)).get();
@@ -249,15 +253,15 @@ try {
     cleanup: "pending"
   }, null, 2));
 } finally {
-  process.stdout.write("\nI7 E2E: cleanup starting\n");
+  process.stdout.write(`\n${e2eLabel}: cleanup starting\n`);
   await app?.close().catch(() => undefined);
-  process.stdout.write("I7 E2E: API closed\n");
+  process.stdout.write(`${e2eLabel}: API closed\n`);
   await worker?.forceCleanup();
-  process.stdout.write("I7 E2E: worker closed\n");
+  process.stdout.write(`${e2eLabel}: worker closed\n`);
   workerDatabase?.close();
   await runtime?.close();
   await server?.stop();
   await rm(dataRoot, { recursive: true, force: true });
-  process.stdout.write("\nI7 cleanup complete\n");
+  process.stdout.write(`\n${e2eLabel} cleanup complete\n`);
 }
 }, 120_000);

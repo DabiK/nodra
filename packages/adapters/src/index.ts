@@ -58,6 +58,13 @@ export { CodexProcessSupervisor } from "./codex/codex-process-supervisor.js";
 export { CodexProtocolError } from "./codex/codex-protocol-error.js";
 export { CodexRedactor } from "./codex/codex-redactor.js";
 export {
+  OpenCodeProviderAdapter,
+  type OpenCodeProviderAdapterOptions
+} from "./opencode/opencode-provider-adapter.js";
+export { OpenCodeContractProbe } from "./opencode/opencode-contract-probe.js";
+export { OpenCodeEventMapper } from "./opencode/opencode-event-mapper.js";
+export { OpenCodeRunSupervisor } from "./opencode/opencode-run-supervisor.js";
+export {
   LocalCodexProcessLauncher,
   type CodexProcessLauncher
 } from "./codex/codex-process-launcher.js";

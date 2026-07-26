@@ -159,10 +159,7 @@ describe("SqliteProviderPermissionHandler", () => {
       }
     });
 
-    await expect(response).resolves.toEqual({
-      scope: "turn",
-      permissions: { fileSystem: { write: [workspacePath] } }
-    });
+    await expect(response).resolves.toBe("approved");
     expect(database.orm.select().from(confirmations)
       .where(eq(confirmations.id, pending!.id)).get()).toMatchObject({ state: "consumed" });
     expect(database.orm.select().from(runs).where(eq(runs.id, "run-1")).get())

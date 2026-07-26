@@ -259,7 +259,7 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
         }
         events.push(event.type);
       },
-      permission: async () => ({ scope: "turn", permissions: {} })
+      permission: async () => "approved"
     });
 
     expect(result.state).toBe("SUCCEEDED");
@@ -304,7 +304,7 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
       session: async () => undefined,
       runRef: async () => undefined,
       event: async (event) => { events.push(event.type); },
-      permission: async () => ({})
+      permission: async () => "approved"
     });
 
     expect(result.state).toBe("SUCCEEDED");
@@ -337,7 +337,7 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
       session: async () => undefined,
       runRef: async () => undefined,
       event: async () => undefined,
-      permission: async () => ({ scope: "turn", permissions: {} })
+      permission: async () => "approved"
     });
     await expect.poll(() => child.received.some((message) => message.method === "turn/start")).toBe(true);
     await adapter.steer("run-1", "more");
@@ -360,8 +360,8 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
 
   it("does not answer a provider permission request before the Nodra decision resolves", async () => {
     const permissionMessages = await fixture("permission");
-    let resolvePermission!: (value: unknown) => void;
-    const permissionDecision = new Promise((resolve) => { resolvePermission = resolve; });
+    let resolvePermission!: (value: "approved") => void;
+    const permissionDecision = new Promise<"approved">((resolve) => { resolvePermission = resolve; });
     const child = processFixture((message, send) => {
       if (message.method === "initialize") send({ id: message.id, result: { userAgent: "codex_cli_rs/0.145.0" } });
       if (message.method === "thread/start") send({ id: message.id, result: { thread: { id: "thr_fixture" } } });
@@ -381,7 +381,7 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
     });
     await expect.poll(() => child.received.some((message) => message.method === "turn/start")).toBe(true);
     expect(child.received.some((message) => message.id === 61)).toBe(false);
-    resolvePermission((permissionMessages[1]!.result as unknown));
+    resolvePermission("approved");
     await execution;
     expect(child.received.find((message) => message.id === 61)).toEqual(permissionMessages[1]);
   });
@@ -389,10 +389,6 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
   it("maps the documented 0.145.0 command and file approval fixtures exactly", async () => {
     const approvals = await fixture("legacy-approvals");
     const requests = [approvals[0]!, approvals[2]!];
-    const responses = new Map([
-      [62, approvals[1]!.result],
-      [63, approvals[3]!.result]
-    ]);
     const child = processFixture((message, send) => {
       if (message.method === "initialize") {
         send({ id: message.id, result: { userAgent: "codex_cli_rs/0.145.0" } });
@@ -415,7 +411,7 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
       session: async () => undefined,
       runRef: async () => undefined,
       event: async () => undefined,
-      permission: async (request) => responses.get(Number(request.requestId))
+      permission: async () => "approved"
     });
 
     expect(child.received.find((message) => message.id === 62)).toEqual(approvals[1]);
@@ -462,7 +458,7 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
       session: async () => undefined,
       runRef: async () => undefined,
       event: async (event) => { events.push(event.type); },
-      permission: async () => ({})
+      permission: async () => "approved"
     })).rejects.toMatchObject({ code: "PROVIDER_PROTOCOL_INCOMPATIBLE" });
     expect(events).toEqual(["turn/completed", "provider/protocolIncompatible"]);
   });
@@ -475,7 +471,7 @@ describe("CodexProviderAdapter JSONL fixtures", () => {
       session: async () => undefined,
       runRef: async () => undefined,
       event: async () => undefined,
-      permission: async () => ({})
+      permission: async () => "approved"
     })).rejects.toThrow("Codex app-server -32600");
 
     const malformed = processFixture((_message, send) => send("{not-json"));

@@ -7,6 +7,7 @@ import type {
   ProviderRunConfiguration
 } from "./index.js";
 import { SmokeProvider } from "./smoke-provider.js";
+import { ProviderRegistry } from "./provider-registry.js";
 
 const snapshot = (): ProviderCatalogSnapshot => ({
   providerId: "neutral",
@@ -102,7 +103,7 @@ describe("SmokeProvider", () => {
       };
     });
 
-    await expect(new SmokeProvider(adapter, catalog()).execute(input)).resolves.toEqual({
+    await expect(new SmokeProvider(new ProviderRegistry([adapter]), catalog()).execute(input)).resolves.toEqual({
       provider: "neutral",
       model: "model-1",
       effort: "low",
@@ -128,11 +129,11 @@ describe("SmokeProvider", () => {
       externalSessionId: "session",
       externalRunId: "turn"
     }));
-    await expect(new SmokeProvider(adapter, catalog()).execute({
+    await expect(new SmokeProvider(new ProviderRegistry([adapter]), catalog()).execute({
       ...input,
       modelId: "missing"
     })).rejects.toMatchObject({ code: "CAPABILITY_UNAVAILABLE" });
-    await expect(new SmokeProvider(adapter, catalog()).execute({
+    await expect(new SmokeProvider(new ProviderRegistry([adapter]), catalog()).execute({
       ...input,
       reasoningEffort: "high"
     })).rejects.toMatchObject({ code: "CAPABILITY_UNAVAILABLE" });
@@ -153,7 +154,7 @@ describe("SmokeProvider", () => {
         externalRunId: "turn"
       };
     });
-    await expect(new SmokeProvider(missingMarker, catalog()).execute(input))
+    await expect(new SmokeProvider(new ProviderRegistry([missingMarker]), catalog()).execute(input))
       .rejects.toMatchObject({ code: "PROVIDER_SMOKE_MARKER_MISSING" });
 
     const failed = provider(async () => ({
@@ -161,7 +162,7 @@ describe("SmokeProvider", () => {
       externalSessionId: "session",
       externalRunId: "turn"
     }));
-    await expect(new SmokeProvider(failed, catalog()).execute(input))
+    await expect(new SmokeProvider(new ProviderRegistry([failed]), catalog()).execute(input))
       .rejects.toMatchObject({ code: "PROVIDER_SMOKE_TERMINAL_FAILED" });
   });
 
@@ -171,7 +172,7 @@ describe("SmokeProvider", () => {
       externalSessionId: "session",
       externalRunId: "turn"
     }));
-    await expect(new SmokeProvider(adapter, catalog()).execute({
+    await expect(new SmokeProvider(new ProviderRegistry([adapter]), catalog()).execute({
       ...input,
       allowTurn: false
     })).rejects.toMatchObject({ code: "PROVIDER_SMOKE_OPT_IN_REQUIRED" });

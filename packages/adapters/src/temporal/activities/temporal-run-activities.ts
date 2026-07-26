@@ -2,7 +2,7 @@ import { activityInfo, Context } from "@temporalio/activity";
 import {
   ProviderProtocolIncompatibleError,
   type ProviderCatalogRepository,
-  type ProviderPort
+  type ProviderRegistry
 } from "@nodra/application";
 import type {
   RunWorkflowActivities,
@@ -16,7 +16,7 @@ import type { SqliteProviderRunStore } from "../../sqlite/sqlite-provider-run-st
 export class TemporalRunActivities implements RunWorkflowActivities {
   constructor(
     private readonly sqlite: SqliteRunWorkflowActivity,
-    private readonly provider?: ProviderPort,
+    private readonly providers?: ProviderRegistry,
     private readonly providerRuns?: SqliteProviderRunStore,
     private readonly permissions?: SqliteProviderPermissionHandler,
     private readonly providerCatalog?: ProviderCatalogRepository
@@ -45,16 +45,14 @@ export class TemporalRunActivities implements RunWorkflowActivities {
   async executeProvider(input: { runId: string }): Promise<{
     state: "SUCCEEDED" | "FAILED" | "CANCELLED";
   }> {
-    if (!this.provider || !this.providerRuns || !this.permissions) {
+    if (!this.providers || !this.providerRuns || !this.permissions) {
       throw new Error("Provider Activity is not configured");
     }
     const configuration = this.providerRuns.loadConfiguration(input.runId);
-    if (configuration.providerId !== this.provider.providerId) {
-      throw new Error(`Provider ${configuration.providerId} is unavailable in this worker`);
-    }
+    const provider = this.providers.resolve(configuration.providerId);
     const cancellation = Context.current().cancelled.catch(async () => {
       try {
-        await this.provider?.cancel(input.runId);
+        await provider.cancel(input.runId);
       } catch (error) {
         if (error instanceof ProviderProtocolIncompatibleError) {
           await this.recordControlIncompatible(input.runId, error);
@@ -71,7 +69,7 @@ export class TemporalRunActivities implements RunWorkflowActivities {
     }, 1_000);
     try {
       try {
-        const result = await this.provider.execute(configuration, {
+        const result = await provider.execute(configuration, {
           session: (externalId) => this.providerRuns!.persistSession(input.runId, externalId),
           runRef: (externalId) => this.providerRuns!.persistRunRef(input.runId, externalId),
           event: (event) => this.providerRuns!.persistEvent(input.runId, event).then(() => undefined),
@@ -95,9 +93,11 @@ export class TemporalRunActivities implements RunWorkflowActivities {
   }
 
   async steerProvider(input: { runId: string; text: string }): Promise<void> {
-    if (!this.provider) throw new Error("Provider Activity is not configured");
+    if (!this.providers || !this.providerRuns) throw new Error("Provider Activity is not configured");
+    const providerId = this.providerRuns.loadConfiguration(input.runId).providerId;
+    const provider = this.providers.resolve(providerId);
     try {
-      await this.provider.steer(input.runId, input.text);
+      await provider.steer(input.runId, input.text);
     } catch (error) {
       if (error instanceof ProviderProtocolIncompatibleError) {
         await this.recordControlIncompatible(input.runId, error);

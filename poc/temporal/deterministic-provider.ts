@@ -7,8 +7,12 @@ import type {
 } from "@nodra/application";
 
 export class DeterministicProvider implements ProviderPort {
-  readonly providerId = "i6-2-deterministic";
+  readonly providerId: string;
   private executions = 0;
+
+  constructor(providerId = "i6-2-deterministic") {
+    this.providerId = providerId;
+  }
 
   get executionCount(): number {
     return this.executions;

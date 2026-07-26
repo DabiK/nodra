@@ -7,7 +7,7 @@ import {
   NodraSqliteDatabase,
   SqliteProviderCatalogRepository
 } from "@nodra/adapters";
-import { SmokeProvider } from "@nodra/application";
+import { ProviderRegistry, SmokeProvider } from "@nodra/application";
 import { describe, expect, it } from "vitest";
 import { ProviderSmokeCli } from "./provider-smoke-cli.js";
 
@@ -23,7 +23,7 @@ describe("real Codex provider smoke", () => {
         const provider = new CodexProviderAdapter();
         await catalog.save(await provider.probe());
         await expect(new ProviderSmokeCli(
-          new SmokeProvider(provider, catalog),
+          new SmokeProvider(new ProviderRegistry([provider]), catalog),
           root
         ).execute("provider:smoke", [
           "codex",
