@@ -20,7 +20,7 @@ Au boot : verrou singleton data-root; intégrité SQLite; migrations; supervisor
 | application | transaction+outbox, snapshot atomique, authorisation/confirmations, conflit version |
 | SQLite/Drizzle | schéma TS strict → migration générée → SQLite neuve; FK/index/triggers/FTS, `foreign_key_check`, drift DDL contractuel, WAL/backup restore |
 | Temporal | test environment, Signals/Updates/Queries, replay/version patch, timer/retry/cancel, réutilisation snapshot |
-| adapters | fixtures JSON-RPC Codex et SDK Copilot, validation options versionnée, capability absence sans fallback |
+| adapters | fixtures JSON-RPC Codex et HTTP/SSE OpenCode, validation options versionnée, capability absence sans fallback |
 | intégration | Nest Express REST/SSE/CLI mêmes use cases, SQLite réel + Temporal local isolé |
 | e2e | mission humaine sans config, preview sans I/O, héritage/override, audit snapshot, crash/reboot, retry historique vs nouvelle tentative, proof stale |
 | sécurité | path traversal, secret redaction, loopback, confirmation scope, MCP distant |

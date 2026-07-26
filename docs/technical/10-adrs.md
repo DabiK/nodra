@@ -7,7 +7,7 @@
 | ADR-003 | SQLite vérité métier + artefacts filesystem | accepté (validé) |
 | ADR-004 | Temporal self-host, pas Cloud | accepté sous POC packaging |
 | ADR-005 | outbox/inbox SQLite–Temporal | proposé à approuver |
-| ADR-006 | Codex app-server et Copilot SDK | accepté (validé) |
+| ADR-006 | Codex app-server et OpenCode server HTTP/OpenAPI; aucun parsing de CLI provider | accepté (validé) |
 | ADR-007 | capacités provider, absence visible | accepté (validé) |
 | ADR-008 | preuves immuables/digests/staleness | proposé à approuver |
 | ADR-009 | MCP/full access par défaut + confirmations | accepté (validé) |

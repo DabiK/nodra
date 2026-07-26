@@ -19,7 +19,7 @@ Ce choix est préférable à un scheduler interne : les sémantiques de reprise,
 
 Codex s'intègre au **Codex app-server JSON-RPC**, surface locale dédiée à l'orchestration, et non au CLI parsé. L'adaptateur conserve les identifiants app-server dans son mapping d'infrastructure; le domaine ne connaît que des références provider. Référence : [Codex app-server protocol](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md).
 
-Copilot s'intègre au SDK officiel TypeScript. Le SDK dialogue avec le CLI via JSON-RPC et gère le binaire groupé dans le mode standard; sessions, streaming, steering/queueing, hooks et MCP doivent être vérifiés contre la version figée durant le POC. Références : [SDK](https://docs.github.com/en/copilot/how-tos/copilot-sdk), [CLI groupé](https://docs.github.com/en/copilot/how-tos/copilot-sdk/setup/bundled-cli), [MCP](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/mcp).
+OpenCode s'intègre à son serveur local HTTP/OpenAPI, démarré et supervisé explicitement par Nodra sur loopback, jamais par parsing de sortie CLI. L'adaptateur doit découvrir les modèles et capacités via l'API exposée, consommer les événements SSE et conserver les identifiants de session/runs dans son mapping d'infrastructure. Une POC borne la faisabilité des sessions, streaming, interruption, reprise, steering, usage, pièces jointes et MCP avant de déclarer toute capacité disponible. Référence : [OpenCode Server](https://opencode.ai/docs/server/).
 
 ## Temporal local : limite importante
 

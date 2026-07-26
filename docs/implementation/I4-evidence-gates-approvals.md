@@ -96,7 +96,7 @@ Les évaluateurs supplémentaires devront recevoir un nouvel `evaluatorId` ou un
 
 - `npm run lint` : réussi ;
 - `npm run typecheck` : réussi ;
-- `npm test` : 18 fichiers et 70 tests réussis, incluant parent/child, reprise et replay Temporal I3 ;
+- `npm test` : 18 fichiers et 73 tests réussis, incluant parent/child, reprise et replay Temporal I3 ;
 - `npm run build` : six workspaces construits ;
 - `npm run db:setup -- <base-neuve>` : versions de migration 1, 2 et 3 (`0000`, `0001`, `0002`) enregistrées, FK et WAL valides ;
 - upgrade automatisé depuis une base arrêtée après `0001` vers `0002` : version 3 seule appliquée et index unique de consommation présent ;

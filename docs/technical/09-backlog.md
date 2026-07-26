@@ -6,7 +6,7 @@
 4. **Evidence/Gates** — collecteur command/Git, artefacts digest, approbation; critères : preuve stale refusée.
 5. **Workspaces/Git** — repo/worktree, confirmations; critères : aucune intégration ou suppression sans portée visible.
 6. **Codex** — app-server adapter, capabilities, streaming/cancel/resume; critères : fixture + probe opt-in.
-7. **Copilot** — SDK adapter, steering/queue/MCP; critères : absence explicite de toute capability non prouvée.
+7. **OpenCode** — serveur HTTP/OpenAPI local, événements SSE, sessions et capabilities; critères : aucune sortie CLI parsée et absence explicite de toute capability non prouvée.
 8. **Pipelines/manager/budgets** — dependencies, child workflows, policies; critères : retry ciblé et confirmation dépassement.
 9. **Packaging/recovery** — runtime temporal, backup/restore/update; critères : matrice OS POC satisfaite.
 

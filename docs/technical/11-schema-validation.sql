@@ -39,8 +39,8 @@ INSERT INTO budget_window VALUES('bw-global','global',NULL,'week','confirmable',
 INSERT INTO budget_window VALUES('bw-mission','mission','ma','mission_lifetime','confirmable',20,NULL,'2026-07-21T00:00:00Z',NULL);
 
 INSERT INTO conversation_item VALUES('ci','cm',1,'user','acknowledged','hello',NULL,'2026-07-21T00:00:00Z','2026-07-21T00:00:00Z');
-INSERT INTO conversation VALUES('cm-copilot','ma',NULL,'copilot',NULL,'open','2026-07-21T00:00:00Z',NULL);
--- Le changement manuel de provider conserve ci/ cm et ouvre cm-copilot : aucun transfert d'items.
+INSERT INTO conversation VALUES('cm-opencode','ma',NULL,'opencode',NULL,'open','2026-07-21T00:00:00Z',NULL);
+-- Le changement manuel de provider conserve ci/ cm et ouvre cm-opencode : aucun transfert d'items.
 
 PRAGMA foreign_key_check;
 PRAGMA foreign_key_list(run);
@@ -53,6 +53,6 @@ SELECT 'manager_conversation_run' AS scenario, r.id FROM run r JOIN conversation
 SELECT 'pipeline_scratch' AS scenario, id FROM pipeline WHERE id='ps' AND project_id IS NULL;
 SELECT 'gate_proof' AS scenario, e.id FROM gate_evaluation e JOIN gate_evaluation_evidence x ON x.evaluation_id=e.id WHERE e.id='ge';
 SELECT 'blob_attachment' AS scenario, blob_id FROM mission_input_attachment WHERE mission_id='ma';
-SELECT 'provider_change_new_conversation' AS scenario, id FROM conversation WHERE id='cm-copilot' AND provider_id='copilot';
+SELECT 'provider_change_new_conversation' AS scenario, id FROM conversation WHERE id='cm-opencode' AND provider_id='opencode';
 SELECT 'budget_v1_windows' AS scenario, count(*) FROM budget_window WHERE enforcement='confirmable' AND hard_limit_units IS NULL;
 SELECT 'retention_v1_no_auto_purge' AS scenario, automatic_purge_enabled FROM retention_policy WHERE id=1;

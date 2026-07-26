@@ -8,13 +8,13 @@ title Nodra V1
 Person(user, "Développeur solo")
 System(nodra, "Nodra", "Application locale")
 System_Ext(codex, "Codex app-server", "JSON-RPC local")
-System_Ext(copilot, "Copilot SDK/CLI", "SDK officiel")
+System_Ext(opencode, "OpenCode server", "HTTP/OpenAPI local")
 System_Ext(mcp, "MCP", "Tous les serveurs configurés")
 Rel(user, nodra, "UI web ou CLI")
 Rel(nodra, codex, "provider adapter")
-Rel(nodra, copilot, "provider adapter")
+Rel(nodra, opencode, "provider adapter")
 Rel(codex, mcp, "outils")
-Rel(copilot, mcp, "outils")
+Rel(opencode, mcp, "outils")
 ```
 
 ```mermaid
@@ -45,7 +45,7 @@ Rel(worker, art, "écrit artefacts")
 | `adapters/in` | Nest REST/SSE, CLI | application uniquement |
 | `adapters/out/sqlite` | repositories, outbox, schema Drizzle, migrations générées | ports + Drizzle + driver SQLite |
 | `adapters/out/temporal` | client/worker/workflow | ports + SDK Temporal |
-| `adapters/out/providers` | Codex app-server, Copilot SDK | ports + SDK/protocole |
+| `adapters/out/providers` | Codex app-server, OpenCode server HTTP/OpenAPI | ports + protocole/client HTTP |
 | `adapters/out/git,fs,process` | Git, worktree, observations, artefacts | ports + OS |
 
 Les Workflows Temporal ne contiennent pas d'I/O ni de règle métier persistée. Ils attendent, coordonnent et appellent des Activities; toute écriture SQLite, provider, Git ou fichier est une Activity idempotente.

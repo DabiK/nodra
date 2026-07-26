@@ -21,8 +21,8 @@ SQLite reste la vérité métier. Drizzle ORM fournit le schéma TypeScript stri
 
 ## Gate de validation humaine
 
-Figé : Nodra, TS strict, NestJS/Express, React/Vite, SQLite vérité métier, Temporal self-host, Codex app-server, Copilot SDK, MCP/full-access par défaut avec confirmation sensible.
+Figé : Nodra, TS strict, NestJS/Express, React/Vite, SQLite vérité métier, Temporal self-host, Codex app-server, OpenCode server HTTP/OpenAPI, MCP/full-access par défaut avec confirmation sensible. Copilot CLI/SDK est hors V1.
 
 Décisions produit closes : budget global hebdomadaire + mission lifetime confirmables; conservation indéfinie, tombstone/restauration, aucune purge automatique; historique neuf Nodra uniquement et briefing génératif après V1. Le propriétaire conserve seulement le gate de résultat POC Temporal.
 
-Risques POC : distribution Temporal durable multi-OS; compatibilités réelles Codex/Copilot; sémantique d'annulation d'effets externes. ADR à approuver : ADR-004, ADR-005, ADR-008, ADR-010 à ADR-014 ([10-adrs.md](10-adrs.md)). Aucun POC ne commence avant ce gate.
+Risques POC : distribution Temporal durable multi-OS; compatibilités réelles Codex/OpenCode; sémantique d'annulation d'effets externes. ADR à approuver : ADR-004, ADR-005, ADR-008, ADR-010 à ADR-014 ([10-adrs.md](10-adrs.md)). Aucun POC ne commence avant ce gate.

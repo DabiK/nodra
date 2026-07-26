@@ -6,7 +6,7 @@ Statut : **contraintes V1 validées; seuils et mécanismes détaillés différé
 
 - **NFR-01 / DEC-V** — Fonctionnement local-first et mono-utilisateur; aucun besoin de disponibilité SaaS, tenant, compte ou rôle.
 - **NFR-02 / DEC-V** — Aucune exigence de migration ou rétrocompatibilité avec les données historiques du MVP.
-- **NFR-03 / DEC-V** — Contrat provider stable, testé indépendamment pour Codex et Copilot, extensible sans dépendance du domaine à leurs protocoles.
+- **NFR-03 / DEC-V** — Contrat provider stable, testé indépendamment pour Codex et OpenCode, extensible sans dépendance du domaine à leurs protocoles. Copilot CLI/SDK est hors V1.
 - **NFR-04 / DEC-V** — Capacités optionnelles détectables et dégradation produit explicite; aucun fallback silencieux.
 - **NFR-05 / DEC-V** — Aucune action coûteuse ou à effet de bord lors d'une simple inspection.
 - **NFR-06 / DEC-V** — Données, dépôts et secrets restent locaux sauf transmission explicitement requise par un provider ou MCP choisi.

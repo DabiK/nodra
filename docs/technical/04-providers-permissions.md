@@ -31,9 +31,9 @@ Pour `manager`, le prompt effectif est exactement `app_config.global_manager_pro
 | Provider | Intégration primaire | POC obligatoire |
 | --- | --- | --- |
 | Codex | app-server JSON-RPC; process supervisor; mapping de notifications/requests | session/resume, cancel, approval, stream, modèle, pièces jointes, MCP, usage |
-| Copilot | `@github/copilot-sdk` officiel | session, events, `immediate/enqueue`, stop, hooks permissions, MCP, attachments, usage |
+| OpenCode | serveur local HTTP/OpenAPI sur loopback, démarré/supervisé explicitement; API events SSE | session/resume, cancel, stream, steer/queue si exposés, modèle, pièces jointes, MCP, usage |
 
-Références : [Codex app-server](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md), [Copilot SDK](https://docs.github.com/en/copilot/how-tos/copilot-sdk), [steering](https://github.com/github/copilot-sdk/blob/main/docs/features/steering-and-queueing.md).
+Références : [Codex app-server](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md), [OpenCode Server](https://opencode.ai/docs/server/). Aucun adaptateur provider ne parse la sortie d'un CLI; Copilot CLI/SDK est hors V1.
 
 ## Permissions et MCP
 

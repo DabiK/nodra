@@ -7,7 +7,7 @@
 | D-00 | Le nouveau produit s'appelle **Nodra**. DevFlow désigne uniquement le MVP historique analysé. |
 | D-01 | Local-first, mono-utilisateur, sans SaaS, comptes, rôles ni collaboration. |
 | D-02 | Base transactionnelle locale propre; aucune migration/rétrocompatibilité des données historiques MVP. Logs et artefacts volumineux séparés; export/import manuel simple. |
-| D-03 | Codex et Copilot initiaux, extension future sans coupler le domaine aux protocoles provider. |
+| D-03 | Codex et OpenCode initiaux, extension future sans coupler le domaine aux protocoles provider. Copilot CLI/SDK est hors V1. |
 | D-04 | Relais unique : prêt, actif, bloqué, décision requise. Projets comme contexte/filtre et page secondaire; pas de page Agents V1. |
 | D-05 | Projet implicite pour un dépôt, facultatif pour scratch; vocabulaire Mission, Pipeline, Manager, Provider. |
 | D-06 | Capture titre seul; mission humaine sans agent autorisée. Lifecycle : brouillon, prête, active, bloquée, à valider, terminée, abandonnée. |
@@ -22,7 +22,7 @@
 | D-15 | Direction backend hexagonale/modulaire validée; pas de copie du découpage accidentel MVP. |
 | D-16 | Temporal self-host local est le moteur durable retenu; Temporal Cloud est hors architecture. Nodra supervise un runtime téléchargé et versionné. |
 | D-17 | TypeScript strict, NestJS/Express, React/Vite. SQLite Nodra est la vérité métier; Temporal est le journal et contrôleur d'exécution, sans double écriture fragile. |
-| D-18 | Codex V1 s'intègre d'abord au Codex app-server JSON-RPC; GitHub Copilot V1 au SDK officiel. |
+| D-18 | Codex V1 s'intègre au Codex app-server JSON-RPC; OpenCode V1 à son serveur local HTTP/OpenAPI documenté. Aucun parsing de CLI provider n'est autorisé. |
 | D-19 | Budgets V1 : plafond global hebdomadaire et plafond mission sur toute sa durée de vie, seuils confirmables; override borné/auditable; hard-cap seulement si explicitement configuré. |
 | D-20 | Rétention V1 : conservation indéfinie; suppression soft-delete restaurable; aucune purge automatique; purge manuelle confirmée seulement pour blobs non référencés. |
 | D-21 | Briefing V1 : seul l'historique neuf Nodra est consultable; aucun import DevFlow; génération dédiée après V1. |

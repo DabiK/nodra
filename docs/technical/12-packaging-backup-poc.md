@@ -46,6 +46,6 @@ Précondition : gate humain + ADR-004/005/008/010. Le POC est isolé, sans impor
 3. Signal cancel/steer, Update approve/retry, Query état; timeout/heartbeat Activity;
 4. backup/restore de SQLite+Temporal+artefacts dans root neuf; mapping stable;
 5. upgrade runtime/worker et replay d'un historique existant; rollback documenté;
-6. connecter les deux adapters via doubles/fixtures, puis probes humains Codex app-server et Copilot SDK si credentials disponibles.
+6. connecter les deux adapters via doubles/fixtures, puis probes humains Codex app-server et OpenCode server HTTP/OpenAPI si les environnements locaux requis sont disponibles; aucune probe ne parse un CLI provider ni n'exige Copilot.
 
 Critères de sortie : aucune écriture cloud; aucune duplication d'effet test; health robuste après crash; persistance validée avec backend officiellement supporté; port conflict géré; uninstall ne supprime jamais data root sans confirmation; logs exploitables; chaque OS supporté ou explicitement retiré par décision propriétaire. Échec : pas de fallback Temporal Cloud, pas de scheduler interne implicite; le propriétaire reçoit le diagnostic et décide du support/architecture.

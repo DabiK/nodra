@@ -41,7 +41,7 @@ Les tests d'architecture empêchent les dépendances interdites entre couches, l
 - Santé Nodra accessible depuis NestJS et la CLI.
 - État de santé explicite : SQLite actif, orchestration Temporal désactivée, providers désactivés.
 
-Cette tranche pose volontairement les ports sans installer une fausse intégration Temporal, Codex ou Copilot.
+Cette tranche pose volontairement les ports sans installer une fausse intégration Temporal, Codex ou OpenCode.
 
 ## Validation finale indépendante
 
@@ -61,7 +61,7 @@ Les tests de migration couvrent une base neuve, le redémarrage idempotent, le r
 - cycle de vie complet des missions et projections du Relais ;
 - transactions métier avec événements d'audit et outbox ;
 - exécution durable via Temporal derrière le port existant ;
-- adapters Codex app-server et Copilot SDK ;
+- adapters Codex app-server et OpenCode server HTTP/OpenAPI ;
 - pipelines, managers, budgets et gates ;
 - interface React et cadrage détaillé de ses parcours.
 
