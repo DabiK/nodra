@@ -22,7 +22,11 @@ export type {
   RunWorkflowInput,
   RunWorkflowStartedInput,
   RunWorkflowStartedRequest,
-  RunWorkflowStartedResult
+  RunWorkflowStartedResult,
+  RunWorkflowTerminalInput,
+  RunWorkflowTerminalRequest,
+  RunWorkflowTerminalResult,
+  RunTerminalState
 } from "./temporal/contracts.js";
 export {
   MISSION_CANCEL_SIGNAL,
@@ -42,3 +46,4 @@ export { SqliteDeliveryRepository } from "./sqlite/sqlite-delivery-repository.js
 export { SqliteConfirmationRepository } from "./sqlite/sqlite-confirmation-repository.js";
 export { LocalWorkspaceAdapter } from "./git/local-workspace-adapter.js";
 export { SqliteWorkspaceRepository } from "./sqlite/sqlite-workspace-repository.js";
+export { SqliteWorkspaceDeletionReservation } from "./sqlite/sqlite-workspace-deletion-reservation.js";

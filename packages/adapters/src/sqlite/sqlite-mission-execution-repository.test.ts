@@ -91,7 +91,9 @@ describe("SqliteMissionExecutionRepository", () => {
       expect.objectContaining({ runId: "run-mission-agent", cwd: join(tmpdir(), "workspace-mission-agent") })
     ]);
     expect(database.orm.select().from(businessAuditEvents).where(eq(businessAuditEvents.commandId, "command-start")).all())
-      .toHaveLength(1);
+      .toHaveLength(2);
+    expect(database.orm.select().from(workspaces).where(eq(workspaces.id, "workspace-mission-agent")).get())
+      .toMatchObject({ state: "in_use" });
     expect(database.orm.select().from(outbox).where(eq(outbox.kind, "workflow.mission.start")).all())
       .toEqual([expect.objectContaining({ dedupeKey: "mission/mission-agent", publishedAt: null })]);
     expect(database.orm.select().from(relayItems).where(eq(relayItems.missionId, "mission-agent")).get())
@@ -119,6 +121,8 @@ describe("SqliteMissionExecutionRepository", () => {
     expect(database.orm.select().from(runs).all()).toHaveLength(0);
     expect(database.orm.select().from(runConfigSnapshots).all()).toHaveLength(0);
     expect(database.orm.select().from(outbox).where(eq(outbox.kind, "workflow.mission.start")).all()).toHaveLength(0);
+    expect(database.orm.select().from(workspaces).where(eq(workspaces.id, "workspace-mission-agent")).get())
+      .toMatchObject({ state: "ready" });
   });
 
   it("prioritizes missing persisted configuration before runtime health", async () => {

@@ -23,11 +23,17 @@ export class SqliteMissionExecutionRepository implements MissionExecutionReposit
         throw new DomainError("A persisted agent configuration is required before start", "AGENT_CONFIG_REQUIRED");
       }
       const workspace = this.database.orm
-        .select({ id: workspaces.id })
+        .select({ id: workspaces.id, state: workspaces.state })
         .from(workspaces)
         .where(eq(workspaces.id, config.workspaceId))
         .get();
       if (!workspace) throw new DomainError("The configured workspace was not found", "AGENT_CONFIG_REQUIRED");
+      if (workspace.state !== "ready") {
+        throw new DomainError(
+          `The configured workspace is ${workspace.state}, expected ready`,
+          "WORKSPACE_STATE_CONFLICT"
+        );
+      }
     } catch (error) {
       throw translateSqliteError(error);
     }
@@ -67,11 +73,22 @@ export class SqliteMissionExecutionRepository implements MissionExecutionReposit
           throw new DomainError("A persisted agent configuration is required before start", "AGENT_CONFIG_REQUIRED");
         }
         const workspace = transaction
-          .select({ path: workspaces.path })
+          .select({ path: workspaces.path, state: workspaces.state })
           .from(workspaces)
           .where(eq(workspaces.id, config.workspaceId))
           .get();
         if (!workspace) throw new DomainError("The configured workspace was not found", "AGENT_CONFIG_REQUIRED");
+        const reservedWorkspace = transaction
+          .update(workspaces)
+          .set({ state: "in_use" })
+          .where(and(eq(workspaces.id, config.workspaceId), eq(workspaces.state, "ready")))
+          .run();
+        if (reservedWorkspace.changes !== 1) {
+          throw new DomainError(
+            `The configured workspace is ${workspace.state}, expected ready`,
+            "WORKSPACE_STATE_CONFLICT"
+          );
+        }
 
         const previousRun = transaction
           .select({ userAttempt: runs.userAttempt })
@@ -147,6 +164,22 @@ export class SqliteMissionExecutionRepository implements MissionExecutionReposit
             runId: input.runId,
             workflowId: input.workflowId,
             missionVersion: mission.version
+          }),
+          occurredAt: input.context.occurredAt
+        }).run();
+        transaction.insert(businessAuditEvents).values({
+          id: `audit/workspace/${input.context.commandId}/in-use`,
+          aggregateKind: "workspace",
+          aggregateId: config.workspaceId,
+          commandId: input.context.commandId,
+          eventType: "WORKSPACE_RESERVED_FOR_RUN",
+          actor: input.context.actor,
+          payloadJson: JSON.stringify({
+            schemaVersion: 1,
+            missionId: mission.id,
+            runId: input.runId,
+            previousState: "ready",
+            state: "in_use"
           }),
           occurredAt: input.context.occurredAt
         }).run();

@@ -30,8 +30,29 @@ export interface RunWorkflowStartedResult {
   applied: boolean;
 }
 
+export type RunTerminalState = "SUCCEEDED" | "FAILED" | "CANCELLED";
+
+export interface RunWorkflowTerminalRequest {
+  missionId: string;
+  commandId: string;
+  runId: string;
+  messageId: string;
+  state: RunTerminalState;
+  schemaVersion: 1;
+}
+
+export interface RunWorkflowTerminalInput extends RunWorkflowTerminalRequest {
+  temporalRunId: string;
+  occurredAt: string;
+}
+
+export interface RunWorkflowTerminalResult {
+  applied: boolean;
+}
+
 export interface RunWorkflowActivities {
   recordStarted(input: RunWorkflowStartedRequest): Promise<RunWorkflowStartedResult>;
+  recordTerminal(input: RunWorkflowTerminalRequest): Promise<RunWorkflowTerminalResult>;
 }
 
 export interface MissionWorkflowStatus {

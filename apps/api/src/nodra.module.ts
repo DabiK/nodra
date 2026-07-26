@@ -21,6 +21,7 @@ import {
   SqliteMissionExecutionRepository,
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
+  SqliteWorkspaceDeletionReservation,
   SqliteWorkflowOutboxStore,
   SqliteWorkflowReconciliationStore
 } from "@nodra/adapters";
@@ -171,12 +172,15 @@ export class NodraModule {
         },
         {
           provide: DELETE_WORKSPACE,
-          inject: [DATABASE, WORKSPACE_PORT, MANAGE_CONFIRMATIONS],
+          inject: [DATABASE, WORKSPACE_PORT],
           useFactory: (
             database: NodraSqliteDatabase,
-            workspace: LocalWorkspaceAdapter,
-            confirmations: ManageConfirmations
-          ) => new DeleteWorkspace(new SqliteWorkspaceRepository(database), workspace, confirmations)
+            workspace: LocalWorkspaceAdapter
+          ) => new DeleteWorkspace(
+            new SqliteWorkspaceRepository(database),
+            workspace,
+            new SqliteWorkspaceDeletionReservation(database)
+          )
         },
         {
           provide: RESTORE_WORKSPACE,

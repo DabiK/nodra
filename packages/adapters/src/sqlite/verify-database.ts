@@ -28,7 +28,8 @@ const REQUIRED_TRIGGERS = [
   "manager_ready_requires_instruction",
   "mission_config_only_for_agent",
   "confirmation_exact_fields_immutable",
-  "confirmation_state_transition"
+  "confirmation_state_transition",
+  "workspace_state_transition"
 ] as const;
 
 export interface DatabaseVerification {

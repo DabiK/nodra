@@ -20,6 +20,7 @@ import { SqliteConfirmationRepository } from "./sqlite-confirmation-repository.j
 import { workspaceGitSnapshots } from "./schema/core.js";
 import { missionAgentConfigs, missions } from "./schema/missions.js";
 import { SqliteWorkspaceRepository } from "./sqlite-workspace-repository.js";
+import { SqliteWorkspaceDeletionReservation } from "./sqlite-workspace-deletion-reservation.js";
 
 const exec = promisify(execFile);
 
@@ -156,7 +157,11 @@ describe("I5 SQLite workspace use cases", () => {
       context: at("create-scratch")
     });
     await writeFile(join(workspace.path, "preserved.txt"), "preserved");
-    const deletion = new DeleteWorkspace(repository, adapter, confirmations);
+    const deletion = new DeleteWorkspace(
+      repository,
+      adapter,
+      new SqliteWorkspaceDeletionReservation(database)
+    );
 
     database.connection.exec(`
       insert into mission(id,project_id,title,execution_kind,state,version,created_at,updated_at)

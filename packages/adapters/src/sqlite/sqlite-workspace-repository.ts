@@ -200,33 +200,30 @@ export class SqliteWorkspaceRepository implements WorkspaceRepository {
     });
   }
 
-  async tombstone(input: Parameters<WorkspaceRepository["tombstone"]>[0]) {
+  async completeDeletion(input: Parameters<WorkspaceRepository["completeDeletion"]>[0]) {
     return this.database.orm.transaction((tx) => {
       const replay = tx
         .select({ aggregateId: businessAuditEvents.aggregateId })
         .from(businessAuditEvents)
         .where(and(
           eq(businessAuditEvents.commandId, input.context.commandId),
-          eq(businessAuditEvents.aggregateKind, "workspace")
+          eq(businessAuditEvents.aggregateKind, "workspace"),
+          eq(businessAuditEvents.eventType, "WORKSPACE_TOMBSTONED")
         ))
         .get();
       if (replay) return this.readFrom(tx, replay.aggregateId);
       const current = this.readFrom(tx, input.workspaceId);
       if (current.state === "deleted") return current;
-      const pending = tx.update(workspaces)
-        .set({ state: "pending_delete" })
-        .where(and(eq(workspaces.id, input.workspaceId), eq(workspaces.state, "ready")))
-        .run();
-      if (pending.changes !== 1) {
-        throw new DomainError("Workspace deletion state conflict", "WORKSPACE_STATE_CONFLICT");
-      }
-      tx.update(workspaces).set({
+      const deleted = tx.update(workspaces).set({
         state: "deleted",
         tombstonedAt: input.context.occurredAt
       }).where(and(
         eq(workspaces.id, input.workspaceId),
         eq(workspaces.state, "pending_delete")
       )).run();
+      if (deleted.changes !== 1) {
+        throw new DomainError("Workspace deletion was not reserved", "WORKSPACE_STATE_CONFLICT");
+      }
       tx.update(workspaceRepositories).set({
         tombstonedAt: input.context.occurredAt
       }).where(eq(workspaceRepositories.workspaceId, input.workspaceId)).run();
@@ -250,7 +247,7 @@ export class SqliteWorkspaceRepository implements WorkspaceRepository {
       this.audit(tx, input.context, input.workspaceId, "WORKSPACE_TOMBSTONED", {
         path: current.path,
         kind: current.kind
-      });
+      }, `audit/workspace/${input.context.commandId}/deleted`);
       return this.readFrom(tx, input.workspaceId);
     });
   }
@@ -351,10 +348,11 @@ export class SqliteWorkspaceRepository implements WorkspaceRepository {
     context: CommandContext,
     workspaceId: string,
     eventType: string,
-    payload: Record<string, unknown>
+    payload: Record<string, unknown>,
+    id = `audit/${context.commandId}`
   ): void {
     tx.insert(businessAuditEvents).values({
-      id: `audit/${context.commandId}`,
+      id,
       aggregateKind: "workspace",
       aggregateId: workspaceId,
       commandId: context.commandId,

@@ -6,6 +6,7 @@ import {
   migrateDatabase,
   NodraSqliteDatabase,
   SqliteConfirmationRepository,
+  SqliteWorkspaceDeletionReservation,
   SqliteWorkspaceRepository
 } from "@nodra/adapters";
 import {
@@ -47,7 +48,11 @@ describe("I5 CLI", () => {
         new SnapshotWorkspace(repository, adapter),
         new CommitWorkspace(repository, adapter, confirmations),
         new IntegrateWorkspace(repository, adapter, confirmations),
-        new DeleteWorkspace(repository, adapter, confirmations),
+        new DeleteWorkspace(
+          repository,
+          adapter,
+          new SqliteWorkspaceDeletionReservation(database)
+        ),
         new RestoreWorkspace(repository, adapter)
       )
     ]);

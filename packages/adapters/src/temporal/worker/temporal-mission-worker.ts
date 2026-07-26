@@ -24,7 +24,10 @@ export class TemporalMissionWorker {
       namespace: this.options.namespace,
       taskQueue: MISSION_TASK_QUEUE,
       workflowsPath: this.options.workflowsPath,
-      activities: { recordStarted: this.activities.recordStarted.bind(this.activities) }
+      activities: {
+        recordStarted: this.activities.recordStarted.bind(this.activities),
+        recordTerminal: this.activities.recordTerminal.bind(this.activities)
+      }
     });
     await this.worker.run();
   }

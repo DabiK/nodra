@@ -153,6 +153,14 @@ CREATE TRIGGER confirmation_state_transition BEFORE UPDATE OF state ON confirmat
 ) BEGIN
   SELECT RAISE(ABORT,'invalid confirmation state transition');
 END;
+CREATE TRIGGER workspace_state_transition BEFORE UPDATE OF state ON workspace WHEN NOT (
+  (OLD.state='ready' AND NEW.state IN('ready','in_use','pending_delete')) OR
+  (OLD.state='in_use' AND NEW.state IN('in_use','ready')) OR
+  (OLD.state='pending_delete' AND NEW.state IN('pending_delete','deleted')) OR
+  (OLD.state='deleted' AND NEW.state IN('deleted','ready'))
+) BEGIN
+  SELECT RAISE(ABORT,'invalid workspace state transition');
+END;
 ```
 
 `search_document_registry` fournit l'unicité que FTS5 ne peut pas imposer : la transaction crée/remplace le document FTS seulement après avoir réservé `(entity_kind,entity_id)`; le delete/tombstone supprime le registre et le document FTS. L'index ne reçoit ni secret, ni options sensibles, ni stdout/stderr/log provider brut.

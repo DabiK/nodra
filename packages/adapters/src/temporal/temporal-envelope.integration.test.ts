@@ -106,7 +106,10 @@ describe.sequential("Temporal durable envelope", () => {
       namespace: "default",
       taskQueue: MISSION_TASK_QUEUE,
       workflowsPath,
-      activities: { recordStarted: activities.recordStarted.bind(activities) }
+      activities: {
+        recordStarted: activities.recordStarted.bind(activities),
+        recordTerminal: activities.recordTerminal.bind(activities)
+      }
     });
   };
 
@@ -234,7 +237,15 @@ describe.sequential("Temporal durable envelope", () => {
     const childHistory = await environment.client.workflow.getHandle("run/run-crash").fetchHistory();
     await expect(Worker.runReplayHistory({ workflowsPath }, parentHistory, "mission/crash")).resolves.toBeUndefined();
     await expect(Worker.runReplayHistory({ workflowsPath }, childHistory, "run/run-crash")).resolves.toBeUndefined();
-    expect(database.orm.select().from(inbox).all()).toHaveLength(2);
+    expect(database.orm.select().from(inbox).all()).toHaveLength(4);
+    expect(database.orm.select().from(runs).where(eq(runs.id, "run-crash")).get())
+      .toMatchObject({ state: "CANCELLED" });
+    expect(database.orm.select().from(runs).where(eq(runs.id, "run-normal")).get())
+      .toMatchObject({ state: "CANCELLED" });
+    expect(database.orm.select().from(workspaces).where(eq(workspaces.id, "workspace-crash")).get())
+      .toMatchObject({ state: "ready" });
+    expect(database.orm.select().from(workspaces).where(eq(workspaces.id, "workspace-normal")).get())
+      .toMatchObject({ state: "ready" });
     expect(normalParent.workflowId).toBe("mission/normal");
   }, 120_000);
 });

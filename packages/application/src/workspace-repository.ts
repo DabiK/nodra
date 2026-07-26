@@ -41,7 +41,7 @@ export interface WorkspaceRepository {
     after: WorkspaceGitSnapshot;
     context: CommandContext;
   }): Promise<WorkspaceMutationResult>;
-  tombstone(input: {
+  completeDeletion(input: {
     workspaceId: Id;
     context: CommandContext;
   }): Promise<WorkspaceRecord>;

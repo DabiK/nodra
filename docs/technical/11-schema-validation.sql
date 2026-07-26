@@ -64,4 +64,5 @@ SELECT 'budget_v1_windows' AS scenario, count(*) FROM budget_window WHERE enforc
 SELECT 'confirmation_exact_workspace_once' AS scenario, id FROM confirmation WHERE id='cf-worktree-delete' AND scope='once' AND workspace_id='ws1' AND state='approved';
 SELECT 'confirmation_indexes' AS scenario, count(*) FROM sqlite_master WHERE type='index' AND name IN('idx_confirmation_state_expires','idx_confirmation_run','idx_confirmation_mission','idx_confirmation_workspace');
 SELECT 'confirmation_guards' AS scenario, count(*) FROM sqlite_master WHERE type='trigger' AND name IN('confirmation_exact_fields_immutable','confirmation_state_transition');
+SELECT 'workspace_lifecycle_guard' AS scenario, count(*) FROM sqlite_master WHERE type='trigger' AND name='workspace_state_transition';
 SELECT 'retention_v1_no_auto_purge' AS scenario, automatic_purge_enabled FROM retention_policy WHERE id=1;

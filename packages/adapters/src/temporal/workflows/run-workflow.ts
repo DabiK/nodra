@@ -1,4 +1,9 @@
-import { condition, proxyActivities } from "@temporalio/workflow";
+import {
+  CancellationScope,
+  condition,
+  isCancellation,
+  proxyActivities
+} from "@temporalio/workflow";
 import type { RunWorkflowActivities, RunWorkflowInput } from "../contracts.js";
 
 const activities = proxyActivities<RunWorkflowActivities>({
@@ -8,12 +13,32 @@ const activities = proxyActivities<RunWorkflowActivities>({
 });
 
 export async function RunWorkflow(input: RunWorkflowInput): Promise<void> {
-  await activities.recordStarted({
-    missionId: input.missionId,
-    commandId: input.commandId,
-    runId: input.runId,
-    messageId: `run/${input.runId}/activity/record-started/v${input.schemaVersion}`,
-    schemaVersion: input.schemaVersion
-  });
-  await condition(() => false);
+  try {
+    await activities.recordStarted({
+      missionId: input.missionId,
+      commandId: input.commandId,
+      runId: input.runId,
+      messageId: `run/${input.runId}/activity/record-started/v${input.schemaVersion}`,
+      schemaVersion: input.schemaVersion
+    });
+    await condition(() => false);
+    await activities.recordTerminal({
+      missionId: input.missionId,
+      commandId: input.commandId,
+      runId: input.runId,
+      messageId: `run/${input.runId}/activity/record-terminal/v${input.schemaVersion}`,
+      state: "SUCCEEDED",
+      schemaVersion: input.schemaVersion
+    });
+  } catch (error) {
+    await CancellationScope.nonCancellable(() => activities.recordTerminal({
+      missionId: input.missionId,
+      commandId: input.commandId,
+      runId: input.runId,
+      messageId: `run/${input.runId}/activity/record-terminal/v${input.schemaVersion}`,
+      state: isCancellation(error) ? "CANCELLED" : "FAILED",
+      schemaVersion: input.schemaVersion
+    }));
+    throw error;
+  }
 }

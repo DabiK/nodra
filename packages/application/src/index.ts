@@ -69,6 +69,7 @@ export { DeleteWorkspace } from "./delete-workspace.js";
 export { RestoreWorkspace } from "./restore-workspace.js";
 export type { WorkspacePort } from "./workspace-port.js";
 export type { WorkspaceRepository } from "./workspace-repository.js";
+export type { WorkspaceDeletionReservation } from "./workspace-deletion-reservation.js";
 export type {
   IntegrationMethod,
   RepositoryIdentity,

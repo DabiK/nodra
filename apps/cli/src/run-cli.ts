@@ -19,6 +19,7 @@ import {
   SqliteMissionExecutionRepository,
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
+  SqliteWorkspaceDeletionReservation,
   SqliteWorkflowOutboxStore,
   SqliteWorkflowReconciliationStore
 } from "@nodra/adapters";
@@ -110,7 +111,11 @@ export const runCli = async (
           new SnapshotWorkspace(workspaceRepository, workspace),
           new CommitWorkspace(workspaceRepository, workspace, confirmations),
           new IntegrateWorkspace(workspaceRepository, workspace, confirmations),
-          new DeleteWorkspace(workspaceRepository, workspace, confirmations),
+          new DeleteWorkspace(
+            workspaceRepository,
+            workspace,
+            new SqliteWorkspaceDeletionReservation(database)
+          ),
           new RestoreWorkspace(workspaceRepository, workspace)
         )
       ])
