@@ -1,6 +1,7 @@
 import type { Id, Mission } from "@nodra/domain";
 import type { CommandContext } from "./command-context.js";
 import type { ProviderCatalogSnapshot } from "./provider-model.js";
+import type { ResolvedAgentConfig } from "./agent-config-model.js";
 
 export interface PersistMissionStartInput {
   mission: Mission;
@@ -12,6 +13,7 @@ export interface PersistMissionStartInput {
   outboxId: Id;
   context: CommandContext;
   providerCatalogSnapshot?: ProviderCatalogSnapshot;
+  resolvedConfig?: ResolvedAgentConfig;
 }
 
 export interface MissionExecutionRepository {

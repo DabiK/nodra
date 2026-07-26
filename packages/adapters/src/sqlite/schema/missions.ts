@@ -23,6 +23,7 @@ export const missions = sqliteTable("mission", {
 
 export const missionAgentConfigs = sqliteTable("mission_agent_config", {
   missionId: text("mission_id").primaryKey().references(() => missions.id),
+  version: integer("version").notNull().default(0),
   providerId: text("provider_id"),
   modelId: text("model_id"),
   reasoningEffort: text("reasoning_effort"),
@@ -35,6 +36,7 @@ export const missionAgentConfigs = sqliteTable("mission_agent_config", {
   integrationTargetRef: text("integration_target_ref"),
   updatedAt: text("updated_at").notNull()
 }, (table) => [
+  check("ck_mission_agent_config_version", sql`${table.version} >= 0`),
   check("ck_mission_agent_config_json", sql`json_valid(${table.providerOptionsJson})`),
   check("ck_mission_agent_config_permission", sql`${table.permissionPreset} is null or ${table.permissionPreset} in ('read_only','workspace','full_access')`),
   check("ck_mission_auto_commit", sql`${table.autoCommitAuthorized} in (0,1)`)

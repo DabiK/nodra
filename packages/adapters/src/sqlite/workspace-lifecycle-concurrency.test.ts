@@ -24,6 +24,7 @@ import { runs } from "./schema/runs.js";
 import { SqliteWorkspaceRepository } from "./sqlite-workspace-repository.js";
 import { SqliteWorkspaceDeletionReservation } from "./sqlite-workspace-deletion-reservation.js";
 import { eq } from "drizzle-orm";
+import { conversationItems } from "./schema/conversations.js";
 
 const now = "2026-07-26T12:00:00.000Z";
 
@@ -166,6 +167,18 @@ describe("I5.1 workspace lifecycle concurrency", () => {
         temporalRunId: `temporal-${state}`,
         occurredAt: now
       });
+      if (state === "SUCCEEDED") {
+        database.orm.insert(conversationItems).values({
+          id: "conversation-item/workspace-lifecycle-success",
+          conversationId: "conversation-mission",
+          ordinal: 0,
+          kind: "assistant",
+          deliveryState: "acknowledged",
+          body: "Workspace lifecycle deterministic result",
+          createdAt: now,
+          acknowledgedAt: now
+        }).run();
+      }
       await expect(activity.recordTerminal({
         missionId: "mission",
         commandId: `start-${state}`,

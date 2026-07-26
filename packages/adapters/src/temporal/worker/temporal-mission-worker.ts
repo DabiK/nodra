@@ -11,6 +11,7 @@ export interface TemporalMissionWorkerOptions {
 export class TemporalMissionWorker {
   private connection?: NativeConnection;
   private worker?: Worker;
+  private shutdownRequested = false;
 
   constructor(
     private readonly options: TemporalMissionWorkerOptions,
@@ -31,10 +32,12 @@ export class TemporalMissionWorker {
         steerProvider: this.activities.steerProvider.bind(this.activities)
       }
     });
+    if (this.shutdownRequested) this.worker.shutdown();
     await this.worker.run();
   }
 
   shutdown(): void {
+    this.shutdownRequested = true;
     this.worker?.shutdown();
   }
 

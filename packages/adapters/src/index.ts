@@ -63,3 +63,4 @@ export {
 } from "./codex/codex-process-launcher.js";
 export { SqliteProviderRunStore } from "./sqlite/sqlite-provider-run-store.js";
 export { SqliteProviderPermissionHandler } from "./sqlite/sqlite-provider-permission-handler.js";
+export * from "./sqlite/sqlite-agent-config-repository.js";

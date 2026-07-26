@@ -8,7 +8,8 @@ import { createApp } from "./src/create-app.js";
 import {
   NodraSqliteDatabase,
   SqliteMissionExecutionRepository,
-  SqliteMissionRepository
+  SqliteMissionRepository,
+  SqliteProviderCatalogRepository
 } from "@nodra/adapters";
 import { StartMission, toId } from "@nodra/application";
 import { eq } from "drizzle-orm";
@@ -16,6 +17,8 @@ import { workspaces } from "../../packages/adapters/src/sqlite/schema/core.js";
 import { missionAgentConfigs, missions } from "../../packages/adapters/src/sqlite/schema/missions.js";
 import { outbox } from "../../packages/adapters/src/sqlite/schema/operations.js";
 import { runs } from "../../packages/adapters/src/sqlite/schema/runs.js";
+import { DeterministicProvider } from "../../poc/temporal/deterministic-provider.js";
+import { saveDeterministicCatalog } from "../../poc/temporal/poc-fixture.js";
 
 describe("mission and Relay API", () => {
   let app: NestExpressApplication;
@@ -122,6 +125,10 @@ describe("mission and Relay API", () => {
   it("keeps reads available, blocks start, and exposes dispatch/reconcile when Temporal is unavailable", async () => {
     const database = NodraSqliteDatabase.open(databaseFile);
     try {
+      await saveDeterministicCatalog(
+        new SqliteProviderCatalogRepository(database),
+        new DeterministicProvider()
+      );
       database.orm.insert(workspaces).values({
         id: "workspace-api-agent",
         projectId: null,
@@ -142,8 +149,9 @@ describe("mission and Relay API", () => {
       }).run();
       database.orm.insert(missionAgentConfigs).values({
         missionId: "api-agent",
-        providerId: "configured-not-called",
-        modelId: "configured-not-called",
+        providerId: "i6-2-deterministic",
+        modelId: "fixture-model",
+        reasoningEffort: "low",
         providerOptionsJson: "{}",
         missionPrompt: "No provider",
         permissionPreset: "read_only",

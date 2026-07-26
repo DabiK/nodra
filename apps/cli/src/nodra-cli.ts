@@ -14,6 +14,7 @@ import { ConfirmationRequiredError, DomainError, toId } from "@nodra/application
 import { randomUUID } from "node:crypto";
 import type { I4Cli } from "./i4-cli.js";
 import type { I6Cli } from "./i6-cli.js";
+import type { AgentConfigCli } from "./agent-config-cli.js";
 
 export interface CliOutput {
   write(value: string): void;
@@ -35,7 +36,8 @@ export class NodraCli {
     private readonly reconcileWorkflows: ReconcileWorkflows,
     private readonly output: CliOutput,
     private readonly i4?: I4Cli,
-    private readonly i6?: I6Cli
+    private readonly i6?: I6Cli,
+    private readonly agentConfig?: AgentConfigCli
   ) {}
 
   async run(arguments_: readonly string[]): Promise<number> {
@@ -81,6 +83,10 @@ export class NodraCli {
     }
     if (command && this.i6) {
       const result = await this.i6.execute(command, parameters);
+      if (result !== undefined) return this.write(result);
+    }
+    if (command && this.agentConfig) {
+      const result = await this.agentConfig.execute(command, parameters);
       if (result !== undefined) return this.write(result);
     }
     if (command?.startsWith("mission:")) return this.transition(command.slice("mission:".length), parameters);

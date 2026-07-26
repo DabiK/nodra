@@ -16,6 +16,7 @@ const statusFor = (code: string): number => {
   if (code === "MISSION_NOT_FOUND" || code === "PROJECT_NOT_FOUND") return 404;
   if (
     code === "MISSION_VERSION_CONFLICT" ||
+    code === "AGENT_CONFIG_LOCKED" ||
     code === "TRANSITION_FORBIDDEN" ||
     code === "COMMAND_ID_CONFLICT" ||
     code === "MISSION_ALREADY_EXISTS" || code === "EVIDENCE_STALE" || code === "APPROVAL_ALREADY_DECIDED" ||
@@ -29,6 +30,7 @@ const statusFor = (code: string): number => {
   if (code === "AGENT_CONFIG_REQUIRED") return 422;
   if (code.endsWith("_NOT_FOUND")) return 404;
   if (code === "CAPABILITY_UNAVAILABLE") return 422;
+  if (code === "CONFIG_SCHEMA_UNSUPPORTED" || code === "CONFIG_RESOLUTION_FAILED") return 422;
   if (code === "GATE_DEFINITION_INVALID") return 422;
   if (code === "APPROVAL_REQUIRED") return 428;
   if (code === "CONFIRMATION_REQUIRED") return 428;

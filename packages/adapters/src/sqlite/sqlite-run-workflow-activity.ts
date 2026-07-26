@@ -4,12 +4,15 @@ import type {
   RunWorkflowTerminalInput,
   RunWorkflowTerminalResult
 } from "../temporal/contracts.js";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { workspaces } from "./schema/core.js";
 import { businessAuditEvents, inbox, relayItems } from "./schema/operations.js";
 import { runConfigSnapshots, runs } from "./schema/runs.js";
+import { missions } from "./schema/missions.js";
+import { conversationItems } from "./schema/conversations.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
+import { asId, Mission } from "@nodra/domain";
 
 const consumer = "sqlite.run-workflow-started.v1";
 const terminalConsumer = "sqlite.run-workflow-terminal.v1";
@@ -60,9 +63,12 @@ export class SqliteRunWorkflowActivity {
         const run = transaction.select({
           state: runs.state,
           temporalRunId: runs.temporalRunId,
-          workspaceId: runConfigSnapshots.workspaceId
+          conversationId: runs.conversationId,
+          workspaceId: runConfigSnapshots.workspaceId,
+          mission: missions
         }).from(runs)
           .innerJoin(runConfigSnapshots, eq(runConfigSnapshots.runId, runs.id))
+          .innerJoin(missions, eq(missions.id, runs.missionId))
           .where(and(eq(runs.id, input.runId), eq(runs.missionId, input.missionId)))
           .get();
         if (!run || run.temporalRunId !== input.temporalRunId || !run.workspaceId) {
@@ -87,6 +93,43 @@ export class SqliteRunWorkflowActivity {
           .where(and(eq(workspaces.id, run.workspaceId), eq(workspaces.state, "in_use"))).run();
         if (released.changes !== 1) {
           throw new Error("Terminal Run Workflow Activity could not release its workspace");
+        }
+        const missionState = input.state === "SUCCEEDED" ? "VALIDATION" : "BLOCKED";
+        let missionVersion = run.mission.version + 1;
+        if (input.state === "SUCCEEDED") {
+          const declaredResult = transaction.select({ body: conversationItems.body })
+            .from(conversationItems)
+            .where(and(
+              eq(conversationItems.conversationId, run.conversationId),
+              eq(conversationItems.kind, "assistant")
+            ))
+            .orderBy(desc(conversationItems.ordinal))
+            .limit(1)
+            .get();
+          const mission = Mission.rehydrate({
+            id: asId(run.mission.id),
+            projectId: run.mission.projectId ? asId(run.mission.projectId) : null,
+            title: run.mission.title,
+            executionKind: run.mission.executionKind,
+            state: run.mission.state,
+            version: run.mission.version,
+            createdAt: run.mission.createdAt,
+            updatedAt: run.mission.updatedAt
+          });
+          mission.recordAgentSuccess(input.occurredAt, declaredResult?.body ?? "");
+          missionVersion = mission.snapshot().version;
+        }
+        const missionUpdated = transaction.update(missions).set({
+          state: missionState,
+          version: missionVersion,
+          updatedAt: input.occurredAt
+        }).where(and(
+          eq(missions.id, input.missionId),
+          eq(missions.executionKind, "agent"),
+          eq(missions.state, "ACTIVE")
+        )).run();
+        if (missionUpdated.changes !== 1) {
+          throw new Error("Terminal Run Workflow Activity could not transition its agent mission");
         }
         transaction.insert(businessAuditEvents).values([{
           id: `audit/run-terminal/${input.messageId}`,
@@ -119,7 +162,11 @@ export class SqliteRunWorkflowActivity {
           occurredAt: input.occurredAt
         }]).run();
         transaction.update(relayItems).set({
-          reasonCode: `run_${input.state.toLowerCase()}`
+          queue: input.state === "SUCCEEDED" ? "decision_required" : "blocked",
+          state: "unread",
+          reasonCode: input.state === "SUCCEEDED"
+            ? "agent_result_requires_validation"
+            : `run_${input.state.toLowerCase()}`
         }).where(eq(relayItems.missionId, input.missionId)).run();
         return { applied: true };
       });

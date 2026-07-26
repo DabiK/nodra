@@ -13,6 +13,7 @@ import {
   NodraSqliteDatabase,
   ReadOnlyGitObservationAdapter,
   SqliteApprovalRepository,
+  SqliteAgentConfigRepository,
   SqliteDeliveryRepository,
   SqliteEvidenceRepository,
   SqliteGateRepository,
@@ -38,6 +39,8 @@ import {
   CreateWorkspace,
   DeleteWorkspace,
   DispatchWorkflowOutbox,
+  EnableAgentConfig,
+  GetAgentConfig,
   GetHealth,
   GetProviderStatus,
   GetRelay,
@@ -55,9 +58,12 @@ import {
   StartMission,
   SteerRun,
   ProbeProvider,
+  PreviewAgentConfig,
+  ResolveAgentConfig,
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
-  RestoreWorkspace
+  RestoreWorkspace,
+  UpdateAgentConfig
 } from "@nodra/application";
 import { ApprovalController } from "./approval.controller.js";
 import { BusinessErrorFilter } from "./business-error.filter.js";
@@ -75,6 +81,7 @@ import { WorkspaceController } from "./workspace.controller.js";
 import { ProviderController } from "./provider.controller.js";
 import { RunController } from "./run.controller.js";
 import {
+  AGENT_CONFIG_REPOSITORY,
   CANCEL_RUN,
   CHANGE_MISSION_STATE,
   CODEX_PROVIDER,
@@ -106,7 +113,12 @@ import {
   START_MISSION,
   STEER_RUN,
   TEMPORAL_CONNECTION,
-  WORKSPACE_PORT
+  WORKSPACE_PORT,
+  ENABLE_AGENT_CONFIG,
+  GET_AGENT_CONFIG,
+  PREVIEW_AGENT_CONFIG,
+  RESOLVE_AGENT_CONFIG,
+  UPDATE_AGENT_CONFIG
 } from "./tokens.js";
 
 export interface NodraModuleOptions {
@@ -239,6 +251,40 @@ export class NodraModule {
           useFactory: (database: NodraSqliteDatabase) => new SqliteProviderCatalogRepository(database)
         },
         {
+          provide: AGENT_CONFIG_REPOSITORY,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new SqliteAgentConfigRepository(database)
+        },
+        {
+          provide: RESOLVE_AGENT_CONFIG,
+          inject: [AGENT_CONFIG_REPOSITORY, PROVIDER_CATALOG],
+          useFactory: (
+            configs: SqliteAgentConfigRepository,
+            catalog: SqliteProviderCatalogRepository
+          ) => new ResolveAgentConfig(configs, catalog)
+        },
+        {
+          provide: ENABLE_AGENT_CONFIG,
+          inject: [DATABASE, AGENT_CONFIG_REPOSITORY],
+          useFactory: (database: NodraSqliteDatabase, configs: SqliteAgentConfigRepository) =>
+            new EnableAgentConfig(new SqliteMissionRepository(database), configs)
+        },
+        {
+          provide: GET_AGENT_CONFIG,
+          inject: [AGENT_CONFIG_REPOSITORY],
+          useFactory: (configs: SqliteAgentConfigRepository) => new GetAgentConfig(configs)
+        },
+        {
+          provide: UPDATE_AGENT_CONFIG,
+          inject: [AGENT_CONFIG_REPOSITORY],
+          useFactory: (configs: SqliteAgentConfigRepository) => new UpdateAgentConfig(configs)
+        },
+        {
+          provide: PREVIEW_AGENT_CONFIG,
+          inject: [RESOLVE_AGENT_CONFIG],
+          useFactory: (resolver: ResolveAgentConfig) => new PreviewAgentConfig(resolver)
+        },
+        {
           provide: PROBE_PROVIDER,
           inject: [CODEX_PROVIDER, PROVIDER_CATALOG],
           useFactory: (provider: CodexProviderAdapter, catalog: SqliteProviderCatalogRepository) =>
@@ -271,10 +317,21 @@ export class NodraModule {
         },
         {
           provide: START_MISSION,
-          inject: [DATABASE, TEMPORAL_CONNECTION, PROVIDER_CATALOG],
-          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection, catalog: SqliteProviderCatalogRepository) => {
+          inject: [DATABASE, TEMPORAL_CONNECTION, PROVIDER_CATALOG, RESOLVE_AGENT_CONFIG],
+          useFactory: (
+            database: NodraSqliteDatabase,
+            temporal: LazyTemporalConnection,
+            catalog: SqliteProviderCatalogRepository,
+            resolver: ResolveAgentConfig
+          ) => {
             const repository = new SqliteMissionRepository(database);
-            return new StartMission(repository, new SqliteMissionExecutionRepository(database), temporal, catalog);
+            return new StartMission(
+              repository,
+              new SqliteMissionExecutionRepository(database),
+              temporal,
+              catalog,
+              resolver
+            );
           }
         },
         {
@@ -320,8 +377,9 @@ export class NodraModule {
         },
         {
           provide: CHANGE_MISSION_STATE,
-          inject: [DATABASE],
-          useFactory: (database: NodraSqliteDatabase) => new ChangeMissionState(new SqliteMissionRepository(database))
+          inject: [DATABASE, RESOLVE_AGENT_CONFIG],
+          useFactory: (database: NodraSqliteDatabase, resolver: ResolveAgentConfig) =>
+            new ChangeMissionState(new SqliteMissionRepository(database), resolver)
         },
         {
           provide: LIST_MISSIONS,

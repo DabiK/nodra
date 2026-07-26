@@ -1,6 +1,7 @@
 import { asId, DomainError, type Id, type Mission, type MissionSnapshot } from "@nodra/domain";
 import type { CommandContext } from "./command-context.js";
 import type { MissionRelayRecord, MissionRepository, RelayQueue } from "./mission-repository.js";
+import type { ResolveAgentConfig } from "./resolve-agent-config.js";
 
 export type HumanMissionAction =
   | { type: "prepare" }
@@ -35,7 +36,10 @@ const queueForState = (state: MissionSnapshot["state"]): RelayQueue | null => {
 };
 
 export class ChangeMissionState {
-  constructor(private readonly missions: MissionRepository) {}
+  constructor(
+    private readonly missions: MissionRepository,
+    private readonly resolver?: ResolveAgentConfig
+  ) {}
 
   async execute(input: ChangeMissionStateInput): Promise<MissionSnapshot> {
     const mission = await this.missions.load(input.missionId);
@@ -43,6 +47,9 @@ export class ChangeMissionState {
     const before = mission.snapshot();
     if (before.version !== input.expectedVersion) {
       throw new DomainError("Mission version conflict", "MISSION_VERSION_CONFLICT");
+    }
+    if (input.action.type === "prepare" && before.executionKind === "agent" && this.resolver) {
+      await this.resolver.resolveForStart(input.missionId);
     }
     this.apply(mission, input.action, input.context.occurredAt);
     const after = mission.snapshot();

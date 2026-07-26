@@ -72,6 +72,16 @@ export class Mission {
     this.transitionFrom(["DRAFT"], "READY", now);
   }
 
+  enableAgent(now: string): void {
+    this.requireHuman("Only a human mission can be enabled as an agent mission");
+    if (this.snapshotValue.state !== "DRAFT") {
+      throw new DomainError("Only a DRAFT mission can be enabled as an agent mission", "TRANSITION_FORBIDDEN");
+    }
+    this.snapshotValue.executionKind = "agent";
+    this.snapshotValue.version += 1;
+    this.snapshotValue.updatedAt = now;
+  }
+
   pickup(now: string): void {
     this.requireHuman("Only a human mission can be picked up without an agent run");
     this.transitionFrom(["READY"], "ACTIVE", now);
@@ -115,6 +125,14 @@ export class Mission {
         "Validation requires a declared result and observed gate evidence",
         "VALIDATION_EVIDENCE_REQUIRED"
       );
+    }
+    this.transitionFrom(["ACTIVE"], "VALIDATION", now);
+  }
+
+  recordAgentSuccess(now: string, declaredResult: string): void {
+    this.requireAgent("Only an agent mission can record an agent success");
+    if (!declaredResult.trim()) {
+      throw new DomainError("An agent success requires a declared result", "VALIDATION_RESULT_REQUIRED");
     }
     this.transitionFrom(["ACTIVE"], "VALIDATION", now);
   }

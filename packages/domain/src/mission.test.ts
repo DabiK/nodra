@@ -91,6 +91,14 @@ describe("Mission human lifecycle", () => {
 });
 
 describe("Mission result, evidence and acceptance boundaries", () => {
+  it("records a base agent success for human validation without requiring a gate", () => {
+    const mission = agentIn("ACTIVE");
+    mission.recordAgentSuccess(now, "Persisted provider result");
+    expect(mission.snapshot().state).toBe("VALIDATION");
+    expect(() => agentIn("ACTIVE").recordAgentSuccess(now, "  "))
+      .toThrowError(expect.objectContaining({ code: "VALIDATION_RESULT_REQUIRED" }));
+  });
+
   it("covers agent activation and blocking without exposing them as I2 human commands", () => {
     const ready = agentIn("READY");
     expectTransition(ready, () => ready.startAgent(now), "ACTIVE");

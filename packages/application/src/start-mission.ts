@@ -4,6 +4,7 @@ import type { MissionExecutionRepository } from "./mission-execution-repository.
 import type { MissionRepository } from "./mission-repository.js";
 import type { RuntimeHealthProbe } from "./runtime-health-probe.js";
 import type { ProviderCatalogRepository } from "./provider-catalog-repository.js";
+import type { ResolveAgentConfig } from "./resolve-agent-config.js";
 
 export interface StartMissionCommand {
   missionId: Id;
@@ -29,7 +30,8 @@ export class StartMission {
     private readonly missions: MissionRepository,
     private readonly executions: MissionExecutionRepository,
     private readonly runtime: RuntimeHealthProbe,
-    private readonly providers?: ProviderCatalogRepository
+    private readonly providers?: ProviderCatalogRepository,
+    private readonly resolver?: ResolveAgentConfig
   ) {}
 
   async execute(command: StartMissionCommand): Promise<StartMissionResult> {
@@ -40,17 +42,20 @@ export class StartMission {
     }
 
     mission.startAgent(command.context.occurredAt);
-    const requestedProvider = await this.executions.validateStart(command.missionId);
+    const resolution = this.resolver
+      ? await this.resolver.resolveForStart(command.missionId)
+      : null;
+    const requestedProvider = resolution ? null : await this.executions.validateStart(command.missionId);
     const runtime = await this.runtime.check();
     if (runtime.status !== "ok") {
       throw new DomainError("Temporal runtime is unavailable", "RUNTIME_UNHEALTHY");
     }
-    let providerCatalogSnapshot;
-    if (this.providers) {
+    let providerCatalogSnapshot = resolution?.catalog;
+    if (!resolution && this.providers) {
       if (!requestedProvider) {
         throw new DomainError("Provider configuration could not be resolved", "CONFIG_RESOLUTION_FAILED");
       }
-      providerCatalogSnapshot = await this.providers.latest(requestedProvider.providerId);
+      providerCatalogSnapshot = (await this.providers.latest(requestedProvider.providerId)) ?? undefined;
       if (!providerCatalogSnapshot) {
         throw new DomainError(
           `Provider ${requestedProvider.providerId} has not been explicitly probed`,
@@ -120,7 +125,8 @@ export class StartMission {
       auditId: command.auditId,
       outboxId: command.outboxId,
       context: command.context,
-      ...(providerCatalogSnapshot ? { providerCatalogSnapshot } : {})
+      ...(providerCatalogSnapshot ? { providerCatalogSnapshot } : {}),
+      ...(resolution ? { resolvedConfig: resolution.resolved } : {})
     });
     return {
       commandId: command.context.commandId,

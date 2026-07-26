@@ -11,6 +11,7 @@ import {
   NodraSqliteDatabase,
   ReadOnlyGitObservationAdapter,
   SqliteApprovalRepository,
+  SqliteAgentConfigRepository,
   SqliteDeliveryRepository,
   SqliteEvidenceRepository,
   SqliteGateRepository,
@@ -35,10 +36,12 @@ import {
   CreateWorkspace,
   DeleteWorkspace,
   DispatchWorkflowOutbox,
+  EnableAgentConfig,
   CatalogProviderHealthProbe,
   GetHealth,
   GetProviderStatus,
   GetRelay,
+  GetAgentConfig,
   ListMissions,
   ManageApprovals,
   ManageConfirmations,
@@ -53,10 +56,13 @@ import {
   StartMission,
   SteerRun,
   ProbeProvider,
+  PreviewAgentConfig,
+  ResolveAgentConfig,
   SmokeProvider,
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
-  RestoreWorkspace
+  RestoreWorkspace,
+  UpdateAgentConfig
 } from "@nodra/application";
 import { ConsoleOutput } from "./console-output.js";
 import { NodraCli } from "./nodra-cli.js";
@@ -69,6 +75,7 @@ import { ConfirmationCli } from "./confirmation-cli.js";
 import { WorkspaceCli } from "./workspace-cli.js";
 import { I6Cli } from "./i6-cli.js";
 import { ProviderSmokeCli } from "./provider-smoke-cli.js";
+import { AgentConfigCli } from "./agent-config-cli.js";
 
 export const runCli = async (
   arguments_: readonly string[],
@@ -95,6 +102,8 @@ export const runCli = async (
     const workspaceRepository = new SqliteWorkspaceRepository(database);
     const provider = new CodexProviderAdapter();
     const providerCatalog = new SqliteProviderCatalogRepository(database);
+    const agentConfigs = new SqliteAgentConfigRepository(database);
+    const agentResolver = new ResolveAgentConfig(agentConfigs, providerCatalog);
     const workflow = new LazyTemporalWorkflowAdapter(temporal);
     const confirmations = new ManageConfirmations(new SqliteConfirmationRepository(database), workspace);
     const cli = new NodraCli(
@@ -104,11 +113,17 @@ export const runCli = async (
         new CatalogProviderHealthProbe(providerCatalog, provider.providerId)
       ),
       new CreateMission(repository),
-      new ChangeMissionState(repository),
+      new ChangeMissionState(repository, agentResolver),
       new ListMissions(readModel),
       new ShowMission(readModel),
       new GetRelay(readModel),
-      new StartMission(repository, new SqliteMissionExecutionRepository(database), temporal, providerCatalog),
+      new StartMission(
+        repository,
+        new SqliteMissionExecutionRepository(database),
+        temporal,
+        providerCatalog,
+        agentResolver
+      ),
       new DispatchWorkflowOutbox(
         new SqliteWorkflowOutboxStore(database),
         workflow
@@ -148,6 +163,12 @@ export const runCli = async (
           new SmokeProvider(provider, providerCatalog),
           dataRoot
         )
+      ),
+      new AgentConfigCli(
+        new EnableAgentConfig(repository, agentConfigs),
+        new GetAgentConfig(agentConfigs),
+        new UpdateAgentConfig(agentConfigs),
+        new PreviewAgentConfig(agentResolver)
       )
     );
     return await cli.run(arguments_);

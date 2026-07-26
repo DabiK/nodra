@@ -84,14 +84,52 @@ export class SqliteMissionExecutionRepository implements MissionExecutionReposit
           throw new DomainError(`Command ${input.context.commandId} was already processed`, "COMMAND_ID_CONFLICT");
         }
 
-        const config = transaction
+        const persistedConfig = transaction
           .select()
           .from(missionAgentConfigs)
           .where(eq(missionAgentConfigs.missionId, mission.id))
           .get();
-        if (!config?.providerId || !config.modelId || !config.permissionPreset || !config.workspaceId) {
+        if (
+          !persistedConfig?.providerId
+          || !persistedConfig.modelId
+          || !persistedConfig.permissionPreset
+          || !persistedConfig.workspaceId
+        ) {
           throw new DomainError("A persisted agent configuration is required before start", "AGENT_CONFIG_REQUIRED");
         }
+        if (input.resolvedConfig && persistedConfig.version !== input.resolvedConfig.configVersion) {
+          throw new DomainError("Agent configuration version conflict", "MISSION_VERSION_CONFLICT");
+        }
+        const config: {
+          providerId: string;
+          modelId: string;
+          reasoningEffort: string | null;
+          providerOptionsSchemaVersion: number;
+          providerOptionsJson: string;
+          missionPrompt: string;
+          permissionPreset: "read_only" | "workspace" | "full_access";
+          workspaceId: string;
+        } = input.resolvedConfig
+          ? {
+              providerId: input.resolvedConfig.providerId,
+              modelId: input.resolvedConfig.modelId,
+              reasoningEffort: input.resolvedConfig.reasoningEffort,
+              providerOptionsSchemaVersion: input.resolvedConfig.providerOptions.schemaVersion,
+              providerOptionsJson: JSON.stringify(input.resolvedConfig.providerOptions.value),
+              missionPrompt: input.resolvedConfig.missionPrompt,
+              permissionPreset: input.resolvedConfig.permissionPreset,
+              workspaceId: input.resolvedConfig.workspaceId
+            }
+          : {
+              providerId: persistedConfig.providerId,
+              modelId: persistedConfig.modelId,
+              reasoningEffort: persistedConfig.reasoningEffort,
+              providerOptionsSchemaVersion: persistedConfig.providerOptionsSchemaVersion,
+              providerOptionsJson: persistedConfig.providerOptionsJson,
+              missionPrompt: persistedConfig.missionPrompt,
+              permissionPreset: persistedConfig.permissionPreset,
+              workspaceId: persistedConfig.workspaceId
+            };
         const workspace = transaction
           .select({ path: workspaces.path, state: workspaces.state })
           .from(workspaces)
