@@ -16,4 +16,10 @@ La fondation et I2–I5 utilisent encore `@Body() value: unknown` puis des helpe
 
 Avant d'étendre substantiellement l'API (providers/pipelines), remplacer ce mécanisme par des DTO par endpoint, classes dédiées et `ValidationPipe` global Nest (`whitelist`, `forbidNonWhitelisted`, transformation explicite). Les DTO portent les validations de forme et d'énumération; les règles métier, autorisations, canonicalisation et contrôles de concurrence restent dans l'application. Ajouter des tests de rejet homogènes `application/problem+json` et supprimer `http-validation.ts` seulement après migration complète.
 
+## Dette technique planifiée — arborescence API par domaine
+
+Les contrôleurs et DTO Nest sont actuellement des fichiers correctement petits, mais concentrés au même niveau dans `apps/api/src/` et `apps/api/src/dto/`. Avant que les surfaces provider, conversation, manager et pipeline ne s'étendent, les regrouper par domaine métier/bounded context : par exemple `missions/`, `runs/`, `workspaces/`, `confirmations/`, `evidence-gates/`, `runtime/` et `providers/`. Chaque dossier contient son contrôleur, ses DTO, ses tests HTTP et son mapping de dépendances local; les filtres transverses, bootstrap et tokens réellement partagés restent à la racine.
+
+Cette dette est un déplacement mécanique sans modification de contrat HTTP, de use case, de base SQLite ni de comportement. La réaliser dans un commit dédié après mise à jour des imports et des tests, avec typecheck, lint, suite complète, build et `git diff --check`.
+
 Chaque tranche inclut migration, API/CLI/UI, tests et observabilité; aucun lot horizontal provider avant les fondamentaux de cohérence.
