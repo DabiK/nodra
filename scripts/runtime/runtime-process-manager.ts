@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { ProcessInspector } from "./process-inspector.js";
 import { RuntimeError } from "./runtime-errors.js";
@@ -18,11 +18,25 @@ export class RuntimeProcessManager {
   ) {}
 
   async start(input: ProcessLaunch): Promise<RuntimeProcessIdentity> {
-    const launcher = resolve(this.repositoryRoot, "scripts/runtime/component-launcher.ts");
-    const encodedArguments = Buffer.from(JSON.stringify(input.arguments)).toString("base64url");
+    const launcher = resolve(
+      this.repositoryRoot,
+      "scripts/runtime/component-launcher.ts"
+    );
+
+    const encodedArguments = Buffer.from(
+      JSON.stringify(input.arguments)
+    ).toString("base64url");
+
     const child = spawn(
       process.execPath,
-      ["--import", "tsx", launcher, input.logFile, input.executable, encodedArguments],
+      [
+        "--import",
+        "tsx",
+        launcher,
+        input.logFile,
+        input.executable,
+        encodedArguments
+      ],
       {
         cwd: this.repositoryRoot,
         env: input.environment,
@@ -30,14 +44,67 @@ export class RuntimeProcessManager {
         stdio: "ignore"
       }
     );
-    child.unref();
+
+    let spawnObserved = false;
+    let spawnError: Error | null = null;
+    let exitCode: number | null = null;
+    let exitSignal: NodeJS.Signals | null = null;
+
+    child.once("spawn", () => {
+      spawnObserved = true;
+    });
+
+    child.once("error", (error) => {
+      spawnError = error;
+    });
+
+    child.once("exit", (code, signal) => {
+      exitCode = code;
+      exitSignal = signal;
+    });
+
+    // On garde temporairement la référence au child jusqu’à la capture
+    // de son identité.
     const identity = await this.waitForIdentity(child.pid);
+
     if (!identity) {
+      const psResult = child.pid
+        ? spawnSync(
+            "ps",
+            [
+              "-o",
+              "pid=,ppid=,pgid=,state=,lstart=,command=",
+              "-p",
+              String(child.pid)
+            ],
+            { encoding: "utf8" }
+          )
+        : null;
+
+      const spawnErrorMessage =
+        spawnError instanceof Error ? spawnError.message : "none";
+
       throw new RuntimeError(
-        `Process ${input.executable} exited before its identity could be recorded`,
+        [
+          `Launcher for ${input.executable} could not be identified`,
+          `launcherPid=${child.pid ?? "undefined"}`,
+          `spawnObserved=${spawnObserved}`,
+          `spawnError=${spawnErrorMessage}`,
+          `exitCode=${String(exitCode)}`,
+          `exitSignal=${String(exitSignal)}`,
+          `psStatus=${String(psResult?.status)}`,
+          `psStdout=${JSON.stringify(psResult?.stdout ?? "")}`,
+          `psStderr=${JSON.stringify(psResult?.stderr ?? "")}`,
+          `executable=${input.executable}`,
+          `arguments=${JSON.stringify(input.arguments)}`,
+          `logFile=${input.logFile}`
+        ].join("\n"),
         "RUNTIME_PROCESS_START_FAILED"
       );
     }
+
+    child.unref();
+
     return identity;
   }
 

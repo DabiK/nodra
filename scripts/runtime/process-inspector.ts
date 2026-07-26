@@ -7,8 +7,22 @@ export class ProcessInspector {
     if (!Number.isInteger(pid) || pid < 1) return null;
     const result = spawnSync(
       "ps",
-      ["-o", "pid=,pgid=,lstart=,command=", "-p", String(pid)],
-      { encoding: "utf8" }
+      [
+        "-ww",
+        "-o",
+        "pid=,pgid=,lstart=,command=",
+        "-p",
+        String(pid)
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          LANG: "C",
+          LC_ALL: "C",
+          LC_TIME: "C"
+        }
+      }
     );
     const line = result.stdout.trim();
     if (result.status !== 0 || !line) return null;

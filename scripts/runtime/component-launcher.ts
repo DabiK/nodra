@@ -33,6 +33,21 @@ const write = async (component: "stdout" | "stderr", chunk: unknown): Promise<vo
   await appendFile(logFile, line + "\n", { encoding: "utf8", mode: 0o600 });
 };
 
+const writeLifecycle = async (message: string): Promise<void> => {
+  try {
+    await write("stderr", `[launcher] ${message}`);
+  } catch {
+    // Le diagnostic ne doit jamais faire crasher le launcher.
+  }
+};
+
+await writeLifecycle(
+  `starting launcherPid=${process.pid} ` +
+  `ppid=${process.ppid} ` +
+  `executable=${executable} ` +
+  `arguments=${JSON.stringify(arguments_)}`
+);
+
 const child = spawn(executable, arguments_, {
   cwd: process.cwd(),
   env: {
@@ -41,8 +56,30 @@ const child = spawn(executable, arguments_, {
   },
   stdio: ["ignore", "pipe", "pipe"]
 });
-child.stdout.on("data", (chunk) => { void write("stdout", chunk); });
-child.stderr.on("data", (chunk) => { void write("stderr", chunk); });
+
+await writeLifecycle(
+  `component created pid=${child.pid ?? "undefined"}`
+);
+
+child.stdout.on("data", (chunk) => {
+  void write("stdout", chunk).catch((error) => {
+    void writeLifecycle(
+      `stdout log failure: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  });
+});
+
+child.stderr.on("data", (chunk) => {
+  void write("stderr", chunk).catch((error) => {
+    void writeLifecycle(
+      `stderr log failure: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  });
+});
 
 const stop = (signal: NodeJS.Signals): void => {
   if (child.exitCode === null) child.kill(signal);
@@ -50,8 +87,31 @@ const stop = (signal: NodeJS.Signals): void => {
 process.once("SIGINT", () => stop("SIGINT"));
 process.once("SIGTERM", () => stop("SIGTERM"));
 
-const exitCode = await new Promise<number>((resolveExit, reject) => {
-  child.once("error", reject);
-  child.once("exit", (code, signal) => resolveExit(code ?? (signal ? 1 : 0)));
+const exitCode = await new Promise<number>((resolveExit) => {
+  child.once("spawn", () => {
+    void writeLifecycle(
+      `component spawned pid=${child.pid ?? "undefined"}`
+    );
+  });
+
+  child.once("error", (error) => {
+    void writeLifecycle(
+      `component spawn error name=${error.name} message=${error.message}`
+    ).finally(() => {
+      resolveExit(1);
+    });
+  });
+
+  child.once("exit", (code, signal) => {
+    void writeLifecycle(
+      `component exited pid=${child.pid ?? "undefined"} ` +
+      `code=${String(code)} signal=${String(signal)}`
+    ).finally(() => {
+      resolveExit(code ?? (signal ? 1 : 0));
+    });
+  });
 });
+
+await writeLifecycle(`launcher exiting code=${exitCode}`);
+
 process.exitCode = exitCode;
