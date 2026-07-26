@@ -7,7 +7,7 @@ import { migrateDatabase } from "./migrate-database.js";
 import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { SqlitePipelineRepository } from "./sqlite-pipeline-repository.js";
 import { missions } from "./schema/missions.js";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 const now = "2026-07-26T21:00:00.000Z";
 
@@ -110,6 +110,65 @@ describe("SqlitePipelineRepository", () => {
     });
 
     expect(result.pipelineRun.nodes.map((node) => node.state)).toEqual(["completed", "ready"]);
+  });
+
+  it("supports multiple predecessors converging into one node", async () => {
+    database.orm.insert(missions).values([
+      mission("mission-c", "READY", 2),
+      mission("mission-d", "READY", 2)
+    ]).run();
+    database.orm.update(missions).set({ executionKind: "human" }).where(eq(missions.id, "mission-d")).run();
+    await repository.create({
+      pipelineId: asId("pipeline-join"),
+      definitionId: asId("pipeline-join/definition/1"),
+      nodeIdPrefix: "pipeline-join/node",
+      edgeIdPrefix: "pipeline-join/edge",
+      name: "Pipeline join",
+      nodes: [
+        { nodeKey: "a", missionId: asId("mission-a") },
+        { nodeKey: "b", missionId: asId("mission-b") },
+        { nodeKey: "c", missionId: asId("mission-c") },
+        { nodeKey: "d", missionId: asId("mission-d") }
+      ],
+      edges: [
+        { fromNodeKey: "a", toNodeKey: "d" },
+        { fromNodeKey: "b", toNodeKey: "d" },
+        { fromNodeKey: "c", toNodeKey: "d" }
+      ],
+      context: context("create-join")
+    });
+    const started = await repository.start({
+      pipelineId: asId("pipeline-join"),
+      pipelineRunId: asId("pipeline-run-join"),
+      nodeRunIdPrefix: "pipeline-run-join/node-run",
+      context: context("start-join")
+    });
+
+    expect(started.pipelineRun.nodes.map((node) => [node.nodeKey, node.state])).toEqual([
+      ["a", "ready"],
+      ["b", "ready"],
+      ["c", "ready"],
+      ["d", "pending"]
+    ]);
+
+    database.orm.update(missions).set({ state: "DONE", version: 3 })
+      .where(inArray(missions.id, ["mission-a", "mission-b"])).run();
+    const partial = await repository.advance({
+      pipelineRunId: asId("pipeline-run-join"),
+      context: context("advance-partial-join"),
+      startMission: async () => undefined
+    });
+    expect(partial.pipelineRun.nodes.find((node) => node.nodeKey === "d")?.state).toBe("pending");
+
+    database.orm.update(missions).set({ state: "DONE", version: 3 })
+      .where(eq(missions.id, "mission-c")).run();
+    const joined = await repository.advance({
+      pipelineRunId: asId("pipeline-run-join"),
+      context: context("advance-join"),
+      startMission: async () => undefined
+    });
+
+    expect(joined.pipelineRun.nodes.find((node) => node.nodeKey === "d")?.state).toBe("ready");
   });
 
   it("blocks when a mission waits for human validation", async () => {

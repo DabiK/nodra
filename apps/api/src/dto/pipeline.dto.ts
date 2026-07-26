@@ -9,6 +9,14 @@ export class PipelineNodeDto {
   missionId!: string;
 }
 
+export class PipelineEdgeDto {
+  @IsString()
+  fromNodeKey!: string;
+
+  @IsString()
+  toNodeKey!: string;
+}
+
 export class CreatePipelineDto {
   @IsOptional()
   @IsString()
@@ -26,6 +34,12 @@ export class CreatePipelineDto {
   @ValidateNested({ each: true })
   @Type(() => PipelineNodeDto)
   nodes!: PipelineNodeDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PipelineEdgeDto)
+  edges?: PipelineEdgeDto[];
 }
 
 export class StartPipelineDto {

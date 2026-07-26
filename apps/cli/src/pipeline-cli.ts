@@ -35,6 +35,7 @@ export class PipelineCli implements I4CliHandler {
     const values = [...request.args];
     const id = this.option(values, "--id") ?? randomUUID();
     const nodes: Array<{ nodeKey: string; missionId: ReturnType<typeof toId> }> = [];
+    const edges: Array<{ fromNodeKey: string; toNodeKey: string }> = [];
     for (;;) {
       const node = this.option(values, "--node");
       if (!node) break;
@@ -43,6 +44,16 @@ export class PipelineCli implements I4CliHandler {
       nodes.push({
         nodeKey: node.slice(0, separator),
         missionId: toId(node.slice(separator + 1))
+      });
+    }
+    for (;;) {
+      const edge = this.option(values, "--edge");
+      if (!edge) break;
+      const separator = edge.indexOf(":");
+      if (separator <= 0 || separator === edge.length - 1) this.usage();
+      edges.push({
+        fromNodeKey: edge.slice(0, separator),
+        toNodeKey: edge.slice(separator + 1)
       });
     }
     const name = values.join(" ").trim();
@@ -54,6 +65,7 @@ export class PipelineCli implements I4CliHandler {
       edgeIdPrefix: `${id}/edge`,
       name,
       nodes,
+      ...(edges.length ? { edges } : {}),
       context: request.context
     });
   }
@@ -127,7 +139,7 @@ export class PipelineCli implements I4CliHandler {
 
   private usage(): never {
     throw new DomainError(
-      "Usage: pipeline:create <name...> --node <key:missionId> --node <key:missionId> [--id <id>] | pipeline:show <id> | pipeline:start <id> [--run-id <id>] | pipeline:advance <runId> | pipeline:run:show <runId>",
+      "Usage: pipeline:create <name...> --node <key:missionId> --node <key:missionId> [--edge <from:to>] [--id <id>] | pipeline:show <id> | pipeline:start <id> [--run-id <id>] | pipeline:advance <runId> | pipeline:run:show <runId>",
       "CLI_USAGE_ERROR"
     );
   }

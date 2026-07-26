@@ -106,8 +106,10 @@ Pipelines:
   pipeline:create <name...>
     --node <key:mission-id>
     --node <key:mission-id>
+    [--edge <from-key:to-key>]
     [--id <pipeline-id>]
-      Create a published linear pipeline from existing missions.
+      Create a published pipeline from existing missions. Without edges,
+      nodes are linked linearly in declaration order.
 
   pipeline:show <pipeline-id>
       Show a pipeline definition.

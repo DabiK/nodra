@@ -9,6 +9,11 @@ export interface PipelineNodeInput {
   missionId: Id;
 }
 
+export interface PipelineEdgeInput {
+  fromNodeKey: string;
+  toNodeKey: string;
+}
+
 export interface PipelineView {
   id: Id;
   projectId: Id | null;

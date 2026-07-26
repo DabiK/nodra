@@ -59,12 +59,17 @@ export class SqlitePipelineRepository implements PipelineRepository {
           startMode: "auto" as const
         }));
         transaction.insert(pipelineNodes).values(nodeRows).run();
-        if (nodeRows.length > 1) {
-          transaction.insert(pipelineEdges).values(nodeRows.slice(0, -1).map((node, index) => ({
+        const nodeByKey = new Map(nodeRows.map((node) => [node.nodeKey, node]));
+        const edgeInputs = input.edges ?? input.nodes.slice(0, -1).map((node, index) => ({
+          fromNodeKey: node.nodeKey,
+          toNodeKey: input.nodes[index + 1]!.nodeKey
+        }));
+        if (edgeInputs.length > 0) {
+          transaction.insert(pipelineEdges).values(edgeInputs.map((edge, index) => ({
             id: `${input.edgeIdPrefix}/${index}`,
             definitionId: input.definitionId,
-            fromNodeId: node.id,
-            toNodeId: nodeRows[index + 1]!.id
+            fromNodeId: nodeByKey.get(edge.fromNodeKey)!.id,
+            toNodeId: nodeByKey.get(edge.toNodeKey)!.id
           }))).run();
         }
         transaction.insert(businessAuditEvents).values({
@@ -131,12 +136,15 @@ export class SqlitePipelineRepository implements PipelineRepository {
           endedAt: null,
           createdAt: input.context.occurredAt
         }).run();
+        const edges = transaction.select().from(pipelineEdges)
+          .where(eq(pipelineEdges.definitionId, definition.id)).all();
+        const nodesWithIncoming = new Set(edges.map((edge) => edge.toNodeId));
         transaction.insert(pipelineNodeRuns).values(nodes.map((node, index) => ({
           id: `${input.nodeRunIdPrefix}/${index}`,
           pipelineRunId: input.pipelineRunId,
           nodeId: node.id,
           ...(node.missionId ? { missionId: node.missionId } : {}),
-          state: index === 0 ? "ready" as const : "pending" as const,
+          state: nodesWithIncoming.has(node.id) ? "pending" as const : "ready" as const,
           userAttempt: 1
         }))).run();
         transaction.insert(relayItems).values({

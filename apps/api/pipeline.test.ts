@@ -87,4 +87,59 @@ describe("pipeline API", () => {
       .expect(200);
     expect(shown.body.state).toBe("completed");
   });
+
+  it("supports arbitrary join edges", async () => {
+    const missionIds: string[] = [];
+    for (const name of ["A", "B", "C", "D"]) {
+      const created = await request(app.getHttpServer())
+        .post("/api/missions")
+        .send({ title: `Mission ${name}`, commandId: `join-${name}` })
+        .expect(201);
+      missionIds.push(created.body.id as string);
+      await request(app.getHttpServer())
+        .post(`/api/missions/${created.body.id}/ready`)
+        .send({ expectedVersion: 0 })
+        .expect(201);
+    }
+
+    await request(app.getHttpServer())
+      .post("/api/pipelines")
+      .send({
+        id: "pipeline-join-api",
+        name: "Pipeline Join API",
+        commandId: "pipeline-join-create",
+        nodes: [
+          { nodeKey: "a", missionId: missionIds[0] },
+          { nodeKey: "b", missionId: missionIds[1] },
+          { nodeKey: "c", missionId: missionIds[2] },
+          { nodeKey: "d", missionId: missionIds[3] }
+        ],
+        edges: [
+          { fromNodeKey: "a", toNodeKey: "d" },
+          { fromNodeKey: "b", toNodeKey: "d" },
+          { fromNodeKey: "c", toNodeKey: "d" }
+        ]
+      })
+      .expect(201);
+
+    const started = await request(app.getHttpServer())
+      .post("/api/pipelines/pipeline-join-api/start")
+      .send({ runId: "pipeline-run-join-api" })
+      .expect(201);
+    expect(started.body.pipelineRun.nodes.map((node: { nodeKey: string; state: string }) => [node.nodeKey, node.state]))
+      .toEqual([["a", "ready"], ["b", "ready"], ["c", "ready"], ["d", "pending"]]);
+
+    for (const id of missionIds.slice(0, 3)) {
+      await request(app.getHttpServer())
+        .post(`/api/missions/${id}/complete`)
+        .send({ expectedVersion: 1 })
+        .expect(201);
+    }
+    const advanced = await request(app.getHttpServer())
+      .post("/api/pipelines/runs/pipeline-run-join-api/advance")
+      .send({})
+      .expect(201);
+    expect(advanced.body.pipelineRun.nodes.find((node: { nodeKey: string }) => node.nodeKey === "d").state)
+      .toBe("ready");
+  });
 });

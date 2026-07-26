@@ -2,6 +2,7 @@ import type { Id } from "@nodra/domain";
 import type { CommandContext } from "./command-context.js";
 import type {
   PipelineAdvanceResult,
+  PipelineEdgeInput,
   PipelineNodeInput,
   PipelineRunView,
   PipelineView
@@ -15,6 +16,7 @@ export interface CreatePipelineInput {
   name: string;
   projectId?: Id | null;
   nodes: PipelineNodeInput[];
+  edges?: PipelineEdgeInput[];
   context: CommandContext;
 }
 

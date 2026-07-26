@@ -45,6 +45,7 @@ export class PipelineController {
       edgeIdPrefix: `${pipelineId}/edge`,
       name: body.name,
       nodes: body.nodes.map((node) => ({ nodeKey: node.nodeKey, missionId: toId(node.missionId) })),
+      ...(body.edges?.length ? { edges: body.edges } : {}),
       context: commandContext(body.commandId)
     });
   }

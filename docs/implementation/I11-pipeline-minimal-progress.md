@@ -60,3 +60,11 @@ Implement a minimal pipeline vertical slice so existing missions can be composed
 - No application repository/use case/CLI/API currently uses the pipeline schema.
 - Existing `StartMission` already provides the safe way to create mission runs and outbox entries.
 - I11 should therefore add the smallest orchestration layer around existing missions instead of creating a new Temporal workflow immediately.
+
+## Arbitrary Edge Extension
+
+- [x] CLI accepts `--edge <from-key:to-key>` on `pipeline:create`.
+- [x] API accepts `edges: [{ fromNodeKey, toNodeKey }]` on `POST /api/pipelines`.
+- [x] Missing edges still default to linear order for backward-compatible minimal usage.
+- [x] Join nodes wait for all predecessor node runs to become `completed` before becoming `ready`.
+- [x] Focused tests cover `A + B + C -> D`.
