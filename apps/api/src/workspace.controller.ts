@@ -4,20 +4,20 @@ import type {
   CreateWorkspace,
   DeleteWorkspace,
   IntegrateWorkspace,
-  IntegrationMethod,
   ReadWorkspace,
   RestoreWorkspace,
   SnapshotWorkspace,
-  WorkspaceKind
 } from "@nodra/application";
 import { toId } from "@nodra/application";
 import { randomUUID } from "node:crypto";
-import {
-  assertKeys,
-  commandContext,
-  objectBody,
-  requiredString
-} from "./http-validation.js";
+import { commandContext } from "./command-context.js";
+/* eslint-disable @typescript-eslint/consistent-type-imports */
+import { CreateWorkspaceDto } from "./dto/workspace.dto.js";
+import { SnapshotWorkspaceDto } from "./dto/snapshot-workspace.dto.js";
+import { CommitWorkspaceDto } from "./dto/commit-workspace.dto.js";
+import { IntegrateWorkspaceDto } from "./dto/integrate-workspace.dto.js";
+import { DeleteWorkspaceDto } from "./dto/delete-workspace.dto.js";
+import { RestoreWorkspaceDto } from "./dto/restore-workspace.dto.js";
 import {
   COMMIT_WORKSPACE,
   CREATE_WORKSPACE,
@@ -41,27 +41,18 @@ export class WorkspaceController {
   ) {}
 
   @Post()
-  create(@Body() value: unknown) {
-    const body = objectBody(value);
-    assertKeys(body, [
-      "id", "projectId", "kind", "path", "sourceWorkspaceId", "baseRef",
-      "branchName", "integrationTargetRef", "commandId"
-    ]);
-    const kind = requiredString(body.kind, "kind") as WorkspaceKind;
-    if (!["repo", "scratch", "worktree"].includes(kind)) {
-      return requiredString(undefined, "kind");
-    }
+  create(@Body() body: CreateWorkspaceDto) {
     return this.createWorkspace.execute({
-      id: toId(typeof body.id === "string" ? body.id : randomUUID()),
-      ...(typeof body.projectId === "string" ? { projectId: toId(body.projectId) } : {}),
-      kind,
-      path: requiredString(body.path, "path"),
-      ...(typeof body.sourceWorkspaceId === "string"
+      id: toId(body.id ?? randomUUID()),
+      ...(body.projectId === undefined ? {} : { projectId: toId(body.projectId) }),
+      kind: body.kind,
+      path: body.path,
+      ...(body.sourceWorkspaceId !== undefined
         ? { sourceWorkspaceId: toId(body.sourceWorkspaceId) }
         : {}),
-      ...(typeof body.baseRef === "string" ? { baseRef: body.baseRef } : {}),
-      ...(typeof body.branchName === "string" ? { branchName: body.branchName } : {}),
-      ...(body.integrationTargetRef === null || typeof body.integrationTargetRef === "string"
+      ...(body.baseRef !== undefined ? { baseRef: body.baseRef } : {}),
+      ...(body.branchName !== undefined ? { branchName: body.branchName } : {}),
+      ...(body.integrationTargetRef !== undefined
         ? { integrationTargetRef: body.integrationTargetRef }
         : {}),
       context: commandContext(body.commandId)
@@ -74,27 +65,23 @@ export class WorkspaceController {
   }
 
   @Post(":id/snapshots")
-  snapshot(@Param("id") id: string, @Body() value: unknown) {
-    const body = objectBody(value);
-    assertKeys(body, ["reason", "commandId"]);
+  snapshot(@Param("id") id: string, @Body() body: SnapshotWorkspaceDto) {
     const context = commandContext(body.commandId);
     return this.snapshotWorkspace.execute({
       workspaceId: toId(id),
       snapshotId: toId(`${context.commandId}/snapshot`),
-      reason: requiredString(body.reason, "reason"),
+      reason: body.reason,
       context
     });
   }
 
   @Post(":id/commit")
-  commit(@Param("id") id: string, @Body() value: unknown) {
-    const body = objectBody(value);
-    assertKeys(body, ["missionId", "message", "confirmationId", "commandId"]);
+  commit(@Param("id") id: string, @Body() body: CommitWorkspaceDto) {
     return this.commitWorkspace.execute({
       workspaceId: toId(id),
-      missionId: toId(requiredString(body.missionId, "missionId")),
-      message: requiredString(body.message, "message"),
-      ...(typeof body.confirmationId === "string"
+      missionId: toId(body.missionId),
+      message: body.message,
+      ...(body.confirmationId !== undefined
         ? { confirmationId: toId(body.confirmationId) }
         : {}),
       context: commandContext(body.commandId)
@@ -102,15 +89,13 @@ export class WorkspaceController {
   }
 
   @Post(":id/integrate")
-  integrate(@Param("id") id: string, @Body() value: unknown) {
-    const body = objectBody(value);
-    assertKeys(body, ["method", "sourceRef", "targetRef", "confirmationId", "commandId"]);
+  integrate(@Param("id") id: string, @Body() body: IntegrateWorkspaceDto) {
     return this.integrateWorkspace.execute({
       workspaceId: toId(id),
-      method: requiredString(body.method, "method") as IntegrationMethod,
-      sourceRef: requiredString(body.sourceRef, "sourceRef"),
-      targetRef: requiredString(body.targetRef, "targetRef"),
-      ...(typeof body.confirmationId === "string"
+      method: body.method,
+      sourceRef: body.sourceRef,
+      targetRef: body.targetRef,
+      ...(body.confirmationId !== undefined
         ? { confirmationId: toId(body.confirmationId) }
         : {}),
       context: commandContext(body.commandId)
@@ -118,12 +103,10 @@ export class WorkspaceController {
   }
 
   @Post(":id/delete")
-  delete(@Param("id") id: string, @Body() value: unknown) {
-    const body = objectBody(value);
-    assertKeys(body, ["confirmationId", "commandId"]);
+  delete(@Param("id") id: string, @Body() body: DeleteWorkspaceDto) {
     return this.deleteWorkspace.execute({
       workspaceId: toId(id),
-      ...(typeof body.confirmationId === "string"
+      ...(body.confirmationId !== undefined
         ? { confirmationId: toId(body.confirmationId) }
         : {}),
       context: commandContext(body.commandId)
@@ -131,9 +114,7 @@ export class WorkspaceController {
   }
 
   @Post(":id/restore")
-  restore(@Param("id") id: string, @Body() value: unknown) {
-    const body = objectBody(value);
-    assertKeys(body, ["commandId"]);
+  restore(@Param("id") id: string, @Body() body: RestoreWorkspaceDto) {
     return this.restoreWorkspace.execute({
       workspaceId: toId(id),
       context: commandContext(body.commandId)

@@ -49,8 +49,8 @@ export class BusinessErrorFilter implements ExceptionFilter<DomainError> {
     const http = host.switchToHttp();
     const request = http.getRequest<HttpRequest>();
     const response = http.getResponse<HttpResponse>();
-    const body = request.body as { commandId?: unknown } | undefined;
-    const commandId = typeof body?.commandId === "string" && body.commandId.trim() ? body.commandId : randomUUID();
+    const body = request.body;
+    const commandId = isBodyWithCommandId(body) && body.commandId.trim() ? body.commandId : randomUUID();
     const status = statusFor(error.code);
     response.status(status).type("application/problem+json").json({
       type: `https://nodra.local/problems/${error.code.toLowerCase()}`,
@@ -65,3 +65,7 @@ export class BusinessErrorFilter implements ExceptionFilter<DomainError> {
     });
   }
 }
+
+const isBodyWithCommandId = (value: unknown): value is { commandId: string } =>
+  typeof value === "object" && value !== null && !Array.isArray(value) &&
+  "commandId" in value && typeof value.commandId === "string";

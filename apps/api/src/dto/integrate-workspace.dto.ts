@@ -1,0 +1,2 @@
+import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, ValidateIf } from "class-validator";
+export class IntegrateWorkspaceDto { @IsIn(["merge", "rebase", "cherry-pick"]) method!: "merge" | "rebase" | "cherry-pick"; @IsString() @IsNotEmpty() @Matches(/\S/) sourceRef!: string; @IsString() @IsNotEmpty() @Matches(/\S/) targetRef!: string; @IsOptional() @IsString() confirmationId?: string; @ValidateIf((value) => value.commandId !== undefined) @IsString() commandId?: string; }

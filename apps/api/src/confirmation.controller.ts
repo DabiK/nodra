@@ -1,13 +1,11 @@
 import { Body, Controller, Get, Inject, Param, Post } from "@nestjs/common";
-import type { ConfirmationScope, ManageConfirmations } from "@nodra/application";
+import type { ManageConfirmations } from "@nodra/application";
 import { toId } from "@nodra/application";
 import { randomUUID } from "node:crypto";
-import {
-  assertKeys,
-  commandContext,
-  objectBody,
-  requiredString
-} from "./http-validation.js";
+import { commandContext } from "./command-context.js";
+/* eslint-disable @typescript-eslint/consistent-type-imports */
+import { RequestConfirmationDto } from "./dto/confirmation.dto.js";
+import { DecideConfirmationDto } from "./dto/decide-confirmation.dto.js";
 import { MANAGE_CONFIRMATIONS } from "./tokens.js";
 
 @Controller("api/confirmations")
@@ -18,30 +16,20 @@ export class ConfirmationController {
   ) {}
 
   @Post()
-  request(@Body() value: unknown) {
-    const body = objectBody(value);
-    assertKeys(body, [
-      "action", "target", "cwd", "providerId", "permissionPreset", "risk", "scope",
-      "runId", "missionId", "workspaceId", "expiresAt", "commandId"
-    ]);
-    const scope = requiredString(body.scope, "scope") as ConfirmationScope;
-    if (!["once", "run", "mission"].includes(scope)) {
-      return requiredString(undefined, "scope");
-    }
-    const target = objectBody(body.target);
+  request(@Body() body: RequestConfirmationDto) {
     return this.confirmations.request({
       id: toId(randomUUID()),
-      action: requiredString(body.action, "action"),
-      target,
-      cwd: this.optionalString(body.cwd, "cwd"),
-      providerId: this.optionalString(body.providerId, "providerId"),
-      permissionPreset: this.permissionPreset(body.permissionPreset),
-      risk: requiredString(body.risk, "risk"),
-      scope,
-      ...(typeof body.runId === "string" ? { runId: toId(body.runId) } : {}),
-      ...(typeof body.missionId === "string" ? { missionId: toId(body.missionId) } : {}),
-      ...(typeof body.workspaceId === "string" ? { workspaceId: toId(body.workspaceId) } : {}),
-      expiresAt: requiredString(body.expiresAt, "expiresAt"),
+      action: body.action,
+      target: body.target,
+      cwd: body.cwd ?? null,
+      providerId: body.providerId ?? null,
+      permissionPreset: body.permissionPreset ?? null,
+      risk: body.risk,
+      scope: body.scope,
+      ...(body.runId === undefined ? {} : { runId: toId(body.runId) }),
+      ...(body.missionId === undefined ? {} : { missionId: toId(body.missionId) }),
+      ...(body.workspaceId === undefined ? {} : { workspaceId: toId(body.workspaceId) }),
+      expiresAt: body.expiresAt,
       context: commandContext(body.commandId)
     });
   }
@@ -52,35 +40,14 @@ export class ConfirmationController {
   }
 
   @Post(":id/decide")
-  decide(@Param("id") id: string, @Body() value: unknown) {
-    const body = objectBody(value);
-    assertKeys(body, ["decision", "actor", "comment", "commandId"]);
-    const decision = requiredString(body.decision, "decision");
-    if (decision !== "approved" && decision !== "denied") {
-      return requiredString(undefined, "decision");
-    }
+  decide(@Param("id") id: string, @Body() body: DecideConfirmationDto) {
     return this.confirmations.decide({
       id: toId(id),
-      decision,
-      actor: requiredString(body.actor, "actor"),
-      comment: requiredString(body.comment, "comment"),
+      decision: body.decision,
+      actor: body.actor,
+      comment: body.comment,
       context: commandContext(body.commandId)
     });
   }
 
-  private optionalString(value: unknown, name: string): string | null {
-    if (value === undefined || value === null) return null;
-    return requiredString(value, name);
-  }
-
-  private permissionPreset(
-    value: unknown
-  ): "read_only" | "workspace" | "full_access" | null {
-    if (value === undefined || value === null) return null;
-    const preset = requiredString(value, "permissionPreset");
-    if (!["read_only", "workspace", "full_access"].includes(preset)) {
-      return requiredString(undefined, "permissionPreset") as never;
-    }
-    return preset as "read_only" | "workspace" | "full_access";
-  }
 }
