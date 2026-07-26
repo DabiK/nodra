@@ -24,6 +24,7 @@ Au boot : verrou singleton data-root; intégrité SQLite; migrations; supervisor
 | intégration | Nest Express REST/SSE/CLI mêmes use cases, SQLite réel + Temporal local isolé |
 | e2e | mission humaine sans config, preview sans I/O, héritage/override, audit snapshot, crash/reboot, retry historique vs nouvelle tentative, proof stale |
 | sécurité | path traversal, secret redaction, loopback, confirmation scope, MCP distant |
+| I5 workspace/Git | chemin canonique et refus d'écrasement, repo/scratch/worktree, snapshot avant/après, commit autorisé/refusé, intégration humaine, confirmation expirée/mauvaise cible/consommation concurrente, run actif bloquant, tombstone/restauration |
 | rétention | conservation indéfinie, tombstone/restauration, purge manuelle confirmée, blob non référencé seulement |
 | compatibilité | macOS arm64/x64, Linux x64/arm64, Windows x64; runtime install/update/rollback |
 

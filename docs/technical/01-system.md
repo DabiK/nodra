@@ -62,6 +62,8 @@ interface CommandContext { commandId: Id; actor: 'user'|'manager'; occurredAt: s
 interface MissionRepository { load(id: Id): Promise<Mission>; save(m: Mission, expectedVersion: number): Promise<void>; }
 interface WorkflowPort { start(input: StartMissionInput): Promise<{workflowId:string; runId:string}>; signal(id:string, signal: WorkflowSignal): Promise<void>; update<T>(id:string, update:WorkflowUpdate): Promise<T>; query<T>(id:string, q:WorkflowQuery): Promise<T>; }
 interface ProviderPort { capabilities(): Promise<ProviderCapabilities>; start(input: ProviderStart): Promise<ProviderRef>; events(ref:ProviderRef): AsyncIterable<ProviderEvent>; steer(ref:ProviderRef, text:string, mode:'immediate'|'enqueue'): Promise<void>; cancel(ref:ProviderRef): Promise<void>; resume(ref:ProviderRef): Promise<ProviderRef>; }
+interface ConfirmationPort { request(input: ConfirmationRequest): Promise<Confirmation>; decide(input: ConfirmationDecision): Promise<Confirmation>; consume(input: ExactConfirmationUse): Promise<Confirmation>; }
+interface WorkspacePort { createRepo(input: CreateRepoWorkspace): Promise<Workspace>; createScratch(input: CreateScratchWorkspace): Promise<Workspace>; createWorktree(input: CreateWorktree): Promise<Workspace>; snapshot(input: WorkspaceSnapshotRequest): Promise<GitSnapshot>; tombstone(input: DeleteWorktree): Promise<void>; }
 ```
 
 ## Machines à états
@@ -83,4 +85,4 @@ READY --> ABANDONED
 BLOCKED --> ABANDONED
 ```
 
-Invariants : aucun lancement à la lecture; `DONE` agent nécessite acceptation; `ACTIVE` implique au plus un run actif par mission; une dépendance non satisfaite interdit le start; une suppression exige confirmation et cible exacte.
+Invariants : aucun lancement à la lecture; `DONE` agent nécessite acceptation; `ACTIVE` implique au plus un run actif par mission; une dépendance non satisfaite interdit le start; une suppression exige confirmation et cible exacte. Les détails complets des contrats Workspace/Git/confirmation sont figés dans [I5-workspaces-git.md](../implementation/I5-workspaces-git.md).

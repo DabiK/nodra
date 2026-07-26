@@ -18,5 +18,6 @@
 | ADR-014 | FTS SQLite limité au contenu non secret/non-log | recommandé, à approuver |
 | ADR-015 | Budgets V1 hebdomadaire global + mission lifetime confirmables; rétention indéfinie sans purge auto; briefing neuf Nodra seulement | accepté (validé) |
 | ADR-016 | Drizzle ORM source d'implémentation SQLite; SQL manuel ciblé pour FTS/triggers/index/PRAGMA; DDL contractuel de validation | accepté (validé) |
+| ADR-017 | `confirmation` distincte de `approval`, exacte, expirante et consommée une seule fois pour les effets externes sensibles | accepté (validé) |
 
-ADR-004/005/008/010/011/012/013/014 sont les signatures techniques minimales avant POC. ADR-015 est une contrainte produit désormais close. ADR-016 encadre l'implémentation, sans remplacer SQLite ni les validations SQL.
+ADR-004/005/008/010/011/012/013/014 sont les signatures techniques minimales avant POC. ADR-015 est une contrainte produit désormais close. ADR-016 encadre l'implémentation, sans remplacer SQLite ni les validations SQL. ADR-017 fixe le contrat I5 et ne transforme pas les confirmations en permissions implicites.

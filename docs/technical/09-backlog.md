@@ -4,7 +4,7 @@
 2. **Mission humaine** — FSM, Relais, projet/scratch, API/CLI; critères : titre seul, fermeture sans run.
 3. **Temporal envelope** — outbox/inbox, supervisor contract, MissionWorkflow test environment; critères : start explicite et crash recovery simulé.
 4. **Evidence/Gates** — collecteur command/Git, artefacts digest, approbation; critères : preuve stale refusée.
-5. **Workspaces/Git** — repo/worktree, confirmations; critères : aucune intégration ou suppression sans portée visible.
+5. **Workspaces/Git** — repo/scratch/worktree, snapshots et confirmations exactes; critères : aucun écrasement, commit seulement autorisé, aucune intégration/suppression sans confirmation consommée, tombstone restaurable.
 6. **Codex** — app-server adapter, capabilities, streaming/cancel/resume; critères : fixture + probe opt-in.
 7. **OpenCode** — serveur HTTP/OpenAPI local, événements SSE, sessions et capabilities; critères : aucune sortie CLI parsée et absence explicite de toute capability non prouvée.
 8. **Pipelines/manager/budgets** — dependencies, child workflows, policies; critères : retry ciblé et confirmation dépassement.
