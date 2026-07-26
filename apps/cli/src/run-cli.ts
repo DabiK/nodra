@@ -67,7 +67,11 @@ import {
   UpdateAgentConfig
 } from "@nodra/application";
 import { ConsoleOutput } from "./console-output.js";
-import { NodraCli } from "./nodra-cli.js";
+import {
+  CLI_HELP,
+  isCliHelpRequest,
+  NodraCli
+} from "./nodra-cli.js";
 import { I4Cli } from "./i4-cli.js";
 import { EvidenceCli } from "./evidence-cli.js";
 import { GateCli } from "./gate-cli.js";
@@ -87,6 +91,12 @@ export const runCli = async (
   temporalNamespace = process.env.NODRA_TEMPORAL_NAMESPACE ?? "nodra",
   dataRoot = process.env.NODRA_DATA_ROOT ?? dirname(databaseFile)
 ): Promise<number> => {
+  const output = new ConsoleOutput();
+
+  if (isCliHelpRequest(arguments_)) {
+    output.write(CLI_HELP);
+    return 0;
+  }
   await mkdir(dirname(databaseFile), { recursive: true });
   const database = NodraSqliteDatabase.open(databaseFile);
   const temporal = new LazyTemporalConnection({ address: temporalAddress, namespace: temporalNamespace });
@@ -106,7 +116,8 @@ export const runCli = async (
     const providers = new ProviderRegistry([
       codex,
       new OpenCodeProviderAdapter({
-        baseUrl: process.env.NODRA_OPENCODE_URL ?? "http://127.0.0.1:4096"
+        baseUrl: process.env.NODRA_OPENCODE_URL ?? "http://127.0.0.1:4096",
+        executionTimeoutMs: Number(process.env.NODRA_OPENCODE_EXECUTION_TIMEOUT_MS ?? "300000")
       })
     ]);
     const providerCatalog = new SqliteProviderCatalogRepository(database);
@@ -140,7 +151,7 @@ export const runCli = async (
         new SqliteWorkflowReconciliationStore(database),
         workflow
       ),
-      new ConsoleOutput(),
+      output,
       new I4Cli([
         new EvidenceCli(new ReadEvidence(evidenceRepository), new CollectEvidence(evidenceRepository, blobs, new LocalCommandObservationAdapter(git), git)),
         new GateCli(manageGates),

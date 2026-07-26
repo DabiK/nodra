@@ -20,8 +20,270 @@ export interface CliOutput {
   write(value: string): void;
 }
 
-const usage =
-  "Usage: nodra <health|mission:*|relay|temporal:*|run:*|provider:*|evidence:*|gate:*|approval:*|delivery:*|workspace:*|confirmation:*>";
+export const CLI_USAGE = "Usage: nodra <command> [arguments]";
+
+export const CLI_HELP = `
+Nodra CLI
+
+Usage:
+  nodra <command> [arguments]
+
+General:
+  help
+  -h
+  --help
+      Show this help.
+
+  health
+      Check SQLite, Temporal and provider health.
+
+Missions:
+  mission:create <title...>
+    [--project <project-id>]
+    [--command-id <command-id>]
+      Create a mission.
+
+  mission:list
+  mission:list --scratch
+  mission:list --project <project-id>
+      List missions, optionally filtered by project.
+
+  mission:show <mission-id>
+      Show a mission.
+
+  mission:start <mission-id> <expected-version>
+    [--command-id <command-id>]
+      Start a mission and create its workflow run.
+
+  mission:prepare <mission-id> <expected-version>
+      Move a mission to the prepared state.
+
+  mission:pickup <mission-id> <expected-version>
+      Pick up a mission.
+
+  mission:block <mission-id> <expected-version> <reason...>
+      Block a mission with a reason.
+
+  mission:resume <mission-id> <expected-version>
+      Resume a blocked mission.
+
+  mission:close <mission-id> <expected-version>
+      Close a mission.
+
+  mission:abandon <mission-id> <expected-version>
+      Abandon a mission.
+
+Mission agent configuration:
+  mission:agent-enable <mission-id> <mission-version>
+      Enable the configured agent for a mission.
+
+  mission:agent-show <mission-id>
+      Show the stored agent configuration.
+
+  mission:agent-preview <mission-id>
+      Preview the resolved agent configuration.
+
+  mission:agent-config <mission-id> <config-version>
+    --provider <provider-id>
+    --model <model-id>
+    --effort <minimal|low|medium|high|xhigh|provider_default>
+    --prompt <text>
+    --permission <read_only|workspace|full_access>
+    --workspace <workspace-id>
+    [--auto-commit]
+    [--integration-ref <git-ref>]
+    [--options-version <version>]
+    [--options-json <json-object>]
+      Configure the agent used by a mission.
+
+Relay:
+  relay
+  relay --scratch
+  relay --project <project-id>
+      Show the mission relay, optionally filtered by project.
+
+Temporal:
+  temporal:dispatch
+      Dispatch up to 100 pending workflow outbox entries.
+
+  temporal:reconcile
+      Reconcile persisted workflow state with Temporal.
+
+Evidence:
+  evidence:list <run-id>
+      List evidence collected for a run.
+
+  evidence:show <evidence-id>
+      Show one evidence record.
+
+  evidence:collect-git <run-id>
+      Collect the current Git observation for a run.
+
+  evidence:collect-command <run-id>
+    --cwd <directory>
+    [--timeout <milliseconds>]
+    [--max-output <bytes>]
+    -- <command> [arguments...]
+      Execute a command and store its output as evidence.
+
+      Defaults:
+        --timeout     30000
+        --max-output  1000000
+
+Gates:
+  gate:define <mission-id> <name>
+    [--expected-exit <exit-code>]
+    [--requires-git]
+      Define and bind a command-exit gate to a mission.
+
+  gate:evaluate <binding-id> <run-id> <evidence-id...>
+      Evaluate a gate using one or more evidence records.
+
+  gate:list <mission-id>
+      List gates bound to a mission.
+
+  gate:refresh-staleness <run-id>
+      Refresh gate staleness for a run.
+
+  gate:override <evaluation-id> <approval-id>
+    <accept|reject|waive>
+    <comment...>
+      Override a gate evaluation using an approval.
+
+  gate:bind-pipeline
+      Unavailable until pipeline gate bindings are implemented.
+
+Approvals:
+  approval:show <approval-id>
+      Show an approval request.
+
+  approval:request <run|mission|manager> <subject-id> <kind...>
+      Create an approval request for a run, mission or manager.
+
+  approval:decide <approval-id>
+    <approved|denied>
+    <actor>
+    <comment...>
+      Approve or deny an approval request.
+
+Deliveries:
+  delivery:show <delivery-id>
+      Show a delivery.
+
+  delivery:declare <run-id>
+    <expected-mission-version>
+    <agent-declaration>
+    <observation-summary...>
+      Declare the delivery produced by a run.
+
+  delivery:accept <run-id>
+    <expected-mission-version>
+    <comment...>
+      Accept a delivery.
+
+  delivery:request-changes <run-id>
+    <expected-mission-version>
+    <comment...>
+      Request changes to a delivery.
+
+  delivery:reject <run-id>
+    <expected-mission-version>
+    <comment...>
+      Reject a delivery.
+
+Confirmations:
+  confirmation:show <confirmation-id>
+      Show a confirmation request.
+
+  confirmation:request
+    [--cwd <directory>]
+    <action>
+    <risk>
+    <once|run|mission>
+    <run|mission|workspace>
+    <subject-id>
+    <expires-at>
+    <target-json>
+      Request confirmation for a potentially sensitive action.
+
+      target-json must be a valid JSON object.
+
+  confirmation:decide <confirmation-id>
+    <approved|denied>
+    <actor>
+    <comment...>
+      Approve or deny a confirmation request.
+
+Additional command groups:
+  provider:*
+      Provider status, probing and smoke-test commands.
+
+  run:*
+      Run cancellation, resumption and steering commands.
+
+  workspace:*
+      Workspace creation, inspection, snapshots, commits,
+      integration, deletion and restoration commands.
+
+Examples:
+  nodra health
+
+  nodra mission:create "Implement provider fallback"
+
+  nodra mission:create "Fix authentication"
+    --project project-123
+
+  nodra mission:list --scratch
+
+  nodra mission:start mission-123 2
+
+  nodra mission:block mission-123 3 "Waiting for API credentials"
+
+  nodra mission:agent-config mission-123 0
+    --provider opencode
+    --model qwen3-coder
+    --effort high
+    --prompt "Implement the mission and run the tests"
+    --permission workspace
+    --workspace workspace-123
+    --auto-commit
+
+  nodra evidence:collect-command run-123
+    --cwd /path/to/repository
+    --timeout 60000
+    -- npm test
+
+  nodra gate:define mission-123 "Unit tests"
+    --expected-exit 0
+    --requires-git
+
+  nodra approval:request run run-123 production-deployment
+
+  nodra confirmation:request
+    --cwd /path/to/repository
+    execute-command
+    high
+    run
+    run
+    run-123
+    2026-07-26T18:00:00Z
+    '{"command":"npm deploy"}'
+`.trim();
+
+const HELP_COMMANDS = new Set([
+  "help",
+  "-h",
+  "--help"
+]);
+
+export const isCliHelpRequest = (
+  arguments_: readonly string[]
+): boolean => {
+  const [command] = arguments_;
+
+  return command === undefined || HELP_COMMANDS.has(command);
+};
+
 
 export class NodraCli {
   constructor(
@@ -60,6 +322,10 @@ export class NodraCli {
   }
 
   private async execute(arguments_: readonly string[]): Promise<number> {
+    if (isCliHelpRequest(arguments_)) {
+      return this.writeHelp();
+    }
+
     const [command, ...parameters] = arguments_;
     if (command === "health") return this.write(await this.getHealth.execute());
     if (command === "mission:create") return this.create(parameters);
@@ -90,7 +356,7 @@ export class NodraCli {
       if (result !== undefined) return this.write(result);
     }
     if (command?.startsWith("mission:")) return this.transition(command.slice("mission:".length), parameters);
-    return this.writeUsage();
+    return this.writeUsage(`Unknown command: ${command}`);
   }
 
   private async start(parameters: readonly string[]): Promise<number> {
@@ -175,7 +441,7 @@ export class NodraCli {
     if (parameters.length === 2 && parameters[0] === "--project" && parameters[1]) {
       return { projectId: toId(parameters[1]) };
     }
-    throw new DomainError(usage, "CLI_USAGE_ERROR");
+    throw new DomainError(CLI_USAGE, "CLI_USAGE_ERROR");
   }
 
   private context(commandId?: ReturnType<typeof toId>) {
@@ -187,8 +453,19 @@ export class NodraCli {
     return 0;
   }
 
-  private writeUsage(): number {
-    this.output.write(usage);
+
+  private writeHelp(): number {
+    this.output.write(CLI_HELP);
+    return 0;
+  }
+
+  private writeUsage(detail?: string): number {
+    this.output.write(
+      detail
+        ? `${detail}\n\n${CLI_HELP}`
+        : CLI_HELP
+    );
+
     return 2;
   }
 }

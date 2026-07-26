@@ -46,7 +46,7 @@ export class RuntimeProcessManager {
     );
 
     let spawnObserved = false;
-    let spawnError: Error | null = null;
+    let spawnErrorMessage = "none";
     let exitCode: number | null = null;
     let exitSignal: NodeJS.Signals | null = null;
 
@@ -55,7 +55,7 @@ export class RuntimeProcessManager {
     });
 
     child.once("error", (error) => {
-      spawnError = error;
+      spawnErrorMessage = error.message;
     });
 
     child.once("exit", (code, signal) => {
@@ -80,9 +80,6 @@ export class RuntimeProcessManager {
             { encoding: "utf8" }
           )
         : null;
-
-      const spawnErrorMessage =
-        spawnError instanceof Error ? spawnError.message : "none";
 
       throw new RuntimeError(
         [

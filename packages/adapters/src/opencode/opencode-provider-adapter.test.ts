@@ -51,6 +51,36 @@ describe("OpenCodeProviderAdapter", () => {
     await Promise.all(close.splice(0).map((stop) => stop()));
   });
 
+  it("omits messageID and variant when using provider_default", async () => {
+    const requests: string[] = [];
+    const promptBodies: Array<Record<string, unknown>> = [];
+
+    const baseUrl = await fixtureServer(requests, promptBodies);
+
+    await new OpenCodeProviderAdapter({ baseUrl }).execute({
+      runId: asId("run-provider-default"),
+      providerId: "opencode",
+      modelId: "local-engine/gemma3:4b",
+      reasoningEffort: "provider_default",
+      prompt: "Reply with marker",
+      cwd: "/workspace",
+      permissionPreset: "read_only",
+      capabilityVersion: "fixture",
+      contractStatus: "compatible_unverified",
+      session: null
+    }, {
+      session: async () => undefined,
+      runRef: async () => undefined,
+      event: async () => undefined,
+      permission: async () => "denied"
+    });
+
+    expect(promptBodies).toHaveLength(1);
+    expect(promptBodies[0]).not.toHaveProperty("messageID");
+    expect(promptBodies[0]).not.toHaveProperty("variant");
+  });
+
+
   it("probes health, /doc and provider catalog without creating a session", async () => {
     const requests: string[] = [];
     const baseUrl = await fixtureServer(requests);
@@ -85,7 +115,10 @@ describe("OpenCodeProviderAdapter", () => {
 
   it("maps SSE, persists the assistant result and reaches a provider terminal", async () => {
     const requests: string[] = [];
-    const baseUrl = await fixtureServer(requests);
+    const promptBodies: Array<Record<string, unknown>> = [];
+
+    const baseUrl = await fixtureServer(requests, promptBodies);
+
     const events: ProviderEventInput[] = [];
     const permissions: string[] = [];
     const sessions: string[] = [];
@@ -130,10 +163,26 @@ describe("OpenCodeProviderAdapter", () => {
     );
     expect(requests).toContain("POST /session/session-fixture/prompt_async");
     expect(requests).toContain("VARIANT high");
-    expect(requests).toContain("GET /session/session-fixture/message");
+    expect(requests).toContain("GET /session/session-fixture/message"); expect(promptBodies).toHaveLength(1);
+
+    expect(promptBodies[0]).toMatchObject({
+      model: {
+        providerID: "local-engine",
+        modelID: "gemma3:4b"
+      },
+      variant: "high",
+      parts: [
+        {
+          type: "text",
+          text: "Reply with marker"
+        }
+      ]
+    });
+
+    expect(promptBodies[0]).not.toHaveProperty("messageID");
   });
 
-  const fixtureServer = async (requests: string[]): Promise<string> => {
+  const fixtureServer = async (requests: string[], promptBodies: Array<Record<string, unknown>> = []): Promise<string> => {
     let eventResponse: ServerResponse | undefined;
     const server = createServer(async (request, response) => {
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -170,9 +219,23 @@ describe("OpenCodeProviderAdapter", () => {
         && request.method === "POST"
       ) {
         const chunks: Buffer[] = [];
-        for await (const chunk of request) chunks.push(Buffer.from(chunk));
-        const body: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-        if (isRecord(body) && typeof body.variant === "string") {
+
+        for await (const chunk of request) {
+          chunks.push(Buffer.from(chunk));
+        }
+
+        const body: unknown = JSON.parse(
+          Buffer.concat(chunks).toString("utf8")
+        );
+
+        if (!isRecord(body)) {
+          response.writeHead(400).end();
+          return;
+        }
+
+        promptBodies.push(body);
+
+        if (typeof body.variant === "string") {
           requests.push(`VARIANT ${body.variant}`);
         }
         response.writeHead(204).end();

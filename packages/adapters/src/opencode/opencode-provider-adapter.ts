@@ -22,12 +22,14 @@ const certifiedSchemaDigest = "f5cb443f0d160fc4b17190f64c2401f199160eb2137ce4e00
 export interface OpenCodeProviderAdapterOptions {
   baseUrl?: string;
   fetch?: typeof fetch;
+  executionTimeoutMs?: number;
 }
 
 export class OpenCodeProviderAdapter implements ProviderPort {
   readonly providerId = "opencode";
   private readonly baseUrl: string;
   private readonly fetchImplementation: typeof fetch;
+  private readonly executionTimeoutMs: number;
 
   constructor(
     options: OpenCodeProviderAdapterOptions = {},
@@ -36,6 +38,7 @@ export class OpenCodeProviderAdapter implements ProviderPort {
   ) {
     this.baseUrl = (options.baseUrl ?? "http://127.0.0.1:4096").replace(/\/+$/, "");
     this.fetchImplementation = options.fetch ?? fetch;
+    this.executionTimeoutMs = options.executionTimeoutMs ?? 300_000;
   }
 
   async probe(): Promise<ProviderProbeResult> {
@@ -129,12 +132,37 @@ export class OpenCodeProviderAdapter implements ProviderPort {
     try {
       const model = this.parseModelId(input.modelId);
       await this.promptAsync(session.id, input, model);
-      const state = await terminal;
-      return {
-        state,
-        externalSessionId: session.id,
-        externalRunId: runRef
-      };
+      let timeout: NodeJS.Timeout | undefined;
+
+      try {
+        const timedOut = new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => {
+            stopEvents.abort();
+
+            reject(
+              new Error(
+                `OpenCode execution timed out after ${this.executionTimeoutMs}ms: ` +
+                `runId=${input.runId} sessionId=${session.id} model=${input.modelId}`
+              )
+            );
+          }, this.executionTimeoutMs);
+
+          timeout.unref();
+        });
+
+        const state = await Promise.race([
+          terminal,
+          timedOut
+        ]);
+
+        return {
+          state,
+          externalSessionId: session.id,
+          externalRunId: runRef
+        };
+      } finally {
+        if (timeout) clearTimeout(timeout);
+      }
     } catch (error) {
       stopEvents.abort();
       if (error instanceof ProviderProtocolIncompatibleError) throw error;
@@ -278,12 +306,16 @@ export class OpenCodeProviderAdapter implements ProviderPort {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          messageID: `msg_${input.runId}`,
           model,
           ...(input.reasoningEffort === "provider_default"
             ? {}
             : { variant: input.reasoningEffort }),
-          parts: [{ type: "text", text: input.prompt }]
+          parts: [
+            {
+              type: "text",
+              text: input.prompt
+            }
+          ]
         })
       }
     );

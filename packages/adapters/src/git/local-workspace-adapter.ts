@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { access, lstat, mkdir, realpath } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import type {
   IntegrationMethod,
@@ -163,9 +163,10 @@ export class LocalWorkspaceAdapter implements WorkspacePort {
     if (!isAbsolute(requestedPath)) {
       throw new DomainError("Managed workspace path must be absolute", "WORKSPACE_PATH_CONFLICT");
     }
-    const target = resolve(requestedPath);
+    const requested = resolve(requestedPath);
+    const parent = await this.real(dirname(requested), "Workspace parent path does not exist");
+    const target = resolve(parent, basename(requested));
     this.assertManaged(target);
-    const parent = await this.real(dirname(target), "Workspace parent path does not exist");
     this.assertManaged(parent, true);
     if (resolve(parent, target.slice(parent.length + 1)) !== target) {
       throw new DomainError("Workspace path escapes its canonical parent", "WORKSPACE_PATH_CONFLICT");

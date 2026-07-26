@@ -38,7 +38,8 @@ const activities = new TemporalRunActivities(
   new ProviderRegistry([
     new CodexProviderAdapter(),
     new OpenCodeProviderAdapter({
-      baseUrl: process.env.NODRA_OPENCODE_URL ?? "http://127.0.0.1:4096"
+      baseUrl: process.env.NODRA_OPENCODE_URL ?? "http://127.0.0.1:4096",
+      executionTimeoutMs: Number(process.env.NODRA_OPENCODE_EXECUTION_TIMEOUT_MS ?? "300000")
     })
   ]),
   providerRuns,

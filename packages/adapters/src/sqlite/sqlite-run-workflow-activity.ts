@@ -4,7 +4,7 @@ import type {
   RunWorkflowTerminalInput,
   RunWorkflowTerminalResult
 } from "../temporal/contracts.js";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { workspaces } from "./schema/core.js";
 import { businessAuditEvents, inbox, relayItems } from "./schema/operations.js";
@@ -71,21 +71,54 @@ export class SqliteRunWorkflowActivity {
           .innerJoin(missions, eq(missions.id, runs.missionId))
           .where(and(eq(runs.id, input.runId), eq(runs.missionId, input.missionId)))
           .get();
-        if (!run || run.temporalRunId !== input.temporalRunId || !run.workspaceId) {
-          throw new Error("Terminal Run Workflow Activity could not resolve its persisted run workspace");
+        if (!run || !run.workspaceId) {
+          throw new Error(
+            "Terminal Run Workflow Activity could not resolve its persisted run workspace"
+          );
+        }
+
+        const temporalRunMismatch =
+          run.temporalRunId !== null &&
+          run.temporalRunId !== input.temporalRunId;
+
+        const missingTemporalRunOutsideQueued =
+          run.temporalRunId === null &&
+          run.state !== "QUEUED";
+
+        if (temporalRunMismatch || missingTemporalRunOutsideQueued) {
+          throw new Error(
+            "Terminal Run Workflow Activity detected a Temporal run mismatch"
+          );
         }
         if (["SUCCEEDED", "FAILED", "CANCELLED"].includes(run.state)) {
           return { applied: false };
         }
+
+
         const updated = transaction.update(runs).set({
           state: input.state,
+          temporalRunId: input.temporalRunId,
           endedAt: input.occurredAt
         }).where(and(
           eq(runs.id, input.runId),
           eq(runs.missionId, input.missionId),
-          eq(runs.temporalRunId, input.temporalRunId),
-          inArray(runs.state, ["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"])
+          or(
+            eq(runs.temporalRunId, input.temporalRunId),
+            and(
+              isNull(runs.temporalRunId),
+              eq(runs.state, "QUEUED")
+            )
+          ),
+          inArray(runs.state, [
+            "QUEUED",
+            "STARTING",
+            "RUNNING",
+            "WAITING_APPROVAL",
+            "CANCELLING"
+          ])
         )).run();
+
+
         if (updated.changes !== 1) {
           throw new Error("Terminal Run Workflow Activity lost its run state transition");
         }

@@ -84,6 +84,60 @@ describe("I5.1 workspace lifecycle concurrency", () => {
 
   afterEach(() => database.close());
 
+  it("terminalizes a run that fails before recordStarted", async () => {
+    await startMission("start-pre-start-failure");
+
+    const activity = new SqliteRunWorkflowActivity(database);
+
+    await expect(activity.recordTerminal({
+      missionId: "mission",
+      commandId: "start-pre-start-failure",
+      runId: "run-mission",
+      messageId: "terminal-pre-start-failure",
+      state: "FAILED",
+      schemaVersion: 1,
+      temporalRunId: "temporal-pre-start-failure",
+      occurredAt: "2026-07-26T12:01:00.000Z"
+    })).resolves.toEqual({ applied: true });
+
+    expect(
+      database.orm
+        .select()
+        .from(runs)
+        .where(eq(runs.id, "run-mission"))
+        .get()
+    ).toMatchObject({
+      state: "FAILED",
+      temporalRunId: "temporal-pre-start-failure",
+      endedAt: "2026-07-26T12:01:00.000Z"
+    });
+
+    expect(workspaceState()).toBe("ready");
+
+    expect(
+      database.orm
+        .select()
+        .from(missions)
+        .where(eq(missions.id, "mission"))
+        .get()
+    ).toMatchObject({
+      state: "BLOCKED",
+      version: 3
+    });
+
+    await expect(activity.recordTerminal({
+      missionId: "mission",
+      commandId: "start-pre-start-failure",
+      runId: "run-mission",
+      messageId: "terminal-pre-start-failure",
+      state: "FAILED",
+      schemaVersion: 1,
+      temporalRunId: "temporal-pre-start-failure",
+      occurredAt: "2026-07-26T12:01:00.000Z"
+    })).resolves.toEqual({ applied: false });
+  });
+
+
   it("reserves pending_delete with confirmation before Activity and blocks concurrent start", async () => {
     const confirmationId = await approveDeletion("delete-confirmation");
     let enterActivity!: () => void;
