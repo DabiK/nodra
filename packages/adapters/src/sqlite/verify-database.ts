@@ -6,6 +6,9 @@ const REQUIRED_TABLES = [
   "run",
   "pipeline",
   "provider_event",
+  "workspace",
+  "workspace_git_snapshot",
+  "confirmation",
   "search_document",
   "schema_migration"
 ] as const;
@@ -23,7 +26,9 @@ const REQUIRED_TRIGGERS = [
   "pipeline_node_run_definition_matches",
   "manager_current_instruction_exists",
   "manager_ready_requires_instruction",
-  "mission_config_only_for_agent"
+  "mission_config_only_for_agent",
+  "confirmation_exact_fields_immutable",
+  "confirmation_state_transition"
 ] as const;
 
 export interface DatabaseVerification {

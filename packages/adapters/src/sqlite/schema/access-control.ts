@@ -1,8 +1,9 @@
 import { sql } from "drizzle-orm";
-import { check, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { check, index, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { approvals } from "./approvals.js";
 import { missions } from "./missions.js";
 import { runs } from "./runs.js";
+import { workspaces } from "./core.js";
 
 export const mcpSelections = sqliteTable("mcp_selection", {
   ownerKind: text("owner_kind", { enum: ["global", "project", "mission", "manager"] }).notNull(),
@@ -44,4 +45,36 @@ export const permissionGrants = sqliteTable("permission_grant", {
   check("ck_permission_scope", sql`${table.scope} in ('once','run','mission')`),
   check("ck_permission_decision", sql`${table.decision} in ('approved','denied')`),
   check("ck_permission_subject", sql`((${table.scope} in ('once','run')) and ${table.runId} is not null and ${table.missionId} is null) or (${table.scope} = 'mission' and ${table.missionId} is not null and ${table.runId} is null)`)
+]);
+
+export const confirmations = sqliteTable("confirmation", {
+  id: text("id").primaryKey(),
+  action: text("action").notNull(),
+  targetJson: text("target_json").notNull(),
+  targetDigest: text("target_digest").notNull(),
+  cwd: text("cwd"),
+  providerId: text("provider_id"),
+  permissionPreset: text("permission_preset", { enum: ["read_only", "workspace", "full_access"] }),
+  risk: text("risk").notNull(),
+  scope: text("scope", { enum: ["once", "run", "mission"] }).notNull(),
+  runId: text("run_id").references(() => runs.id),
+  missionId: text("mission_id").references(() => missions.id),
+  workspaceId: text("workspace_id").references(() => workspaces.id),
+  expiresAt: text("expires_at").notNull(),
+  state: text("state", { enum: ["pending", "approved", "denied", "expired", "consumed"] }).notNull(),
+  decidedBy: text("decided_by"),
+  comment: text("comment"),
+  createdAt: text("created_at").notNull(),
+  decidedAt: text("decided_at"),
+  consumedAt: text("consumed_at")
+}, (table) => [
+  check("ck_confirmation_target_digest", sql`length(${table.targetDigest}) = 64`),
+  check("ck_confirmation_target_json", sql`json_valid(${table.targetJson})`),
+  check("ck_confirmation_scope", sql`${table.scope} in ('once','run','mission')`),
+  check("ck_confirmation_state", sql`${table.state} in ('pending','approved','denied','expired','consumed')`),
+  check("ck_confirmation_subject", sql`(${table.scope} = 'once' and ((${table.runId} is not null)+(${table.missionId} is not null)+(${table.workspaceId} is not null)) = 1) or (${table.scope} = 'run' and ${table.runId} is not null and ${table.missionId} is null and ${table.workspaceId} is null) or (${table.scope} = 'mission' and ${table.missionId} is not null and ${table.runId} is null and ${table.workspaceId} is null)`),
+  index("idx_confirmation_state_expires").on(table.state, table.expiresAt),
+  index("idx_confirmation_run").on(table.runId, table.action, table.state),
+  index("idx_confirmation_mission").on(table.missionId, table.action, table.state),
+  index("idx_confirmation_workspace").on(table.workspaceId, table.action, table.state)
 ]);

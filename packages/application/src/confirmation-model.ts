@@ -1,0 +1,6 @@
+import type { Id } from "@nodra/domain";
+import type { CommandContext } from "./command-context.js";
+export type ConfirmationScope = "once" | "run" | "mission";
+export type ConfirmationState = "pending" | "approved" | "denied" | "expired" | "consumed";
+export interface ConfirmationRecord { id: Id; action: string; targetJson: string; targetDigest: string; cwd: string | null; providerId: string | null; permissionPreset: "read_only" | "workspace" | "full_access" | null; risk: string; scope: ConfirmationScope; runId: Id | null; missionId: Id | null; workspaceId: Id | null; expiresAt: string; state: ConfirmationState; decidedBy: string | null; comment: string | null; createdAt: string; decidedAt: string | null; consumedAt: string | null; }
+export interface ConfirmationRepository { request(record: ConfirmationRecord, context: CommandContext): Promise<void>; decide(input: { id: Id; decision: "approved" | "denied"; actor: string; comment: string; context: CommandContext }): Promise<ConfirmationRecord>; consume(input: { id: Id; action: string; targetDigest: string; cwd: string | null; scope: ConfirmationScope; runId: Id | null; missionId: Id | null; workspaceId: Id | null; context: CommandContext }): Promise<ConfirmationRecord>; show(id: Id): Promise<ConfirmationRecord>; }

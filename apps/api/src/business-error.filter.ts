@@ -1,5 +1,5 @@
 import { Catch, type ArgumentsHost, type ExceptionFilter } from "@nestjs/common";
-import { DomainError } from "@nodra/application";
+import { ConfirmationRequiredError, DomainError } from "@nodra/application";
 import { randomUUID } from "node:crypto";
 
 interface HttpRequest {
@@ -31,6 +31,15 @@ const statusFor = (code: string): number => {
   if (code === "CAPABILITY_UNAVAILABLE") return 422;
   if (code === "GATE_DEFINITION_INVALID") return 422;
   if (code === "APPROVAL_REQUIRED") return 428;
+  if (code === "CONFIRMATION_REQUIRED") return 428;
+  if (
+    code === "CONFIRMATION_EXPIRED" ||
+    code === "CONFIRMATION_TARGET_MISMATCH" ||
+    code === "CONFIRMATION_ALREADY_CONSUMED" ||
+    code === "WORKSPACE_ACTIVE_RUN" ||
+    code === "WORKSPACE_PATH_CONFLICT" ||
+    code === "WORKSPACE_STATE_CONFLICT"
+  ) return 409;
   return 400;
 };
 
@@ -49,7 +58,10 @@ export class BusinessErrorFilter implements ExceptionFilter<DomainError> {
       status,
       code: error.code,
       detail: error.message,
-      commandId
+      commandId,
+      ...(error instanceof ConfirmationRequiredError
+        ? { confirmation: error.confirmation }
+        : {})
     });
   }
 }

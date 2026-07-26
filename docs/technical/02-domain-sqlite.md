@@ -102,6 +102,10 @@ CREATE INDEX idx_gate_evaluation ON gate_evaluation(gate_binding_id,state,evalua
 CREATE INDEX idx_budget_ledger_run ON budget_ledger(run_id,created_at DESC);
 CREATE INDEX idx_relay_queue ON relay_item(queue,state,snoozed_until,created_at DESC);
 CREATE INDEX idx_audit_aggregate ON business_audit_event(aggregate_kind,aggregate_id,occurred_at DESC);
+CREATE INDEX idx_confirmation_state_expires ON confirmation(state,expires_at);
+CREATE INDEX idx_confirmation_run ON confirmation(run_id,action,state);
+CREATE INDEX idx_confirmation_mission ON confirmation(mission_id,action,state);
+CREATE INDEX idx_confirmation_workspace ON confirmation(workspace_id,action,state);
 
 -- Cross-table integrity SQLite cannot express through FK alone.
 CREATE TRIGGER run_subject_matches_conversation BEFORE INSERT ON run BEGIN
@@ -138,6 +142,16 @@ CREATE TRIGGER manager_ready_requires_instruction BEFORE UPDATE OF state ON mana
 END;
 CREATE TRIGGER mission_config_only_for_agent BEFORE INSERT ON mission_agent_config BEGIN
   SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM mission m WHERE m.id=NEW.mission_id AND m.execution_kind='agent') THEN RAISE(ABORT,'human mission cannot have agent config') END;
+END;
+CREATE TRIGGER confirmation_exact_fields_immutable BEFORE UPDATE OF action,target_json,target_digest,cwd,provider_id,permission_preset,risk,scope,run_id,mission_id,workspace_id,expires_at,created_at ON confirmation BEGIN
+  SELECT RAISE(ABORT,'confirmation exact fields are immutable');
+END;
+CREATE TRIGGER confirmation_state_transition BEFORE UPDATE OF state ON confirmation WHEN NOT (
+  (OLD.state='pending' AND NEW.state IN('approved','denied','expired')) OR
+  (OLD.state='approved' AND NEW.state IN('consumed','expired')) OR
+  OLD.state=NEW.state
+) BEGIN
+  SELECT RAISE(ABORT,'invalid confirmation state transition');
 END;
 ```
 

@@ -8,6 +8,7 @@ PRAGMA foreign_keys=ON;
 INSERT INTO app_config VALUES(1,'global prompt',1,'2026-07-21T00:00:00Z','2026-07-21T00:00:00Z');
 INSERT INTO retention_policy VALUES(1,0,'2026-07-21T00:00:00Z','2026-07-21T00:00:00Z');
 INSERT INTO blob VALUES('b1','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','blobs/aa/b1','text/plain',3,'2026-07-21T00:00:00Z',NULL);
+INSERT INTO workspace VALUES('ws',NULL,'scratch','/tmp/ws','ready','2026-07-21T00:00:00Z',NULL);
 INSERT INTO repository VALUES('repo1','local:/tmp/nodra-repo',NULL,'/tmp/nodra-repo','/tmp/nodra-repo','2026-07-21T00:00:00Z',NULL);
 INSERT INTO workspace VALUES('ws1',NULL,'worktree','/tmp/nodra-worktree','ready','2026-07-21T00:00:00Z',NULL);
 INSERT INTO workspace_repository VALUES('ws1','repo1','main','head1','nodra/i5','main',NULL);
@@ -38,6 +39,7 @@ INSERT INTO evidence VALUES('ev','rm','observation','digest','collector','1','{}
 INSERT INTO evidence_blob VALUES('ev','b1','report');
 INSERT INTO gate_evaluation VALUES('ge','gb','rm','collector','1','passed','2026-07-21T00:00:00Z',NULL,'ok');
 INSERT INTO gate_evaluation_evidence VALUES('ge','ev','required');
+INSERT INTO confirmation VALUES('cf','workspace.delete','{"workspaceId":"ws"}','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','/tmp/ws',NULL,NULL,'destructive','once',NULL,NULL,'ws','2027-07-21T00:00:00Z','approved','user','reviewed','2026-07-21T00:00:00Z','2026-07-21T00:00:00Z',NULL);
 INSERT INTO budget_window VALUES('bw-global','global',NULL,'week','confirmable',100,NULL,'2026-07-21T00:00:00Z',NULL);
 INSERT INTO budget_window VALUES('bw-mission','mission','ma','mission_lifetime','confirmable',20,NULL,'2026-07-21T00:00:00Z',NULL);
 INSERT INTO confirmation VALUES('cf-worktree-delete','workspace.delete','{"workspaceId":"ws1","path":"/tmp/nodra-worktree"}','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','/tmp/nodra-worktree',NULL,'workspace','destructive','once',NULL,NULL,'ws1','2026-07-21T01:00:00Z','approved','user','reviewed','2026-07-21T00:00:00Z','2026-07-21T00:01:00Z',NULL);
@@ -60,4 +62,6 @@ SELECT 'blob_attachment' AS scenario, blob_id FROM mission_input_attachment WHER
 SELECT 'provider_change_new_conversation' AS scenario, id FROM conversation WHERE id='cm-opencode' AND provider_id='opencode';
 SELECT 'budget_v1_windows' AS scenario, count(*) FROM budget_window WHERE enforcement='confirmable' AND hard_limit_units IS NULL;
 SELECT 'confirmation_exact_workspace_once' AS scenario, id FROM confirmation WHERE id='cf-worktree-delete' AND scope='once' AND workspace_id='ws1' AND state='approved';
+SELECT 'confirmation_indexes' AS scenario, count(*) FROM sqlite_master WHERE type='index' AND name IN('idx_confirmation_state_expires','idx_confirmation_run','idx_confirmation_mission','idx_confirmation_workspace');
+SELECT 'confirmation_guards' AS scenario, count(*) FROM sqlite_master WHERE type='trigger' AND name IN('confirmation_exact_fields_immutable','confirmation_state_transition');
 SELECT 'retention_v1_no_auto_purge' AS scenario, automatic_purge_enabled FROM retention_policy WHERE id=1;

@@ -56,3 +56,25 @@ export { ManageApprovals } from "./manage-approvals.js";
 export type { ApprovalRecord, ApprovalRepository, ApprovalSubject } from "./approval-model.js";
 export { ManageDelivery } from "./manage-delivery.js";
 export type { DeliveryRecord, DeliveryRepository } from "./delivery-model.js";
+export { ManageConfirmations } from "./manage-confirmations.js";
+export { ConfirmationRequiredError } from "./confirmation-required-error.js";
+export type { ConfirmationRequestMetadata } from "./confirmation-required-error.js";
+export type { ConfirmationRecord, ConfirmationRepository, ConfirmationScope, ConfirmationState } from "./confirmation-model.js";
+export { CreateWorkspace } from "./create-workspace.js";
+export { ReadWorkspace } from "./read-workspace.js";
+export { SnapshotWorkspace } from "./snapshot-workspace.js";
+export { CommitWorkspace } from "./commit-workspace.js";
+export { IntegrateWorkspace } from "./integrate-workspace.js";
+export { DeleteWorkspace } from "./delete-workspace.js";
+export { RestoreWorkspace } from "./restore-workspace.js";
+export type { WorkspacePort } from "./workspace-port.js";
+export type { WorkspaceRepository } from "./workspace-repository.js";
+export type {
+  IntegrationMethod,
+  RepositoryIdentity,
+  WorkspaceGitSnapshot,
+  WorkspaceKind,
+  WorkspaceMutationResult,
+  WorkspaceRecord,
+  WorkspaceState
+} from "./workspace-model.js";

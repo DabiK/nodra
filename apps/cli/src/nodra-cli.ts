@@ -10,7 +10,7 @@ import type {
   StartMission,
   ShowMission
 } from "@nodra/application";
-import { DomainError, toId } from "@nodra/application";
+import { ConfirmationRequiredError, DomainError, toId } from "@nodra/application";
 import { randomUUID } from "node:crypto";
 import type { I4Cli } from "./i4-cli.js";
 
@@ -19,7 +19,7 @@ export interface CliOutput {
 }
 
 const usage =
-  "Usage: nodra <health|mission:*|relay|temporal:*|evidence:*|gate:*|approval:*|delivery:*>";
+  "Usage: nodra <health|mission:*|relay|temporal:*|evidence:*|gate:*|approval:*|delivery:*|workspace:*|confirmation:*>";
 
 export class NodraCli {
   constructor(
@@ -41,7 +41,13 @@ export class NodraCli {
       return await this.execute(arguments_);
     } catch (error) {
       if (error instanceof DomainError) {
-        this.output.write(JSON.stringify({ code: error.code, detail: error.message }));
+        this.output.write(JSON.stringify({
+          code: error.code,
+          detail: error.message,
+          ...(error instanceof ConfirmationRequiredError
+            ? { confirmation: error.confirmation }
+            : {})
+        }));
         return 1;
       }
       this.output.write(JSON.stringify({ code: "INTERNAL_ERROR", detail: "Unexpected internal error" }));

@@ -7,6 +7,7 @@ import {
   LazyTemporalConnection,
   LazyTemporalWorkflowAdapter,
   LocalCommandObservationAdapter,
+  LocalWorkspaceAdapter,
   migrateDatabase,
   NodraSqliteDatabase,
   ReadOnlyGitObservationAdapter,
@@ -18,30 +19,41 @@ import {
   SqliteMissionReadModel,
   SqliteMissionRepository,
   SqliteMissionExecutionRepository,
+  SqliteConfirmationRepository,
+  SqliteWorkspaceRepository,
   SqliteWorkflowOutboxStore,
   SqliteWorkflowReconciliationStore
 } from "@nodra/adapters";
 import {
   ChangeMissionState,
+  CommitWorkspace,
   CollectEvidence,
   CreateMission,
+  CreateWorkspace,
+  DeleteWorkspace,
   DispatchWorkflowOutbox,
   GetHealth,
   GetRelay,
   ListMissions,
   ManageApprovals,
+  ManageConfirmations,
   ManageDelivery,
   ManageGates,
   ReadEvidence,
+  ReadWorkspace,
   ReconcileWorkflows,
   ShowMission,
+  SnapshotWorkspace,
   StartMission,
-  StructuredGateEvaluatorRegistry
+  StructuredGateEvaluatorRegistry,
+  IntegrateWorkspace,
+  RestoreWorkspace
 } from "@nodra/application";
 import { ApprovalController } from "./approval.controller.js";
 import { BusinessErrorFilter } from "./business-error.filter.js";
 import { DatabaseLifecycle } from "./database-lifecycle.js";
 import { DeliveryController } from "./delivery.controller.js";
+import { ConfirmationController } from "./confirmation.controller.js";
 import { EvidenceController } from "./evidence.controller.js";
 import { GateController } from "./gate.controller.js";
 import { HealthController } from "./health.controller.js";
@@ -49,6 +61,7 @@ import { MissionController } from "./mission.controller.js";
 import { RelayController } from "./relay.controller.js";
 import { RuntimeController } from "./runtime.controller.js";
 import { RuntimeLifecycle } from "./runtime-lifecycle.js";
+import { WorkspaceController } from "./workspace.controller.js";
 import {
   CHANGE_MISSION_STATE,
   CREATE_MISSION,
@@ -65,7 +78,16 @@ import {
   COLLECT_EVIDENCE,
   MANAGE_GATES,
   MANAGE_APPROVALS,
-  MANAGE_DELIVERY
+  MANAGE_DELIVERY,
+  WORKSPACE_PORT,
+  MANAGE_CONFIRMATIONS,
+  CREATE_WORKSPACE,
+  READ_WORKSPACE,
+  SNAPSHOT_WORKSPACE,
+  COMMIT_WORKSPACE,
+  INTEGRATE_WORKSPACE,
+  DELETE_WORKSPACE,
+  RESTORE_WORKSPACE
 } from "./tokens.js";
 
 export interface NodraModuleOptions {
@@ -81,7 +103,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, ApprovalController, DeliveryController],
+      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController],
       providers: [
         {
           provide: DATABASE,
@@ -96,6 +118,71 @@ export class NodraModule {
               throw error;
             }
           }
+        },
+        {
+          provide: WORKSPACE_PORT,
+          useFactory: async () => {
+            const adapter = new LocalWorkspaceAdapter(`${options.dataRoot ?? dirname(options.databaseFile)}/workspaces`);
+            await adapter.initialize();
+            return adapter;
+          }
+        },
+        {
+          provide: MANAGE_CONFIRMATIONS,
+          inject: [DATABASE, WORKSPACE_PORT],
+          useFactory: (database: NodraSqliteDatabase, workspace: LocalWorkspaceAdapter) =>
+            new ManageConfirmations(new SqliteConfirmationRepository(database), workspace)
+        },
+        {
+          provide: CREATE_WORKSPACE,
+          inject: [DATABASE, WORKSPACE_PORT],
+          useFactory: (database: NodraSqliteDatabase, workspace: LocalWorkspaceAdapter) =>
+            new CreateWorkspace(new SqliteWorkspaceRepository(database), workspace)
+        },
+        {
+          provide: READ_WORKSPACE,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) =>
+            new ReadWorkspace(new SqliteWorkspaceRepository(database))
+        },
+        {
+          provide: SNAPSHOT_WORKSPACE,
+          inject: [DATABASE, WORKSPACE_PORT],
+          useFactory: (database: NodraSqliteDatabase, workspace: LocalWorkspaceAdapter) =>
+            new SnapshotWorkspace(new SqliteWorkspaceRepository(database), workspace)
+        },
+        {
+          provide: COMMIT_WORKSPACE,
+          inject: [DATABASE, WORKSPACE_PORT, MANAGE_CONFIRMATIONS],
+          useFactory: (
+            database: NodraSqliteDatabase,
+            workspace: LocalWorkspaceAdapter,
+            confirmations: ManageConfirmations
+          ) => new CommitWorkspace(new SqliteWorkspaceRepository(database), workspace, confirmations)
+        },
+        {
+          provide: INTEGRATE_WORKSPACE,
+          inject: [DATABASE, WORKSPACE_PORT, MANAGE_CONFIRMATIONS],
+          useFactory: (
+            database: NodraSqliteDatabase,
+            workspace: LocalWorkspaceAdapter,
+            confirmations: ManageConfirmations
+          ) => new IntegrateWorkspace(new SqliteWorkspaceRepository(database), workspace, confirmations)
+        },
+        {
+          provide: DELETE_WORKSPACE,
+          inject: [DATABASE, WORKSPACE_PORT, MANAGE_CONFIRMATIONS],
+          useFactory: (
+            database: NodraSqliteDatabase,
+            workspace: LocalWorkspaceAdapter,
+            confirmations: ManageConfirmations
+          ) => new DeleteWorkspace(new SqliteWorkspaceRepository(database), workspace, confirmations)
+        },
+        {
+          provide: RESTORE_WORKSPACE,
+          inject: [DATABASE, WORKSPACE_PORT],
+          useFactory: (database: NodraSqliteDatabase, workspace: LocalWorkspaceAdapter) =>
+            new RestoreWorkspace(new SqliteWorkspaceRepository(database), workspace)
         },
         {
           provide: READ_EVIDENCE,
