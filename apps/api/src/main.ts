@@ -13,5 +13,6 @@ const app = await createApp({
   temporalAddress: process.env.NODRA_TEMPORAL_ADDRESS ?? "127.0.0.1:7233",
   temporalNamespace: process.env.NODRA_TEMPORAL_NAMESPACE ?? "nodra"
 });
+app.enableShutdownHooks(["SIGINT", "SIGTERM"]);
 await app.listen(port, host);
 process.stdout.write(`Nodra API ready on http://${host}:${port}\n`);

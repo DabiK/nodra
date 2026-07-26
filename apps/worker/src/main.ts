@@ -14,7 +14,7 @@ import {
   TemporalMissionWorker
 } from "@nodra/adapters";
 import { ManageConfirmations, ProviderRegistry } from "@nodra/application";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,7 +56,21 @@ process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);
 
 try {
-  await worker.run();
+  await worker.run(async () => {
+    const readinessFile = process.env.NODRA_WORKER_READY_FILE;
+    if (!readinessFile) return;
+    await mkdir(dirname(readinessFile), { recursive: true });
+    const temporaryFile = `${readinessFile}.${process.pid}.tmp`;
+    await writeFile(temporaryFile, JSON.stringify({
+      pid: process.pid,
+      ownerPid: Number(process.env.NODRA_RUNTIME_GROUP_LEADER_PID ?? process.pid),
+      readyAt: new Date().toISOString(),
+      temporalAddress: process.env.NODRA_TEMPORAL_ADDRESS ?? "127.0.0.1:7233",
+      temporalNamespace: process.env.NODRA_TEMPORAL_NAMESPACE ?? "nodra",
+      taskQueue: worker.taskQueue
+    }, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+    await rename(temporaryFile, readinessFile);
+  });
 } finally {
   await worker.close();
   database.close();

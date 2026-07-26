@@ -18,7 +18,11 @@ export class TemporalMissionWorker {
     private readonly activities: TemporalRunActivities
   ) {}
 
-  async run(): Promise<void> {
+  get taskQueue(): string {
+    return MISSION_TASK_QUEUE;
+  }
+
+  async run(onReady?: () => Promise<void>): Promise<void> {
     this.connection = await NativeConnection.connect({ address: this.options.address });
     this.worker = await Worker.create({
       connection: this.connection,
@@ -33,7 +37,10 @@ export class TemporalMissionWorker {
       }
     });
     if (this.shutdownRequested) this.worker.shutdown();
-    await this.worker.run();
+    const execution = this.worker.run();
+    await this.waitUntilPolling();
+    await onReady?.();
+    await execution;
   }
 
   shutdown(): void {
@@ -43,5 +50,21 @@ export class TemporalMissionWorker {
 
   async close(): Promise<void> {
     await this.connection?.close();
+  }
+
+  private async waitUntilPolling(): Promise<void> {
+    if (!this.worker) throw new Error("Temporal worker was not created");
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const status = this.worker.getStatus();
+      if (
+        status.runState === "RUNNING"
+        && status.workflowPollerState === "POLLING"
+        && status.activityPollerState === "POLLING"
+      ) {
+        return;
+      }
+      await new Promise((resolveWait) => setTimeout(resolveWait, 20));
+    }
+    throw new Error("Temporal worker did not enter polling readiness");
   }
 }
