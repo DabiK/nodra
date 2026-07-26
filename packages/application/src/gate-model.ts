@@ -45,6 +45,10 @@ export interface GateEvaluatorResult {
   gitEvidenceIds: readonly Id[];
 }
 export interface GateEvaluatorRegistryPort {
+  // TODO(gates-v2): garder les gates opt-in. Ajouter des évaluateurs versionnés pour
+  // command@1 (argv attendu), content-freshness@1 (digest de contenu indépendant
+  // du commit), commit@1 et manual-checklist@1. Ne jamais transformer une preuve
+  // ou une commande observée en prérequis implicite d'acceptation humaine.
   validateDefinition(definition: GateDefinitionRecord): string | null;
   evaluate(definition: GateDefinitionRecord, evidence: readonly EvidenceRecord[], runId: Id): GateEvaluatorResult;
 }
