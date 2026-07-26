@@ -17,6 +17,33 @@ Date : 26 juillet 2026. Cette note est une aide d'implémentation pour I6, pas u
 4. Consommer les notifications jusqu'à `turn/completed`. Persister les événements Nodra dans l'ordre; `item/completed` est l'état final autoritatif d'un item.
 5. Annuler uniquement par `turn/interrupt`; reprendre seulement par `thread/resume` de la session externe connue; `turn/steer` est disponible pour un tour actif.
 
+## Échanges JSONL de référence
+
+Ces extraits sont des messages indépendants, une ligne JSON chacun sur stdin/stdout. Les IDs numériques sont des IDs RPC du client et doivent être corrélés; `thr_*` et `turn_*` sont les références externes à persister, jamais des identifiants Nodra.
+
+```json
+{"method":"initialize","id":1,"params":{"clientInfo":{"name":"nodra","title":"Nodra","version":"0.1.0"}}}
+{"method":"initialized","params":{}}
+{"method":"model/list","id":2,"params":{}}
+{"method":"thread/start","id":3,"params":{"model":"<model-from-probe>","cwd":"<canonical-workspace>"}}
+{"id":3,"result":{"thread":{"id":"thr_123"}}}
+```
+
+Un tour ne reçoit pas une chaîne brute : son `input` est un tableau discriminé. I6 n'envoie que la variante texte tant que les entrées fichier/image/audio ne sont pas réellement supportées et testées.
+
+```json
+{"method":"turn/start","id":4,"params":{"threadId":"thr_123","clientUserMessageId":"<nodra-message-id>","input":[{"type":"text","text":"<effective-prompt>"}],"cwd":"<canonical-workspace>","model":"<model-from-run-snapshot>","effort":"medium"}}
+{"id":4,"result":{"turn":{"id":"turn_456","status":"inProgress","items":[],"error":null}}}
+```
+
+```json
+{"method":"turn/steer","id":5,"params":{"threadId":"thr_123","expectedTurnId":"turn_456","clientUserMessageId":"<nodra-message-id>","input":[{"type":"text","text":"<steer-text>"}]}}
+{"method":"turn/interrupt","id":6,"params":{"threadId":"thr_123","turnId":"turn_456"}}
+{"method":"thread/resume","id":7,"params":{"threadId":"thr_123","excludeTurns":true}}
+```
+
+Les notifications à fixture sont au minimum `turn/started`, `item/started`, `item/agentMessage/delta`, `item/completed` et `turn/completed`. La conclusion d'un run vient de `turn/completed` (`completed`, `interrupted` ou `failed`) et non de la simple fermeture du processus.
+
 ## Événements et données à conserver
 
 - Notifications de base : `turn/started`, `item/started`, `item/completed`, `item/agentMessage/delta`, `turn/completed`.
@@ -30,6 +57,17 @@ Date : 26 juillet 2026. Cette note est une aide d'implémentation pour I6, pas u
 - `item/permissions/requestApproval` est une **requête serveur → client** JSON-RPC. Elle inclut thread, turn, item, `cwd`, raison et sous-ensemble de permissions demandé.
 - I6 doit traduire cette requête en confirmation Nodra exacte, afficher la cible/risk, et répondre au serveur seulement après décision humaine. Ne jamais répondre par une approbation générale ou persistante sans une nouvelle confirmation Nodra compatible.
 - MCP, pièces jointes, options avancées et permissions par profil sont capability-gated. Si la forme app-server exacte n'est pas validée par un fixture et la version probée, déclarer la capability indisponible avec raison; ne pas créer de fallback ou de fausse prise en charge.
+
+### Réponse à une demande de permission
+
+Une requête serveur `item/permissions/requestApproval` porte un `id` RPC : l'adaptateur doit créer la confirmation Nodra, attendre la décision humaine, puis répondre sur le même `id` uniquement avec le sous-ensemble autorisé. Une décision humaine refusée, expirée ou incompatible doit répondre au serveur avec un sous-ensemble vide/refus selon le schéma de la version probée; elle ne doit jamais être transformée en `acceptForSession`.
+
+```json
+{"method":"item/permissions/requestApproval","id":61,"params":{"threadId":"thr_123","turnId":"turn_456","itemId":"item_1","cwd":"<canonical-workspace>","reason":"…","permissions":{"fileSystem":{"write":["<path>"]}}}}
+{"id":61,"result":{"scope":"turn","permissions":{"fileSystem":{"write":["<approved-subset>"]}}}}
+```
+
+Les variantes historiques `commandExecution/requestApproval` et `fileChange/requestApproval` ont des décisions propres (`accept`, `decline`, etc.). Elles ne sont pas un raccourci : les activer seulement après un fixture correspondant et un mapping confirmation Nodra exact.
 
 ## Tests attendus
 
