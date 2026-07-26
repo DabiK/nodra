@@ -4,6 +4,7 @@ export { NodraSqliteDatabase, type NodraDrizzleDatabase } from "./sqlite/nodra-s
 export { SqliteHealthProbe } from "./sqlite/sqlite-health-probe.js";
 export { SqliteMissionReadModel } from "./sqlite/sqlite-mission-read-model.js";
 export { SqliteMissionRepository } from "./sqlite/sqlite-mission-repository.js";
+export { SqlitePipelineRepository } from "./sqlite/sqlite-pipeline-repository.js";
 export { SqliteMissionExecutionRepository } from "./sqlite/sqlite-mission-execution-repository.js";
 export { SqliteRunWorkflowActivity } from "./sqlite/sqlite-run-workflow-activity.js";
 export { SqliteWorkflowOutboxStore } from "./sqlite/sqlite-workflow-outbox-store.js";

@@ -19,7 +19,18 @@ export const readRuntimeEnvironment = (
     temporalAddress: environment.NODRA_TEMPORAL_ADDRESS ?? "127.0.0.1:7233",
     temporalNamespace: environment.NODRA_TEMPORAL_NAMESPACE ?? "nodra"
   };
+  const shouldReadRuntimeManifest = Boolean(environment.NODRA_RUNTIME_ROOT) || !environment.NODRA_DATABASE_FILE;
   const runtimeRoot = resolve(environment.NODRA_RUNTIME_ROOT ?? `${fallbackDataRoot}/runtime`);
+  if (!shouldReadRuntimeManifest) {
+    const databaseFile = environment.NODRA_DATABASE_FILE;
+    if (!databaseFile) return fallback;
+    return {
+      databaseFile,
+      dataRoot: environment.NODRA_DATA_ROOT ?? fallback.dataRoot,
+      temporalAddress: environment.NODRA_TEMPORAL_ADDRESS ?? fallback.temporalAddress,
+      temporalNamespace: environment.NODRA_TEMPORAL_NAMESPACE ?? fallback.temporalNamespace
+    };
+  }
   try {
     const manifest = JSON.parse(readFileSync(`${runtimeRoot}/runtime-state.json`, "utf8")) as {
       databaseFile?: unknown;

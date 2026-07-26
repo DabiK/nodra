@@ -102,6 +102,26 @@ Relay:
   relay --project <project-id>
       Show the mission relay, optionally filtered by project.
 
+Pipelines:
+  pipeline:create <name...>
+    --node <key:mission-id>
+    --node <key:mission-id>
+    [--id <pipeline-id>]
+      Create a published linear pipeline from existing missions.
+
+  pipeline:show <pipeline-id>
+      Show a pipeline definition.
+
+  pipeline:start <pipeline-id>
+    [--run-id <pipeline-run-id>]
+      Start a pipeline run and start ready mission nodes.
+
+  pipeline:advance <pipeline-run-id>
+      Reconcile node states and start newly ready mission nodes.
+
+  pipeline:run:show <pipeline-run-id>
+      Show a pipeline run and node states.
+
 Temporal:
   temporal:dispatch
       Dispatch up to 100 pending workflow outbox entries.

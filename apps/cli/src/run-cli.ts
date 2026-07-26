@@ -20,6 +20,7 @@ import {
   SqliteMissionReadModel,
   SqliteMissionRepository,
   SqliteMissionExecutionRepository,
+  SqlitePipelineRepository,
   SqliteProviderCatalogRepository,
   SqliteRunControlRepository,
   SqliteConfirmationRepository,
@@ -29,11 +30,13 @@ import {
   SqliteWorkflowReconciliationStore
 } from "@nodra/adapters";
 import {
+  AdvancePipeline,
   ChangeMissionState,
   CancelRun,
   CommitWorkspace,
   CollectEvidence,
   CreateMission,
+  CreatePipeline,
   CreateWorkspace,
   DeleteWorkspace,
   DispatchWorkflowOutbox,
@@ -53,8 +56,11 @@ import {
   ResumeRun,
   ReconcileWorkflows,
   ShowMission,
+  ShowPipeline,
+  ShowPipelineRun,
   SnapshotWorkspace,
   StartMission,
+  StartPipeline,
   SteerRun,
   ProbeProvider,
   ProviderRegistry,
@@ -82,6 +88,7 @@ import { WorkspaceCli } from "./workspace-cli.js";
 import { I6Cli } from "./i6-cli.js";
 import { ProviderSmokeCli } from "./provider-smoke-cli.js";
 import { AgentConfigCli } from "./agent-config-cli.js";
+import { PipelineCli } from "./pipeline-cli.js";
 
 export const runCli = async (
   arguments_: readonly string[],
@@ -123,6 +130,7 @@ export const runCli = async (
     const providerCatalog = new SqliteProviderCatalogRepository(database);
     const agentConfigs = new SqliteAgentConfigRepository(database);
     const agentResolver = new ResolveAgentConfig(agentConfigs, providerCatalog);
+    const pipelineRepository = new SqlitePipelineRepository(database);
     const workflow = new LazyTemporalWorkflowAdapter(temporal);
     const confirmations = new ManageConfirmations(new SqliteConfirmationRepository(database), workspace);
     const cli = new NodraCli(
@@ -170,6 +178,21 @@ export const runCli = async (
             new SqliteWorkspaceDeletionReservation(database)
           ),
           new RestoreWorkspace(workspaceRepository, workspace)
+        ),
+        new PipelineCli(
+          new CreatePipeline(pipelineRepository),
+          new ShowPipeline(pipelineRepository),
+          new ShowPipelineRun(pipelineRepository),
+          new StartPipeline(pipelineRepository),
+          new AdvancePipeline(pipelineRepository),
+          new ShowMission(readModel),
+          new StartMission(
+            repository,
+            new SqliteMissionExecutionRepository(database),
+            temporal,
+            providerCatalog,
+            agentResolver
+          )
         )
       ]),
       new I6Cli(

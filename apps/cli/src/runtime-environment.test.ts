@@ -36,4 +36,17 @@ describe("readRuntimeEnvironment", () => {
     expect(environment.NODRA_OPENCODE_URL).toBe("http://127.0.0.1:7124");
     expect(environment.NODRA_API_URL).toBe("http://127.0.0.1:7125");
   });
+
+  it("keeps an explicit database file when no runtime root is selected", () => {
+    const root = mkdtempSync(join(tmpdir(), "nodra-cli-runtime-"));
+    const environment: NodeJS.ProcessEnv = {
+      NODRA_DATABASE_FILE: join(root, "explicit.db"),
+      NODRA_DATA_ROOT: join(root, "explicit-data")
+    };
+
+    expect(readRuntimeEnvironment(root, environment)).toMatchObject({
+      databaseFile: join(root, "explicit.db"),
+      dataRoot: join(root, "explicit-data")
+    });
+  });
 });

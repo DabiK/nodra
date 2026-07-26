@@ -22,6 +22,7 @@ import {
   SqliteMissionReadModel,
   SqliteMissionRepository,
   SqliteMissionExecutionRepository,
+  SqlitePipelineRepository,
   SqliteProviderCatalogRepository,
   SqliteRunControlRepository,
   SqliteConfirmationRepository,
@@ -32,11 +33,13 @@ import {
 } from "@nodra/adapters";
 import {
   ChangeMissionState,
+  AdvancePipeline,
   CancelRun,
   CatalogProviderHealthProbe,
   CommitWorkspace,
   CollectEvidence,
   CreateMission,
+  CreatePipeline,
   CreateWorkspace,
   DeleteWorkspace,
   DispatchWorkflowOutbox,
@@ -54,9 +57,12 @@ import {
   ReadWorkspace,
   ResumeRun,
   ReconcileWorkflows,
+  ShowPipeline,
+  ShowPipelineRun,
   ShowMission,
   SnapshotWorkspace,
   StartMission,
+  StartPipeline,
   SteerRun,
   ProbeProvider,
   ProviderRegistry,
@@ -81,15 +87,18 @@ import { RuntimeController } from "./runtime.controller.js";
 import { RuntimeLifecycle } from "./runtime-lifecycle.js";
 import { WorkspaceController } from "./workspace.controller.js";
 import { ProviderController } from "./provider.controller.js";
+import { PipelineController } from "./pipeline.controller.js";
 import { RunController } from "./run.controller.js";
 import {
   AGENT_CONFIG_REPOSITORY,
+  ADVANCE_PIPELINE,
   CANCEL_RUN,
   CHANGE_MISSION_STATE,
   COLLECT_EVIDENCE,
   COMMIT_WORKSPACE,
   CREATE_WORKSPACE,
   CREATE_MISSION,
+  CREATE_PIPELINE,
   DATABASE,
   DELETE_WORKSPACE,
   DISPATCH_WORKFLOW_OUTBOX,
@@ -111,8 +120,11 @@ import {
   RESTORE_WORKSPACE,
   RESUME_RUN,
   SHOW_MISSION,
+  SHOW_PIPELINE,
+  SHOW_PIPELINE_RUN,
   SNAPSHOT_WORKSPACE,
   START_MISSION,
+  START_PIPELINE,
   STEER_RUN,
   TEMPORAL_CONNECTION,
   WORKSPACE_PORT,
@@ -137,7 +149,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController],
+      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController, PipelineController],
       providers: [
         {
           provide: DATABASE,
@@ -404,6 +416,31 @@ export class NodraModule {
           provide: SHOW_MISSION,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new ShowMission(new SqliteMissionReadModel(database))
+        },
+        {
+          provide: CREATE_PIPELINE,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new CreatePipeline(new SqlitePipelineRepository(database))
+        },
+        {
+          provide: SHOW_PIPELINE,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ShowPipeline(new SqlitePipelineRepository(database))
+        },
+        {
+          provide: SHOW_PIPELINE_RUN,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ShowPipelineRun(new SqlitePipelineRepository(database))
+        },
+        {
+          provide: START_PIPELINE,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new StartPipeline(new SqlitePipelineRepository(database))
+        },
+        {
+          provide: ADVANCE_PIPELINE,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new AdvancePipeline(new SqlitePipelineRepository(database))
         },
         {
           provide: GET_RELAY,
