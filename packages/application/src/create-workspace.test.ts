@@ -39,7 +39,10 @@ function fakes(sourceRecord: WorkspaceRecord = record()) {
     snapshot: vi.fn(async () => ({ head: "deadbeef", treeDigest: "t", diffDigest: "d", branchName: "main", capturedAt: new Date().toISOString() })),
     commit: vi.fn(async () => undefined),
     integrate: vi.fn(async () => undefined),
-    deleteActivity: vi.fn(async () => undefined)
+    deleteActivity: vi.fn(async () => undefined),
+    inspectWorktree: vi.fn(async () => ({ mainRepositoryPath: "/src/repo", worktreeExists: true, branchExists: true, branchName: "nodra/task", baseRef: "main", hasUncommittedChanges: false, hasUnmergedCommits: false, head: "deadbeef" })),
+    removeWorktree: vi.fn(async () => undefined),
+    deleteWorktreeBranch: vi.fn(async () => undefined)
   } satisfies WorkspacePort;
   const repository = {
     findCommand: vi.fn(async () => null),

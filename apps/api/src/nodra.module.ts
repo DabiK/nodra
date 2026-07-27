@@ -84,6 +84,7 @@ import {
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
   RestoreWorkspace,
+  ResolveWorktree,
   UpdateAgentConfig,
   UpdateManager
 } from "@nodra/application";
@@ -144,6 +145,7 @@ import {
   RECONCILE_WORKFLOWS,
   REPOSITORY_ROOT,
   RESTORE_WORKSPACE,
+  RESOLVE_WORKTREE,
   RESUME_RUN,
   SHOW_MANAGER,
   SHOW_MISSION,
@@ -266,6 +268,12 @@ export class NodraModule {
           inject: [DATABASE, WORKSPACE_PORT],
           useFactory: (database: NodraSqliteDatabase, workspace: LocalWorkspaceAdapter) =>
             new RestoreWorkspace(new SqliteWorkspaceRepository(database), workspace)
+        },
+        {
+          provide: RESOLVE_WORKTREE,
+          inject: [DATABASE, WORKSPACE_PORT],
+          useFactory: (database: NodraSqliteDatabase, workspace: LocalWorkspaceAdapter) =>
+            new ResolveWorktree(new SqliteWorkspaceRepository(database), workspace)
         },
         {
           provide: READ_EVIDENCE,

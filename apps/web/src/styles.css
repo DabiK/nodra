@@ -693,3 +693,32 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 /* ============ Workspace mode picker (shared Terrain de travail) ============ */
 .workspace-mode-warning { margin: 8px 0 0; padding: 8px 11px; border-radius: 8px; background: #fbf3dd; border: 1px solid #e6d3a6; color: #7a5a12; font-size: 11px; }
 .workspace-mode-error { margin: 8px 0 0; padding: 8px 11px; border-radius: 8px; background: #fbeaea; border: 1px solid #e6b3b3; color: #8a2b2b; font-size: 11px; font-weight: 600; }
+
+/* ============ Worktree resolution dialog ============ */
+.worktree-dialog { position: relative; z-index: 60; width: min(560px, 94vw); max-height: 90vh; overflow-y: auto; margin: auto; padding: 24px; border-radius: 18px; background: var(--panel); box-shadow: 0 24px 70px rgba(20, 30, 25, 0.28); display: grid; gap: 14px; }
+.worktree-dialog header { display: grid; gap: 4px; }
+.worktree-dialog h2 { margin: 2px 0; font: 800 22px Manrope; }
+.worktree-branch { justify-self: start; padding: 3px 9px; border-radius: 7px; background: #eef2ee; color: #3a5a45; font-size: 12px; }
+.worktree-state { margin: 0; padding: 10px 12px; border-radius: 10px; background: #eef2f6; color: #40556a; font-weight: 600; }
+.worktree-status-summary { display: grid; gap: 6px; }
+.worktree-warning { margin: 0; padding: 9px 12px; border-radius: 10px; background: #fbeaea; border: 1px solid #e6b3b3; color: #8a2b2b; font-size: 12px; font-weight: 600; }
+.worktree-note { margin: 0; padding: 9px 12px; border-radius: 10px; background: #fbf3dd; border: 1px solid #e6d3a6; color: #7a5a12; font-size: 12px; }
+.worktree-ok { margin: 0; color: #2e6b45; font-size: 12px; font-weight: 700; }
+.worktree-options { display: grid; gap: 10px; }
+.worktree-option { display: grid; gap: 3px; text-align: left; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcf9; cursor: pointer; }
+.worktree-option:hover:not(:disabled) { border-color: var(--green); }
+.worktree-option:disabled { opacity: 0.55; cursor: not-allowed; }
+.worktree-option strong { font: 800 14px Manrope; }
+.worktree-option small { color: var(--muted); font-size: 12px; }
+.worktree-option.danger strong { color: #a13030; }
+.worktree-confirm { display: grid; gap: 10px; padding: 14px; border-radius: 12px; background: #fdf6f6; border: 1px solid #e6c3c3; }
+.worktree-confirm-check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.worktree-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.worktree-done ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink); font-size: 13px; display: grid; gap: 3px; }
+.worktree-error { display: grid; gap: 6px; padding: 14px; border-radius: 12px; background: #fbeaea; border: 1px solid #e6b3b3; }
+.worktree-error strong { color: #8a2b2b; }
+.worktree-error code { justify-self: start; font-size: 11px; color: #8a2b2b; opacity: 0.8; }
+.worktree-error button { justify-self: start; }
+.worktree-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; }
+.worktree-hint { margin: 0; color: var(--muted); font-size: 11px; }
+.worktree-resolve-button { border-color: #cbd8d0 !important; }

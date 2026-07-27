@@ -5,6 +5,7 @@ import type {
   DeleteWorkspace,
   IntegrateWorkspace,
   ReadWorkspace,
+  ResolveWorktree,
   RestoreWorkspace,
   SnapshotWorkspace,
 } from "@nodra/application";
@@ -19,12 +20,14 @@ import { CommitWorkspaceDto } from "./dto/commit-workspace.dto.js";
 import { IntegrateWorkspaceDto } from "./dto/integrate-workspace.dto.js";
 import { DeleteWorkspaceDto } from "./dto/delete-workspace.dto.js";
 import { RestoreWorkspaceDto } from "./dto/restore-workspace.dto.js";
+import { ResolveWorktreeDto } from "./dto/resolve-worktree.dto.js";
 import {
   COMMIT_WORKSPACE,
   CREATE_WORKSPACE,
   DELETE_WORKSPACE,
   INTEGRATE_WORKSPACE,
   READ_WORKSPACE,
+  RESOLVE_WORKTREE,
   RESTORE_WORKSPACE,
   SNAPSHOT_WORKSPACE
 } from "./tokens.js";
@@ -38,7 +41,8 @@ export class WorkspaceController {
     @Inject(COMMIT_WORKSPACE) private readonly commitWorkspace: CommitWorkspace,
     @Inject(INTEGRATE_WORKSPACE) private readonly integrateWorkspace: IntegrateWorkspace,
     @Inject(DELETE_WORKSPACE) private readonly deleteWorkspace: DeleteWorkspace,
-    @Inject(RESTORE_WORKSPACE) private readonly restoreWorkspace: RestoreWorkspace
+    @Inject(RESTORE_WORKSPACE) private readonly restoreWorkspace: RestoreWorkspace,
+    @Inject(RESOLVE_WORKTREE) private readonly resolveWorktree: ResolveWorktree
   ) {}
 
   @Post()
@@ -142,6 +146,21 @@ export class WorkspaceController {
     return this.restoreWorkspace.execute({
       workspaceId: toId(id),
       context: commandContext(body.commandId)
+    });
+  }
+
+  @Get(":id/worktree")
+  worktreeStatus(@Param("id") id: string) {
+    return this.resolveWorktree.status(toId(id));
+  }
+
+  @Post(":id/worktree/resolve")
+  resolve(@Param("id") id: string, @Body() body: ResolveWorktreeDto) {
+    return this.resolveWorktree.execute({
+      workspaceId: toId(id),
+      action: body.action,
+      ...(body.confirmDiscardChanges !== undefined ? { confirmDiscardChanges: body.confirmDiscardChanges } : {}),
+      ...(body.confirmDeleteUnmerged !== undefined ? { confirmDeleteUnmerged: body.confirmDeleteUnmerged } : {})
     });
   }
 }

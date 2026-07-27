@@ -159,7 +159,10 @@ describe("I5.1 workspace lifecycle concurrency", () => {
       deleteActivity: async () => {
         enterActivity();
         await activityReleased;
-      }
+      },
+      inspectWorktree: (value) => local.inspectWorktree(value),
+      removeWorktree: (value) => local.removeWorktree(value),
+      deleteWorktreeBranch: (value) => local.deleteWorktreeBranch(value)
     };
     const deletion = new DeleteWorkspace(
       workspaceRepository,

@@ -74,6 +74,8 @@ export { CommitWorkspace } from "./commit-workspace.js";
 export { IntegrateWorkspace } from "./integrate-workspace.js";
 export { DeleteWorkspace } from "./delete-workspace.js";
 export { RestoreWorkspace } from "./restore-workspace.js";
+export { ResolveWorktree } from "./resolve-worktree.js";
+export type { WorktreeResolutionAction, WorktreeResolutionResult } from "./resolve-worktree.js";
 export type { WorkspacePort } from "./workspace-port.js";
 export type { WorkspaceRepository } from "./workspace-repository.js";
 export type { WorkspaceDeletionReservation } from "./workspace-deletion-reservation.js";
@@ -84,7 +86,8 @@ export type {
   WorkspaceKind,
   WorkspaceMutationResult,
   WorkspaceRecord,
-  WorkspaceState
+  WorkspaceState,
+  WorktreeStatus
 } from "./workspace-model.js";
 export type {
   ProviderCapabilities,

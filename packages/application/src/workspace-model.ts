@@ -20,6 +20,23 @@ export interface RepositoryIdentity {
   branchName: string | null;
 }
 
+/** Live Git status of a worktree, used to drive safe end-of-task resolution. */
+export interface WorktreeStatus {
+  /** Absolute path of the main repository, resolved from the worktree. Null if it can't be determined (e.g. the worktree directory was deleted manually). */
+  mainRepositoryPath: string | null;
+  /** The worktree directory exists on disk AND is registered in Git. */
+  worktreeExists: boolean;
+  /** The task branch still exists in the main repository. */
+  branchExists: boolean;
+  branchName: string | null;
+  baseRef: string | null;
+  /** Uncommitted (staged, unstaged or untracked) changes are present. */
+  hasUncommittedChanges: boolean;
+  /** The branch has commits that are not reachable from its base ref. */
+  hasUnmergedCommits: boolean;
+  head: string | null;
+}
+
 export interface WorkspaceRecord {
   id: Id;
   projectId: Id | null;

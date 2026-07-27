@@ -40,7 +40,10 @@ const statusFor = (code: string): number => {
     code === "CONFIRMATION_ALREADY_CONSUMED" ||
     code === "WORKSPACE_ACTIVE_RUN" ||
     code === "WORKSPACE_PATH_CONFLICT" ||
-    code === "WORKSPACE_STATE_CONFLICT"
+    code === "WORKSPACE_STATE_CONFLICT" ||
+    code === "WORKTREE_UNCOMMITTED_CHANGES" ||
+    code === "WORKTREE_BRANCH_UNMERGED" ||
+    code === "WORKTREE_RESOLUTION_IN_PROGRESS"
   ) return 409;
   return 400;
 };

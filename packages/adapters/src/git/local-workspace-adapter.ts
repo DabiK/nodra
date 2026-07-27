@@ -8,7 +8,8 @@ import type {
   IntegrationMethod,
   RepositoryIdentity,
   WorkspaceGitSnapshot,
-  WorkspacePort
+  WorkspacePort,
+  WorktreeStatus
 } from "@nodra/application";
 import { DomainError } from "@nodra/domain";
 
@@ -154,6 +155,96 @@ export class LocalWorkspaceAdapter implements WorkspacePort {
       if (error instanceof DomainError) throw error;
       throw new DomainError("Workspace path is unavailable for tombstoning", "WORKSPACE_STATE_CONFLICT");
     }
+  }
+
+  async inspectWorktree(input: {
+    worktreePath: string;
+    baseRef: string | null;
+    branchName: string | null;
+  }): Promise<WorktreeStatus> {
+    let mainRepositoryPath: string | null = null;
+    let worktreeExists = false;
+    let head: string | null = null;
+    let hasUncommittedChanges = false;
+    let canonicalWorktree: string | null = null;
+
+    try {
+      canonicalWorktree = await realpath(input.worktreePath);
+      // The common dir of a linked worktree points at the main repo's `.git`.
+      const commonDir = await this.git(canonicalWorktree, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+      mainRepositoryPath = await realpath(dirname(commonDir));
+      worktreeExists = true;
+      head = await this.gitOptional(canonicalWorktree, ["rev-parse", "--verify", "HEAD"]);
+      const status = await this.git(canonicalWorktree, ["status", "--porcelain", "--untracked-files=all"]);
+      hasUncommittedChanges = status.trim().length > 0;
+    } catch {
+      worktreeExists = false;
+    }
+
+    let branchExists = false;
+    let hasUnmergedCommits = false;
+    if (mainRepositoryPath && input.branchName) {
+      const branchRef = `refs/heads/${input.branchName}`;
+      branchExists = (await this.gitOptional(mainRepositoryPath, ["rev-parse", "--verify", "--quiet", branchRef])) !== null;
+      if (branchExists) {
+        if (input.baseRef && (await this.gitOptional(mainRepositoryPath, ["rev-parse", "--verify", `${input.baseRef}^{commit}`]))) {
+          const ahead = await this.gitOptional(mainRepositoryPath, ["rev-list", "--count", `${input.baseRef}..${branchRef}`]);
+          hasUnmergedCommits = ahead !== null && Number.parseInt(ahead, 10) > 0;
+        } else {
+          // Base ref cannot be verified: assume the branch may hold work (conservative).
+          hasUnmergedCommits = true;
+        }
+      }
+    }
+
+    return {
+      mainRepositoryPath,
+      worktreeExists,
+      branchExists,
+      branchName: input.branchName,
+      baseRef: input.baseRef,
+      hasUncommittedChanges,
+      hasUnmergedCommits,
+      head
+    };
+  }
+
+  async removeWorktree(input: {
+    mainRepositoryPath: string;
+    worktreePath: string;
+    force: boolean;
+  }): Promise<void> {
+    const main = await this.real(input.mainRepositoryPath, "Main repository path does not exist");
+    // `git worktree remove` refuses a dirty/locked worktree unless forced.
+    const args = ["worktree", "remove", ...(input.force ? ["--force"] : []), input.worktreePath];
+    try {
+      await this.git(main, args);
+    } catch (error) {
+      // Idempotent: if the directory is already gone / no longer registered,
+      // prune the stale administrative reference and treat it as removed.
+      await this.gitOptional(main, ["worktree", "prune"]);
+      const stillRegistered = await this.gitOptional(main, ["worktree", "list", "--porcelain"]);
+      const target = resolve(input.worktreePath);
+      if (stillRegistered && stillRegistered.split("\n").some((line) => line === `worktree ${target}` || line === `worktree ${input.worktreePath}`)) {
+        throw new DomainError(
+          error instanceof DomainError ? error.message : "Worktree removal failed",
+          "GIT_OPERATION_FAILED"
+        );
+      }
+      return;
+    }
+    await this.gitOptional(main, ["worktree", "prune"]);
+  }
+
+  async deleteWorktreeBranch(input: {
+    mainRepositoryPath: string;
+    branchName: string;
+    force: boolean;
+  }): Promise<void> {
+    const main = await this.real(input.mainRepositoryPath, "Main repository path does not exist");
+    const exists = (await this.gitOptional(main, ["rev-parse", "--verify", "--quiet", `refs/heads/${input.branchName}`])) !== null;
+    if (!exists) return; // Idempotent: branch already deleted manually.
+    await this.git(main, ["branch", input.force ? "-D" : "-d", input.branchName]);
   }
 
   private async absentManagedTarget(requestedPath: string): Promise<string> {

@@ -9,7 +9,9 @@ import { loadMissionResult, type MissionResultView } from "../services/mission-r
 import { loadMissionNotes, saveMissionNotes } from "../services/mission-notes-service";
 import { performMissionAction } from "../services/mission-action-service";
 import { getMissionUiPolicy, type MissionUiAction, type MissionUiPolicy } from "../services/mission-ui-policy";
+import { showWorkspace } from "../services/worktree-service";
 import { WorkspaceModePicker } from "./WorkspaceModePicker";
+import { WorktreeResolutionDialog } from "./WorktreeResolutionDialog";
 import { PixelAvatar } from "./PixelAvatar";
 
 export interface InspectorForm {
@@ -52,6 +54,8 @@ export function MissionInspector({
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [worktree, setWorktree] = useState<{ id: string; branchName: string | null } | null>(null);
+  const [showWorktreeDialog, setShowWorktreeDialog] = useState(false);
 
   useEffect(() => {
     void loadMissionInspector(missionId)
@@ -68,6 +72,21 @@ export function MissionInspector({
       .catch(() => { if (!cancelled) setResult(null); });
     return () => { cancelled = true; };
   }, [missionId, data?.mission.state]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const workspaceId = data?.config?.workspaceId;
+    if (!workspaceId) { setWorktree(null); return; }
+    void showWorkspace(workspaceId)
+      .then((record) => {
+        if (cancelled) return;
+        setWorktree(record.kind === "worktree" && record.state !== "deleted"
+          ? { id: record.id, branchName: null }
+          : null);
+      })
+      .catch(() => { if (!cancelled) setWorktree(null); });
+    return () => { cancelled = true; };
+  }, [data?.config?.workspaceId]);
 
   const sequenceCandidates = useMemo(
     () => missions.filter((mission) => mission.id !== missionId),
@@ -215,6 +234,11 @@ export function MissionInspector({
         <footer>
           {step === "configure" && <button className="secondary-button" type="button" onClick={() => setStep("inspect")}>Retour</button>}
           <button className="secondary-button" type="button" onClick={onClose}>Fermer</button>
+          {step === "inspect" && worktree && (
+            <button className="secondary-button worktree-resolve-button" type="button" onClick={() => setShowWorktreeDialog(true)}>
+              🌿 Résoudre le terrain de travail
+            </button>
+          )}
           {step === "inspect" && policy?.actions.map((action) => (
             <button
               className={`${action.primary ? "primary-button" : "secondary-button"} ${action.danger ? "danger-action" : ""}`}
@@ -231,6 +255,16 @@ export function MissionInspector({
         </footer>
         <p className="inspector-safety">Configuration en deux étapes : lecture d'abord, édition explicite ensuite.</p>
       </section>
+      {showWorktreeDialog && worktree && (
+        <WorktreeResolutionDialog
+          workspaceId={worktree.id}
+          branchHint={worktree.branchName}
+          onClose={(resolved) => {
+            setShowWorktreeDialog(false);
+            if (resolved) { onSaved(); setNotice("Terrain de travail résolu"); void loadMissionInspector(missionId).then(setData).catch(() => undefined); }
+          }}
+        />
+      )}
     </div>
   );
 }
