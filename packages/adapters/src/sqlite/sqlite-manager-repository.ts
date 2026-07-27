@@ -78,7 +78,10 @@ export class SqliteManagerRepository implements ManagerRepository {
         if (input.mode === "create") {
           const existing = transaction.select({ id: managers.id }).from(managers).where(eq(managers.id, snapshot.id)).get();
           if (existing) throw new DomainError(`Manager ${snapshot.id} already exists`, "MANAGER_ALREADY_EXISTS");
-          transaction.insert(managers).values({ id: snapshot.id, ...row, createdAt: snapshot.createdAt }).run();
+          // Insert as draft first: a `ready`/`active` manager requires a current
+          // instruction (DB trigger), but the instruction FK requires the manager
+          // row to exist. Seed the instruction, then promote to the real state.
+          transaction.insert(managers).values({ id: snapshot.id, ...row, state: "draft", createdAt: snapshot.createdAt }).run();
           transaction.insert(managerInstructionVersions).values({
             managerId: snapshot.id,
             version: 1,
@@ -86,6 +89,9 @@ export class SqliteManagerRepository implements ManagerRepository {
             isCurrent: 1,
             createdAt: snapshot.createdAt
           }).run();
+          if (snapshot.state !== "draft") {
+            transaction.update(managers).set({ state: snapshot.state }).where(eq(managers.id, snapshot.id)).run();
+          }
         } else {
           const updated = transaction.update(managers).set(row).where(eq(managers.id, snapshot.id)).run();
           if (updated.changes !== 1) throw new DomainError(`Manager ${snapshot.id} was not found`, "MANAGER_NOT_FOUND");
