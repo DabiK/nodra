@@ -668,3 +668,11 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
   .manager-chat { grid-template-columns: 1fr; }
   .manager-create { grid-template-columns: 1fr; }
 }
+
+/* ============ Overdue tasks banner ============ */
+.overdue-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 22px 0 4px; padding: 14px 18px; border: 1px solid #e6d3a6; border-left: 4px solid #d8a11f; border-radius: 14px; background: linear-gradient(120deg, #fbf3dd, var(--panel)); box-shadow: var(--shadow); }
+.overdue-banner-text { display: grid; gap: 3px; }
+.overdue-banner-text strong { font: 800 14px Manrope; color: #7a5a12; }
+.overdue-banner-text small { color: #8a7a55; font-size: 12px; }
+.overdue-banner-button { flex: none; border: 0; border-radius: 10px; background: #d8a11f; color: #241a00; padding: 10px 16px; font-weight: 800; font-size: 12px; box-shadow: 0 6px 16px rgba(216,161,31,.25); }
+.overdue-banner-button:hover { filter: brightness(1.05); transform: translateY(-1px); }

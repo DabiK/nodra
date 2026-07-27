@@ -12,6 +12,7 @@ import { createInitialDraft, loadMissionIntake, submitMissionIntake } from "./se
 import { loadServerConfig } from "./services/config-service";
 import { listManagers } from "./services/manager-service";
 import { listMissions } from "./services/mission-service";
+import { loadSchedule, rescheduleToday, scheduledDay, todayKey, type MissionSchedule } from "./services/mission-schedule-service";
 import { listPipelines } from "./services/pipeline-service";
 import { probeProvider, selectDefaultModel } from "./services/provider-service";
 import { browseFolders } from "./services/workspace-service";
@@ -52,6 +53,7 @@ export function App() {
     return value === "pipelines" || value === "managers" ? value : "tasks";
   });
   const [focusPipelineId, setFocusPipelineId] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<MissionSchedule>(() => loadSchedule());
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -108,6 +110,19 @@ export function App() {
   };
 
   const activePipelineCount = useMemo(() => pipelines.filter((pipeline) => pipeline.runState === "active" || pipeline.runState === "blocked").length, [pipelines]);
+
+  const overdueMissions = useMemo(() => {
+    const today = todayKey();
+    return missions.filter((mission) =>
+      mission.state !== "DONE"
+      && mission.state !== "ABANDONED"
+      && scheduledDay(schedule, mission.id, mission.createdAt) < today
+    );
+  }, [missions, schedule]);
+
+  const moveOverdueToToday = () => {
+    setSchedule((current) => rescheduleToday(current, overdueMissions.map((mission) => mission.id)));
+  };
 
   const missionPipelineIndex = useMemo(() => {
     const index = new Map<string, { pipelineId: string; pipelineName: string; nodeKey: string }>();
@@ -276,6 +291,21 @@ export function App() {
                 <small>missions ouvertes</small>
               </div>
             </header>
+
+            {overdueMissions.length > 0 && (
+              <div className="overdue-banner" role="status">
+                <div className="overdue-banner-text">
+                  <strong>⏰ {overdueMissions.length} tâche{overdueMissions.length > 1 ? "s" : ""} en retard</strong>
+                  <small>
+                    Datent d'un jour précédent et ne sont pas terminées.
+                    {overdueMissions.length <= 3 ? ` (${overdueMissions.map((mission) => mission.title).join(", ")})` : ""}
+                  </small>
+                </div>
+                <button className="overdue-banner-button" onClick={moveOverdueToToday}>
+                  Déplacer à aujourd'hui →
+                </button>
+              </div>
+            )}
 
             <TaskIntakeCard
           draft={draft}
