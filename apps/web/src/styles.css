@@ -586,7 +586,21 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 .manager-chat-history button b { color: var(--muted); font: 800 12px Manrope; }
 .manager-chat-history button strong { display: block; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 165px; }
 .manager-chat-history button small { color: var(--muted); font-size: 10px; }
+.manager-chat-history-item { display: flex; align-items: stretch; gap: 4px; border: 1px solid transparent; border-radius: 10px; background: #f6f6f1; }
+.manager-chat-history-item.active { border-color: #cbd8d0; background: #fff; box-shadow: 0 2px 8px rgba(30,47,39,.05); }
+.manager-chat-history-open { flex: 1; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 9px; border: 0; background: transparent; padding: 9px 4px 9px 10px; text-align: left; }
+.manager-chat-history-open b { color: var(--muted); font: 800 12px Manrope; }
+.manager-chat-history-open strong { display: block; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.manager-chat-history-open small { color: var(--muted); font-size: 10px; }
+.manager-chat-history-delete { border: 0; background: transparent; color: #b6bcb6; padding: 0 10px; font-size: 13px; border-radius: 0 10px 10px 0; }
+.manager-chat-history-delete:hover:not(:disabled) { color: var(--red); background: #f7e3e1; }
+.manager-chat-history-delete:disabled { opacity: .4; }
 .manager-chat-empty { color: var(--muted); font-size: 12px; }
+
+.manager-chat-head-actions { display: flex; align-items: center; gap: 12px; }
+.manager-stop { border: 1px solid var(--red); border-radius: 9px; background: #f7e3e1; color: #97362e; padding: 7px 12px; font-size: 12px; font-weight: 800; }
+.manager-stop:hover:not(:disabled) { background: var(--red); color: #fff; }
+.manager-stop:disabled { opacity: .5; }
 
 .manager-chat-main { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
 .manager-chat-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }

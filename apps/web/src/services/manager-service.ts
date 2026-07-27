@@ -101,3 +101,16 @@ export async function sendManagerMessage(
     })
   });
 }
+
+export async function stopManager(id: string) {
+  return api<{ managerId: string; stopped: number }>(`/api/managers/${id}/stop`, {
+    method: "POST",
+    body: "{}"
+  });
+}
+
+export async function deleteManagerThread(id: string, threadId: string) {
+  return api<{ threadId: string; deleted: boolean }>(`/api/managers/${id}/threads/${threadId}`, {
+    method: "DELETE"
+  });
+}

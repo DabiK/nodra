@@ -5,7 +5,7 @@ import type {
   ManagerView
 } from "@nodra/application";
 import { asId, type Id } from "@nodra/domain";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { conversationItems, conversations } from "./schema/conversations.js";
 import { workspaces } from "./schema/core.js";
@@ -45,7 +45,7 @@ export class SqliteManagerReadModel implements ManagerReadModel {
       const rows = this.database.orm
         .select()
         .from(conversations)
-        .where(eq(conversations.managerId, id))
+        .where(and(eq(conversations.managerId, id), ne(conversations.state, "deleted")))
         .orderBy(desc(conversations.createdAt))
         .all();
       return rows.map((conversation, index) => {
@@ -102,7 +102,7 @@ export class SqliteManagerReadModel implements ManagerReadModel {
     const managerConversations = this.database.orm
       .select({ id: conversations.id, createdAt: conversations.createdAt })
       .from(conversations)
-      .where(eq(conversations.managerId, id))
+      .where(and(eq(conversations.managerId, id), ne(conversations.state, "deleted")))
       .orderBy(desc(conversations.createdAt))
       .all();
     const conversationIds = managerConversations.map((conversation) => conversation.id);

@@ -1,10 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "@nodra/adapters";
-import { conversationItems, conversations, providerEvents, runConfigSnapshots, runs } from "@nodra/adapters";
+import { conversationItems, conversations, managers, providerEvents, runConfigSnapshots, runs, workspaces } from "@nodra/adapters";
 import type {
   ArchiveManager,
+  CancelRun,
   CreateManager,
   DispatchWorkflowOutbox,
   ListManagerConversations,
@@ -19,6 +20,7 @@ import { DomainError, toId } from "@nodra/application";
 import { commandContext } from "./command-context.js";
 import {
   ARCHIVE_MANAGER,
+  CANCEL_RUN,
   CREATE_MANAGER,
   DATABASE,
   DISPATCH_WORKFLOW_OUTBOX,
@@ -32,6 +34,8 @@ import {
 /* eslint-disable @typescript-eslint/consistent-type-imports */
 import { CreateManagerDto, ManagerMessageDto, UpdateManagerDto } from "./dto/manager.dto.js";
 
+const ACTIVE_RUN_STATES = ["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"] as const;
+
 @Controller("api/managers")
 export class ManagerController {
   constructor(
@@ -44,6 +48,7 @@ export class ManagerController {
     @Inject(LIST_MANAGER_CONVERSATIONS) private readonly listConversations: ListManagerConversations,
     @Inject(START_MANAGER_RUN) private readonly startRun: StartManagerRun,
     @Inject(STEER_RUN) private readonly steerRun: SteerRun,
+    @Inject(CANCEL_RUN) private readonly cancelRun: CancelRun,
     @Inject(DISPATCH_WORKFLOW_OUTBOX) private readonly dispatchOutbox: DispatchWorkflowOutbox
   ) {}
 
@@ -131,6 +136,72 @@ export class ManagerController {
     return { runId: result.runId, threadId: conversationId, steered: false };
   }
 
+  // Emergency stop: kill the manager's running agent, force the run terminal and
+  // return the manager to `ready` so the operator regains control.
+  @Post(":id/stop")
+  @HttpCode(202)
+  async stop(@Param("id") id: string) {
+    const active = this.database.orm.select().from(runs)
+      .where(and(eq(runs.managerId, id), inArray(runs.state, ACTIVE_RUN_STATES)))
+      .orderBy(desc(runs.createdAt)).all();
+    for (const run of active) await this.forceStopRun(run.id, run.conversationId, run.providerId);
+    this.database.orm.update(managers).set({ state: "ready" })
+      .where(and(eq(managers.id, id), eq(managers.state, "active"))).run();
+    return { managerId: id, stopped: active.length };
+  }
+
+  @Delete(":id/threads/:threadId")
+  @HttpCode(200)
+  async deleteThread(@Param("id") id: string, @Param("threadId") threadId: string) {
+    const conversation = this.database.orm.select().from(conversations)
+      .where(eq(conversations.id, threadId)).get();
+    if (!conversation || conversation.managerId !== id) {
+      throw new DomainError(`Thread ${threadId} was not found`, "CONVERSATION_NOT_FOUND");
+    }
+    const active = this.database.orm.select().from(runs)
+      .where(and(eq(runs.conversationId, threadId), inArray(runs.state, ACTIVE_RUN_STATES))).all();
+    for (const run of active) await this.forceStopRun(run.id, run.conversationId, run.providerId);
+    if (active.length) {
+      this.database.orm.update(managers).set({ state: "ready" })
+        .where(and(eq(managers.id, id), eq(managers.state, "active"))).run();
+    }
+    const now = new Date().toISOString();
+    this.database.orm.update(conversations).set({ state: "deleted", deletedAt: now })
+      .where(eq(conversations.id, threadId)).run();
+    return { threadId, deleted: true };
+  }
+
+  private async forceStopRun(runId: string, conversationId: string, providerId: string): Promise<void> {
+    await this.cancelRun.execute(toId(runId)).catch(() => undefined);
+    const conversation = this.database.orm.select({ ref: conversations.providerSessionRef })
+      .from(conversations).where(eq(conversations.id, conversationId)).get();
+    await this.abortProviderSession(providerId, conversation?.ref ?? null);
+    this.database.orm.update(runs).set({ state: "CANCELLED", endedAt: new Date().toISOString() })
+      .where(eq(runs.id, runId)).run();
+    // The forced-terminal write bypasses the workflow activity that normally
+    // releases the workspace, so release it here to free it for the next run.
+    const snapshot = this.database.orm.select({ workspaceId: runConfigSnapshots.workspaceId })
+      .from(runConfigSnapshots).where(eq(runConfigSnapshots.runId, runId)).get();
+    if (snapshot?.workspaceId) {
+      this.database.orm.update(workspaces).set({ state: "ready" })
+        .where(and(eq(workspaces.id, snapshot.workspaceId), eq(workspaces.state, "in_use"))).run();
+    }
+  }
+
+  private async abortProviderSession(providerId: string, sessionRef: string | null): Promise<void> {
+    if (!sessionRef || providerId !== "opencode") return;
+    const baseUrl = process.env.NODRA_OPENCODE_URL;
+    if (!baseUrl) return;
+    try {
+      await fetch(`${baseUrl.replace(/\/$/, "")}/session/${encodeURIComponent(sessionRef)}/abort`, {
+        method: "POST",
+        headers: { "content-type": "application/json" }
+      });
+    } catch {
+      // Provider may already be down; the forced DB state still applies.
+    }
+  }
+
   @Get(":id/threads/:threadId")
   async thread(@Param("id") id: string, @Param("threadId") threadId: string) {
     const conversation = this.database.orm.select().from(conversations)
@@ -164,7 +235,7 @@ export class ManagerController {
   @Get(":id/threads")
   latestThread(@Param("id") id: string) {
     const conversation = this.database.orm.select({ id: conversations.id }).from(conversations)
-      .where(eq(conversations.managerId, id)).orderBy(desc(conversations.createdAt)).limit(1).get();
+      .where(and(eq(conversations.managerId, id), ne(conversations.state, "deleted"))).orderBy(desc(conversations.createdAt)).limit(1).get();
     return { threadId: conversation?.id ?? null };
   }
 }

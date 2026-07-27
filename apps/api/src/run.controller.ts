@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, Inject, Param, Post } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "@nodra/adapters";
-import { conversations, runs } from "@nodra/adapters";
+import { conversations, managers, runs } from "@nodra/adapters";
 import type { CancelRun, ChangeMissionState, ResumeRun, ShowMission, SteerRun } from "@nodra/application";
 import { DomainError, toId } from "@nodra/application";
 import { commandContext } from "./command-context.js";
@@ -65,7 +65,8 @@ export class RunController {
       }
     }
 
-    // 4. Unblock the mission: an ACTIVE agent mission moves to BLOCKED.
+    // 4. Unblock the subject. An ACTIVE agent mission moves to BLOCKED; an
+    //    ACTIVE manager returns to ready so the operator can chat again.
     let missionState: string | null = null;
     if (run.missionId) {
       const mission = await this.showMission.execute(toId(run.missionId));
@@ -79,6 +80,10 @@ export class RunController {
         }).catch(() => null);
         missionState = changed?.state ?? missionState;
       }
+    }
+    if (run.managerId) {
+      this.database.orm.update(managers).set({ state: "ready" })
+        .where(and(eq(managers.id, run.managerId), eq(managers.state, "active"))).run();
     }
 
     return { runId: id, state: "force_stopped", runState: "CANCELLED", missionState };
