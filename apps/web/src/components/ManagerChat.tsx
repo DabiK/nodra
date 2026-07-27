@@ -1,14 +1,59 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ManagerConversationView, ManagerThreadView, ManagerView } from "../types";
+import type { AgentSessionView, ManagerConversationView, ManagerThreadView, ManagerView } from "../types";
 import { latestManagerThread, listManagerConversations, loadManagerThread, sendManagerMessage, stopManager, deleteManagerThread } from "../services/manager-service";
+import { normalizeAgentConversation, type AgentConversationEvent } from "../services/agent-conversation-normalizer";
 import { PixelAvatar } from "./PixelAvatar";
 
 const ACTIVE_RUN = new Set(["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"]);
 
-function toolLabel(type: string): string | null {
-  if (type.includes("permission")) return "demande une permission";
-  if (type.includes("tool") || type.includes("command") || type.includes("bash")) return "utilise un outil";
-  return null;
+/** Adapt a manager thread into the shape the shared conversation normalizer expects. */
+function toSession(thread: ManagerThreadView | null): AgentSessionView | null {
+  if (!thread || !thread.run) return null;
+  return {
+    run: thread.run,
+    conversation: thread.conversation,
+    config: thread.config
+      ? { promptEffective: thread.config.promptEffective, promptMission: null, cwd: thread.config.cwd, permissionPreset: thread.config.permissionPreset }
+      : null,
+    items: thread.items,
+    events: thread.events
+  };
+}
+
+function ManagerEvent({ event, manager }: { event: AgentConversationEvent; manager: ManagerView }) {
+  if (event.kind === "system") {
+    return <div className="manager-system">{event.text}</div>;
+  }
+  if (event.kind === "tool" || event.kind === "reasoning") {
+    const title = event.kind === "reasoning" ? "🧠 Réflexion" : event.title;
+    const command = event.kind === "tool" ? event.command : undefined;
+    const output = event.kind === "tool" ? event.output : event.text;
+    return (
+      <div className="manager-tool">
+        <div className="manager-tool-title">{title}</div>
+        {command && <pre className="manager-tool-pre">{command}</pre>}
+        {output && (
+          <details className="manager-tool-details" open={!command}>
+            <summary>Afficher la sortie</summary>
+            <pre className="manager-tool-pre">{output}</pre>
+          </details>
+        )}
+      </div>
+    );
+  }
+  if (event.kind === "error") {
+    return (
+      <div className="manager-bubble from-agent">
+        <div className="manager-bubble-body error">⚠ {event.text}</div>
+      </div>
+    );
+  }
+  return (
+    <div className={`manager-bubble ${event.kind === "user" ? "from-user" : "from-agent"}`}>
+      {event.kind !== "user" && <PixelAvatar id={manager.id} title={manager.name} mini />}
+      <div className="manager-bubble-body">{event.text}</div>
+    </div>
+  );
 }
 
 export function ManagerChat({
@@ -55,16 +100,17 @@ export function ManagerChat({
     return thread?.run ? ACTIVE_RUN.has(thread.run.state) : false;
   }, [manager.activeRunId, thread]);
 
-  const messages = useMemo(() => (thread?.items ?? []).filter((item) => item.body?.trim()), [thread]);
-  const toolActivity = useMemo(() => {
-    const events = thread?.events ?? [];
-    const labels = events.map((event) => toolLabel(event.type)).filter(Boolean) as string[];
-    return labels.length ? labels[labels.length - 1] : null;
+  const events = useMemo(() => {
+    // OpenCode streams the first run's *composed* prompt (system instruction +
+    // DevFlow CLI preamble + brief) as a user part. The clean brief is already
+    // shown from the persisted conversation item, so drop the composed one.
+    return normalizeAgentConversation(toSession(thread))
+      .filter((event) => !(event.kind === "user" && event.text.includes("--- Environnement DevFlow ---")));
   }, [thread]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages.length, running]);
+  }, [events.length, running]);
 
   const send = async (newConversation = false) => {
     const text = draft.trim();
@@ -179,25 +225,20 @@ export function ManagerChat({
         </header>
 
         <div className="manager-chat-log" ref={scrollRef}>
-          {!threadId && !messages.length && (
+          {!threadId && !events.length && (
             <div className="manager-chat-hello">
               <PixelAvatar id={manager.id} title={manager.name} />
               <p>{manager.instruction}</p>
               <small>Ce manager pilote DevFlow via son CLI. Demande-lui de créer des missions, de vérifier un état, ou d'orchestrer un pipeline.</small>
             </div>
           )}
-          {messages.map((item) => (
-            <div key={item.id} className={`manager-bubble ${item.kind === "user" ? "from-user" : "from-agent"}`}>
-              {item.kind !== "user" && <PixelAvatar id={manager.id} title={manager.name} mini />}
-              <div className="manager-bubble-body">{item.body}</div>
-            </div>
-          ))}
+          {events.map((event) => <ManagerEvent key={event.id} event={event} manager={manager} />)}
           {running && (
             <div className="manager-bubble from-agent">
               <PixelAvatar id={manager.id} title={manager.name} mini />
               <div className="manager-bubble-body thinking">
                 <span className="thinking-dots"><i /><i /><i /></span>
-                {toolActivity ?? "réfléchit"}
+                réfléchit
               </div>
             </div>
           )}

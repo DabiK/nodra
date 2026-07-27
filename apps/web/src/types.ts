@@ -242,9 +242,9 @@ export interface ManagerConversationView {
 export interface ManagerThreadView {
   manager: ManagerView | null;
   conversation: { id: string; providerSessionRef: string | null; state: string } | null;
-  run: { id: string; state: string; createdAt: string; endedAt: string | null } | null;
+  run: AgentSessionView["run"] | null;
   config: { promptEffective: string; promptManagerInstruction: string | null; cwd: string; permissionPreset: string } | null;
   items: Array<{ id: string; kind: string; body: string | null; createdAt: string }>;
-  events: Array<{ id: string; sequence: number; type: string; payload: unknown; sourceAt: string | null; receivedAt: string }>;
+  events: AgentSessionView["events"];
   threadId: string;
 }

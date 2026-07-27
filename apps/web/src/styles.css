@@ -617,7 +617,15 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 .manager-bubble.from-user .manager-bubble-body { background: var(--ink); color: #f3f4ee; border-bottom-right-radius: 4px; }
 .manager-bubble.from-agent .manager-bubble-body { background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
 .manager-bubble-body.thinking { display: flex; align-items: center; gap: 8px; color: var(--muted); font-style: italic; }
+.manager-bubble-body.error { background: #f7e3e1; border-color: #e6bcb6; color: #97362e; }
 .thinking-dots { display: inline-flex; gap: 3px; }
+.manager-tool { align-self: stretch; margin: 2px 0; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 8px; background: #fbfbf7; }
+.manager-tool-title { font: 800 11px Manrope; letter-spacing: .02em; color: #45514a; }
+.manager-tool-pre { margin: 8px 0 0; padding: 9px 11px; background: #17231d; color: #e7ede9; border-radius: 6px; font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; }
+.manager-tool-details { margin-top: 6px; }
+.manager-tool-details summary { cursor: pointer; color: var(--green); font-size: 11px; font-weight: 700; }
+.manager-tool-details[open] summary { margin-bottom: 4px; }
+.manager-system { align-self: center; padding: 3px 12px; border-radius: 20px; background: #eef0ea; color: var(--muted); font-size: 11px; font-weight: 600; }
 .thinking-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: bounce 1s infinite; }
 .thinking-dots i:nth-child(2) { animation-delay: .15s; }
 .thinking-dots i:nth-child(3) { animation-delay: .3s; }
