@@ -52,3 +52,5 @@ export const LIST_MANAGERS = Symbol("LIST_MANAGERS");
 export const SHOW_MANAGER = Symbol("SHOW_MANAGER");
 export const LIST_MANAGER_CONVERSATIONS = Symbol("LIST_MANAGER_CONVERSATIONS");
 export const START_MANAGER_RUN = Symbol("START_MANAGER_RUN");
+export const REPOSITORY_ROOT = Symbol("REPOSITORY_ROOT");
+export const DATA_ROOT = Symbol("DATA_ROOT");

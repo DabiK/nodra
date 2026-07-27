@@ -1,7 +1,11 @@
 import { api } from "../api";
 import type { CreateWorkspaceInput, FolderBrowseResult, MissionIntakeDraft, WorkspaceRecord } from "../types";
+import { serverConfig } from "./config-service";
 
-const managedWorkspaceRoot = "/Users/Dabi/Documents/devflow/devflow-next/data/local/workspaces";
+// Fallback used only until the server config (which reports the real, OS-correct
+// workspaces root) has been fetched. Kept relative so it is never a wrong
+// absolute path baked into the client.
+const fallbackWorkspaceRoot = "data/local/workspaces";
 
 export async function browseFolders(path?: string) {
   const params = new URLSearchParams();
@@ -32,7 +36,8 @@ export function workspacePathForDraft(draft: MissionIntakeDraft) {
 }
 
 export function workspacePathFromName(name: string) {
-  return name.trim() ? `${managedWorkspaceRoot}/${slugify(name)}` : "";
+  const root = serverConfig()?.workspacesRoot ?? fallbackWorkspaceRoot;
+  return name.trim() ? `${root}/${slugify(name)}` : "";
 }
 
 function slugify(value: string) {

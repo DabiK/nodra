@@ -9,6 +9,7 @@ import { TaskIntakeCard } from "./components/TaskIntakeCard";
 import type { FolderBrowseResult, ManagerView, MissionIntakeDraft, MissionState, MissionView, PipelineListItem, ProviderOptionsCatalog } from "./types";
 import { filterMissions } from "./services/mission-filters";
 import { createInitialDraft, loadMissionIntake, submitMissionIntake } from "./services/mission-intake-service";
+import { loadServerConfig } from "./services/config-service";
 import { listManagers } from "./services/manager-service";
 import { listMissions } from "./services/mission-service";
 import { listPipelines } from "./services/pipeline-service";
@@ -56,6 +57,7 @@ export function App() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
+    void loadServerConfig().catch(() => undefined);
     void loadMissionIntake()
       .then((result) => {
         setMissions(result.missions);

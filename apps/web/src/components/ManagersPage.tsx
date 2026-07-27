@@ -1,12 +1,12 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { ManagerView, ProviderOptionsCatalog, ProviderPermissionPreset, ProviderReasoningEffort } from "../types";
 import { archiveManager, createManager, updateManager } from "../services/manager-service";
+import { serverConfig } from "../services/config-service";
 import { ManagerChat } from "./ManagerChat";
 import { PixelAvatar } from "./PixelAvatar";
 
 const DEFAULT_INSTRUCTION =
   "Transforme mes demandes en lots autonomes, explicites et testables. Vérifie l'état avant d'agir et privilégie des séquences simples avant de créer un pipeline.";
-const DEFAULT_WORKSPACE = "/Users/Dabi/Documents/devflow/devflow-next";
 
 const stateCopy: Record<string, string> = {
   draft: "à configurer",
@@ -154,7 +154,7 @@ export function ManagersPage({
             </select>
           </label>
           <label className="wide">Dépôt de travail (le manager exécute le CLI depuis ce chemin)
-            <input value={draft.workspacePath} onChange={(event) => setDraft({ ...draft, workspacePath: event.target.value })} placeholder={DEFAULT_WORKSPACE} />
+            <input value={draft.workspacePath} onChange={(event) => setDraft({ ...draft, workspacePath: event.target.value })} placeholder={serverConfig()?.repositoryRoot ?? "chemin absolu du dépôt"} />
           </label>
           <button type="submit" disabled={busy === "create"}>{busy === "create" ? "Création…" : "Inviter le manager"}</button>
         </form>
@@ -238,7 +238,7 @@ function initialDraft(providerOptions: ProviderOptionsCatalog | null): Editable 
     modelId,
     reasoningEffort: providerOptions?.defaults.reasoningEffort ?? "provider_default",
     permissionPreset: "full_access",
-    workspacePath: DEFAULT_WORKSPACE
+    workspacePath: serverConfig()?.repositoryRoot ?? ""
   };
 }
 

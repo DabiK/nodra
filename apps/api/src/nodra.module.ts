@@ -99,6 +99,7 @@ import { FolderController } from "./folder.controller.js";
 import { HealthController } from "./health.controller.js";
 import { MissionController } from "./mission.controller.js";
 import { ManagerController } from "./manager.controller.js";
+import { ConfigController } from "./config.controller.js";
 import { RelayController } from "./relay.controller.js";
 import { RuntimeController } from "./runtime.controller.js";
 import { RuntimeLifecycle } from "./runtime-lifecycle.js";
@@ -119,6 +120,7 @@ import {
   CREATE_MANAGER,
   CREATE_MISSION,
   CREATE_PIPELINE,
+  DATA_ROOT,
   DATABASE,
   DELETE_WORKSPACE,
   DISPATCH_WORKFLOW_OUTBOX,
@@ -140,6 +142,7 @@ import {
   READ_EVIDENCE,
   READ_WORKSPACE,
   RECONCILE_WORKFLOWS,
+  REPOSITORY_ROOT,
   RESTORE_WORKSPACE,
   RESUME_RUN,
   SHOW_MANAGER,
@@ -166,6 +169,7 @@ import {
 export interface NodraModuleOptions {
   databaseFile: string;
   migrationsDirectory: string;
+  repositoryRoot?: string;
   temporalAddress?: string;
   temporalNamespace?: string;
   dataRoot?: string;
@@ -177,8 +181,10 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, ManagerController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController, PipelineController],
+      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController, PipelineController],
       providers: [
+        { provide: REPOSITORY_ROOT, useValue: options.repositoryRoot ?? process.cwd() },
+        { provide: DATA_ROOT, useValue: options.dataRoot ?? dirname(options.databaseFile) },
         {
           provide: DATABASE,
           useFactory: async () => {

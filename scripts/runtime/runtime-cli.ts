@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { RuntimeConfig } from "./runtime-config.js";
 import { RuntimeDoctor } from "./runtime-doctor.js";
 import { RuntimeError } from "./runtime-errors.js";
+import { assertPosixRuntime } from "./runtime-platform.js";
 import { RuntimeReporter } from "./runtime-reporter.js";
 import { RuntimeSupervisor } from "./runtime-supervisor.js";
 
@@ -9,6 +10,7 @@ const command = process.argv[2];
 const reporter = new RuntimeReporter();
 
 try {
+  assertPosixRuntime();
   const config = RuntimeConfig.load();
   const supervisor = new RuntimeSupervisor(config);
   if (command === "start") {

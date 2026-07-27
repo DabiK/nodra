@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { delimiter, isAbsolute, join, resolve } from "node:path";
 import { RuntimeError } from "./runtime-errors.js";
 import type { RuntimeConfiguration } from "./runtime-types.js";
 
@@ -24,13 +24,15 @@ export class RuntimeConfig {
       apiUrl: this.optionalLoopbackUrl(environment.NODRA_API_URL, "NODRA_API_URL"),
       temporalBinary: this.resolveBinary(
         environment.NODRA_TEMPORAL_BINARY,
-        "temporal"
+        "temporal",
+        environment
       ),
       opencodeBinary: this.resolveBinary(
         environment.NODRA_OPENCODE_BINARY,
-        "opencode"
+        "opencode",
+        environment
       ),
-      tsxBinary: resolve(repositoryRoot, "node_modules/.bin/tsx"),
+      tsxBinary: this.resolveNodeBinBinary(repositoryRoot, "tsx"),
       opencodeConfigFile: environment.OPENCODE_CONFIG
         ? resolve(environment.OPENCODE_CONFIG)
         : null,
@@ -89,12 +91,51 @@ export class RuntimeConfig {
 
   private static resolveBinary(
     explicit: string | undefined,
-    name: string
+    name: string,
+    environment: NodeJS.ProcessEnv
   ): string {
     if (explicit?.trim()) return resolve(explicit);
-    const result = spawnSync("which", [name], { encoding: "utf8" });
-    if (result.status !== 0 || !result.stdout.trim()) return name;
-    return resolve(result.stdout.trim());
+    return this.findOnPath(name, environment) ?? name;
+  }
+
+  /**
+   * Resolves a `node_modules/.bin` shim, accounting for the Windows `.cmd`
+   * wrapper that npm installs alongside the extension-less POSIX shim.
+   */
+  private static resolveNodeBinBinary(repositoryRoot: string, name: string): string {
+    const base = resolve(repositoryRoot, "node_modules", ".bin", name);
+    if (process.platform === "win32") {
+      for (const extension of [".cmd", ".exe", ".bat", ""]) {
+        if (existsSync(base + extension)) return base + extension;
+      }
+      return `${base}.cmd`;
+    }
+    return base;
+  }
+
+  /**
+   * Cross-platform PATH lookup (replaces `which`, which does not exist on
+   * Windows). Honours PATHEXT so a bare `temporal`/`opencode` resolves to
+   * `temporal.exe`/`opencode.cmd` on Windows.
+   */
+  private static findOnPath(name: string, environment: NodeJS.ProcessEnv): string | null {
+    const isWindows = process.platform === "win32";
+    const extensions = isWindows
+      ? ["", ...(environment.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)]
+      : [""];
+    if (isAbsolute(name) || name.includes("/") || name.includes("\\")) {
+      for (const extension of extensions) {
+        if (existsSync(name + extension)) return resolve(name + extension);
+      }
+      return null;
+    }
+    for (const directory of (environment.PATH ?? "").split(delimiter).filter(Boolean)) {
+      for (const extension of extensions) {
+        const candidate = join(directory, name + extension);
+        if (existsSync(candidate)) return candidate;
+      }
+    }
+    return null;
   }
 
   private static positiveInteger(value: string | undefined, fallback: number): number {
