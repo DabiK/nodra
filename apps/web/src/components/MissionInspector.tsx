@@ -3,14 +3,16 @@ import type { AgentConfigView, MissionInspectorData, MissionView, ProviderOption
 import { permissionLabels, reasoningLabels, selectDefaultModel } from "../services/provider-service";
 import { loadMissionInspector, updateAgentConfig } from "../services/mission-service";
 import { createWorkspace, workspacePathFromName } from "../services/workspace-service";
+import { branchNameFromTitle, validateWorkspaceMode } from "../services/workspace-mode";
 import { createPrerequisitePipeline } from "../services/pipeline-service";
 import { loadMissionResult, type MissionResultView } from "../services/mission-result-service";
 import { loadMissionNotes, saveMissionNotes } from "../services/mission-notes-service";
 import { performMissionAction } from "../services/mission-action-service";
 import { getMissionUiPolicy, type MissionUiAction, type MissionUiPolicy } from "../services/mission-ui-policy";
+import { WorkspaceModePicker } from "./WorkspaceModePicker";
 import { PixelAvatar } from "./PixelAvatar";
 
-interface InspectorForm {
+export interface InspectorForm {
   providerId: string;
   modelId: string;
   reasoningEffort: ProviderReasoningEffort;
@@ -417,62 +419,16 @@ function ConfigureStep({
   );
 }
 
-function WorkspaceModeEditor({ form, onPatch }: { form: InspectorForm; onPatch(patch: Partial<InspectorForm>): void }) {
+export function WorkspaceModeEditor({ form, onPatch }: { form: InspectorForm; onPatch(patch: Partial<InspectorForm>): void }) {
   const generatedScratchPath = workspacePathFromName(form.workspaceName || form.missionPrompt.slice(0, 40) || "workspace");
   return (
-    <div className="workspace-mode-field">
-      <fieldset className="workspace-mode-picker">
-        <legend>Terrain de travail</legend>
-        {[
-          ["repo", "Dépôt existant", "Travaille dans un dossier ou repo existant."],
-          ["scratch", "Workspace neuf", "Génère un dossier managé."],
-          ["worktree", "Git worktree", "Crée une branche isolée depuis un workspace source."]
-        ].map(([kind, title, description]) => (
-          <button type="button" className={form.workspaceKind === kind ? "active" : ""} onClick={() => onPatch({ workspaceKind: kind as WorkspaceDraftKind })} key={kind}>
-            <strong>{title}</strong>
-            <small>{description}</small>
-          </button>
-        ))}
-      </fieldset>
-
-      {form.workspaceKind === "repo" && (
-        <label>
-          Dossier dépôt
-          <input value={form.workspacePath} onChange={(event) => onPatch({ workspacePath: event.target.value })} placeholder="/Users/.../repo-ou-folder" />
-        </label>
-      )}
-      {form.workspaceKind === "scratch" && (
-        <div className="mission-config-grid identity">
-          <label>
-            Nom du workspace
-            <input value={form.workspaceName} onChange={(event) => onPatch({ workspaceName: event.target.value })} placeholder="nom du folder" />
-          </label>
-          <label>
-            Dossier généré
-            <input value={generatedScratchPath} readOnly />
-          </label>
-        </div>
-      )}
-      {form.workspaceKind === "worktree" && (
-        <div className="mission-config-grid identity">
-          <label>
-            Dépôt Git source
-            <input value={form.sourceRepositoryPath} onChange={(event) => onPatch({ sourceRepositoryPath: event.target.value })} placeholder="/Users/.../repo-source" />
-          </label>
-          <label>
-            Révision de base optionnelle
-            <input value={form.baseRef} onChange={(event) => onPatch({ baseRef: event.target.value })} placeholder="HEAD, main ou SHA" />
-          </label>
-          <label>
-            Branche
-            <input value={form.branchName} onChange={(event) => onPatch({ branchName: event.target.value })} placeholder="nodra/ma-mission" />
-          </label>
-          <label>
-            Chemin worktree optionnel
-            <input value={form.workspacePath} onChange={(event) => onPatch({ workspacePath: event.target.value })} placeholder="Généré par Nodra si vide" />
-          </label>
-        </div>
-      )}
+    <>
+      <WorkspaceModePicker
+        value={form}
+        onChange={onPatch}
+        generatedScratchPath={generatedScratchPath}
+        idPrefix="mission-workspace"
+      />
       <div className="mission-config-grid identity">
         <label>
           Target ref
@@ -483,11 +439,13 @@ function WorkspaceModeEditor({ form, onPatch }: { form: InspectorForm; onPatch(p
           <input type="checkbox" checked={form.autoCommitAuthorized} onChange={(event) => onPatch({ autoCommitAuthorized: event.target.checked })} />
         </label>
       </div>
-    </div>
+    </>
   );
 }
 
 async function createWorkspaceFromForm(form: InspectorForm, fallbackName: string) {
+  const validationError = validateWorkspaceMode(form);
+  if (validationError) throw new Error(validationError);
   if (form.workspaceKind === "repo") {
     if (!form.workspacePath.trim()) {
       return createWorkspace({ kind: "scratch", path: workspacePathFromName(form.workspaceName || fallbackName) });
@@ -497,15 +455,12 @@ async function createWorkspaceFromForm(form: InspectorForm, fallbackName: string
   if (form.workspaceKind === "scratch") {
     return createWorkspace({ kind: "scratch", path: workspacePathFromName(form.workspaceName || fallbackName) });
   }
-  if (!form.sourceWorkspaceId && !form.sourceRepositoryPath.trim()) {
-    throw new Error("Choisis un dépôt Git source pour créer un worktree.");
-  }
   return createWorkspace({
     kind: "worktree",
     ...(form.workspacePath.trim() ? { path: form.workspacePath.trim() } : {}),
     ...(form.sourceWorkspaceId ? { sourceWorkspaceId: form.sourceWorkspaceId } : { sourceRepositoryPath: form.sourceRepositoryPath }),
     baseRef: form.baseRef || "HEAD",
-    branchName: form.branchName || `nodra/${fallbackName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`,
+    branchName: form.branchName || branchNameFromTitle(fallbackName),
     integrationTargetRef: form.integrationTargetRef || null
   });
 }
@@ -530,7 +485,7 @@ function formFrom(data: MissionInspectorData, catalog: ProviderOptionsCatalog | 
     sourceWorkspaceId: config.workspaceId ?? "",
     sourceRepositoryPath: "",
     baseRef: "HEAD",
-    branchName: `nodra/${titleSlug || data.mission.id}`,
+    branchName: branchNameFromTitle(titleSlug || data.mission.id),
     prerequisiteMissionIds: []
   };
 }

@@ -79,9 +79,13 @@ export interface MissionIntakeDraft {
   prompt: string;
   notes: string;
   projectId: string;
-  workspaceKind: "repo" | "scratch";
+  workspaceKind: WorkspaceDraftKind;
   workspacePath: string;
   workspaceName: string;
+  sourceWorkspaceId: string;
+  sourceRepositoryPath: string;
+  baseRef: string;
+  branchName: string;
   providerId: string;
   modelId: string;
   reasoningEffort: ProviderReasoningEffort;

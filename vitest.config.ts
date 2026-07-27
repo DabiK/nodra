@@ -12,7 +12,7 @@ export default defineConfig({
     }
   },
   test: {
-    include: ["packages/**/*.test.ts", "apps/**/*.test.ts", "scripts/**/*.test.ts", "test/**/*.test.ts"],
+    include: ["packages/**/*.test.ts", "apps/**/*.test.ts", "apps/**/*.test.tsx", "scripts/**/*.test.ts", "test/**/*.test.ts"],
     environment: "node",
     pool: "forks",
     testTimeout: 15_000

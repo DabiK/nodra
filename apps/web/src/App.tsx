@@ -10,6 +10,8 @@ import type { FolderBrowseResult, ManagerView, MissionIntakeDraft, MissionState,
 import { filterMissions } from "./services/mission-filters";
 import { createInitialDraft, loadMissionIntake, submitMissionIntake } from "./services/mission-intake-service";
 import { loadServerConfig } from "./services/config-service";
+import { appShellClassName, loadSidebarCollapsed, saveSidebarCollapsed } from "./services/sidebar-preference-service";
+import { AppSidebar } from "./components/AppSidebar";
 import { listManagers } from "./services/manager-service";
 import { listMissions } from "./services/mission-service";
 import { loadSchedule, rescheduleToday, scheduledDay, todayKey, type MissionSchedule } from "./services/mission-schedule-service";
@@ -54,6 +56,7 @@ export function App() {
   });
   const [focusPipelineId, setFocusPipelineId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<MissionSchedule>(() => loadSchedule());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => loadSidebarCollapsed());
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -122,6 +125,14 @@ export function App() {
 
   const moveOverdueToToday = () => {
     setSchedule((current) => rescheduleToday(current, overdueMissions.map((mission) => mission.id)));
+  };
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      saveSidebarCollapsed(next);
+      return next;
+    });
   };
 
   const missionPipelineIndex = useMemo(() => {
@@ -226,21 +237,15 @@ export function App() {
   };
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar" aria-label="Navigation">
-        <div className="brand">
-          <span>N</span>
-          <div>
-            <strong>Nodra</strong>
-            <small>Mission control</small>
-          </div>
-        </div>
-        <nav>
-          <a className={page === "tasks" ? "active" : ""} href="/" onClick={(event) => { event.preventDefault(); navigate("tasks"); }}>Flux · Tâches</a>
-          <a className={page === "pipelines" ? "active" : ""} href="/?page=pipelines" onClick={(event) => { event.preventDefault(); navigate("pipelines"); }}>Pipelines{activePipelineCount ? <span className="count">{activePipelineCount}</span> : null}</a>
-          <a className={page === "managers" ? "active" : ""} href="/?page=managers" onClick={(event) => { event.preventDefault(); navigate("managers"); }}>Managers{managers.some((manager) => manager.state === "active") ? <span className="count">•</span> : null}</a>
-        </nav>
-      </aside>
+    <main className={appShellClassName(sidebarCollapsed)}>
+      <AppSidebar
+        page={page}
+        collapsed={sidebarCollapsed}
+        activePipelineCount={activePipelineCount}
+        hasActiveManager={managers.some((manager) => manager.state === "active")}
+        onToggle={toggleSidebar}
+        onNavigate={navigate}
+      />
 
       <section className="workspace">
         {page === "pipelines" ? (

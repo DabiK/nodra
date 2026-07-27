@@ -2,6 +2,7 @@ import type { MissionIntakeDraft, ProviderOptionsCatalog } from "../types";
 import { createConfiguredMission, createHumanMission, listMissions } from "./mission-service";
 import { saveMissionNotes } from "./mission-notes-service";
 import { loadProviderOptions, selectDefaultModel } from "./provider-service";
+import { DEFAULT_WORKSPACE_MODE, defaultWorktreeFields } from "./workspace-mode";
 
 export async function loadMissionIntake() {
   const [missions, providerOptions] = await Promise.all([
@@ -18,9 +19,12 @@ export function createInitialDraft(catalog: ProviderOptionsCatalog): MissionInta
     prompt: "",
     notes: "",
     projectId: "",
-    workspaceKind: "scratch",
+    workspaceKind: DEFAULT_WORKSPACE_MODE,
     workspacePath: "",
     workspaceName: "",
+    sourceWorkspaceId: "",
+    sourceRepositoryPath: "",
+    ...defaultWorktreeFields(""),
     providerId: catalog.defaults.providerId,
     modelId: selectDefaultModel(catalog, catalog.defaults.providerId),
     reasoningEffort: catalog.defaults.reasoningEffort,

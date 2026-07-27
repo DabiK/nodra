@@ -22,16 +22,29 @@ body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink);
 button, input, select, textarea { font: inherit; }
 button { color: inherit; cursor: pointer; }
 
-.app-shell { min-height: 100vh; display: grid; grid-template-columns: 260px 1fr; }
-.sidebar { position: sticky; top: 0; height: 100vh; padding: 28px 20px 20px; background: #eeede7; border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.app-shell { min-height: 100vh; display: grid; grid-template-columns: 260px 1fr; transition: grid-template-columns 0.25s ease; }
+.app-shell.sidebar-collapsed { grid-template-columns: 68px 1fr; }
+.sidebar { position: sticky; top: 0; height: 100vh; padding: 28px 20px 20px; background: #eeede7; border-right: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; }
+.app-shell.sidebar-collapsed .sidebar { padding: 28px 12px 20px; }
 .brand { display: flex; align-items: center; gap: 12px; padding: 0 9px 35px; }
-.brand > span { width: 42px; height: 42px; display: grid; place-items: center; overflow: hidden; border-radius: 12px; background: var(--ink); color: var(--lime); font: 800 18px Manrope; transform: rotate(-2deg); box-shadow: 0 6px 16px rgba(22, 35, 28, 0.16); }
+.brand > span { width: 42px; height: 42px; flex: none; display: grid; place-items: center; overflow: hidden; border-radius: 12px; background: var(--ink); color: var(--lime); font: 800 18px Manrope; transform: rotate(-2deg); box-shadow: 0 6px 16px rgba(22, 35, 28, 0.16); }
 .brand strong { display: block; font: 800 16px Manrope; }
 .brand small { color: var(--muted); font-size: 11px; letter-spacing: 0.07em; }
+.app-shell.sidebar-collapsed .brand { padding: 0 0 24px; justify-content: center; }
+.app-shell.sidebar-collapsed .brand > div { display: none; }
+.sidebar-toggle { align-self: flex-end; margin: -8px 0 14px; width: 30px; height: 30px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: #637068; font-weight: 800; cursor: pointer; }
+.sidebar-toggle:hover { color: var(--ink); background: #fff; }
+.sidebar-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.app-shell.sidebar-collapsed .sidebar-toggle { align-self: center; }
 nav { display: grid; gap: 4px; }
-nav a { width: 100%; border-radius: 10px; display: flex; align-items: center; gap: 12px; padding: 11px 12px; color: #637068; text-align: left; text-decoration: none; font-weight: 600; }
+nav a { width: 100%; border-radius: 10px; display: flex; align-items: center; gap: 12px; padding: 11px 12px; color: #637068; text-align: left; text-decoration: none; font-weight: 600; white-space: nowrap; }
 nav a:hover { background: rgba(255, 255, 255, 0.55); color: var(--ink); }
 nav a.active { background: var(--panel); color: var(--ink); box-shadow: 0 2px 8px rgba(30, 47, 39, 0.04); }
+nav .nav-icon { flex: none; width: 20px; text-align: center; font-size: 15px; }
+nav .nav-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.app-shell.sidebar-collapsed nav a { justify-content: center; padding: 11px 0; gap: 0; }
+.app-shell.sidebar-collapsed nav .nav-label { display: none; }
+.app-shell.sidebar-collapsed nav .count { position: absolute; margin-left: 22px; margin-top: -16px; }
 
 .workspace { min-width: 0; padding: 60px 5vw 56px; }
 .hero-row { display: flex; align-items: end; justify-content: space-between; gap: 30px; }
@@ -676,3 +689,7 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 .overdue-banner-text small { color: #8a7a55; font-size: 12px; }
 .overdue-banner-button { flex: none; border: 0; border-radius: 10px; background: #d8a11f; color: #241a00; padding: 10px 16px; font-weight: 800; font-size: 12px; box-shadow: 0 6px 16px rgba(216,161,31,.25); }
 .overdue-banner-button:hover { filter: brightness(1.05); transform: translateY(-1px); }
+
+/* ============ Workspace mode picker (shared Terrain de travail) ============ */
+.workspace-mode-warning { margin: 8px 0 0; padding: 8px 11px; border-radius: 8px; background: #fbf3dd; border: 1px solid #e6d3a6; color: #7a5a12; font-size: 11px; }
+.workspace-mode-error { margin: 8px 0 0; padding: 8px 11px; border-radius: 8px; background: #fbeaea; border: 1px solid #e6b3b3; color: #8a2b2b; font-size: 11px; font-weight: 600; }

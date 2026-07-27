@@ -1,7 +1,8 @@
 import type { FormEvent } from "react";
 import type { FolderBrowseResult, MissionIntakeDraft, MissionState, ProviderOptionsCatalog } from "../types";
 import { permissionLabels, reasoningLabels } from "../services/provider-service";
-import { workspacePathForDraft } from "../services/workspace-service";
+import { workspacePathFromName } from "../services/workspace-service";
+import { WorkspaceModePicker } from "./WorkspaceModePicker";
 import { FolderDrawer } from "./FolderDrawer";
 
 export function TaskIntakeCard({
@@ -196,33 +197,13 @@ export function TaskIntakeCard({
               </label>
             </div>
 
-            <div className="workspace-mode-field">
-              <fieldset className="workspace-mode-picker">
-                <legend>Terrain de travail</legend>
-                <button type="button" className={draft.workspaceKind === "repo" ? "active" : ""} onClick={() => onDraftChange({ workspaceKind: "repo" })}>
-                  <strong>Dépôt existant</strong>
-                  <small>Utilise un repo Git déjà présent sur la machine.</small>
-                </button>
-                <button type="button" className={draft.workspaceKind === "scratch" ? "active" : ""} onClick={() => onDraftChange({ workspaceKind: "scratch" })}>
-                  <strong>Workspace neuf</strong>
-                  <small>Crée un dossier de travail dédié.</small>
-                </button>
-              </fieldset>
-              {draft.workspaceKind === "repo" ? (
-                <label>
-                  Dossier workspace
-                  <span className="repository-picker mission-repository">
-                    <input value={draft.workspacePath} onChange={(event) => onDraftChange({ workspacePath: event.target.value })} placeholder="Chemin du dossier" required />
-                    <button type="button" onClick={onFolderOpen}>Parcourir...</button>
-                  </span>
-                </label>
-              ) : (
-                <label>
-                  Dossier généré
-                  <input value={workspacePathForDraft(draft)} readOnly placeholder="Généré depuis le nom du projet" />
-                </label>
-              )}
-            </div>
+            <WorkspaceModePicker
+              value={draft}
+              onChange={onDraftChange}
+              generatedScratchPath={workspacePathFromName(draft.workspaceName || draft.projectId || draft.title)}
+              onBrowseRepo={onFolderOpen}
+              idPrefix="new-task-workspace"
+            />
 
             <div className="form-grid">
               <label>
