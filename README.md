@@ -232,8 +232,18 @@ which do not exist on native Windows. You have two options:
    npm run runtime:start
    npm run web
    ```
-2. **Native Windows, components started manually** — open one terminal per
-   component (see [Running components manually](#running-components-manually-no-supervisor)).
+2. **Native Windows (PowerShell)** — use the bundled starter, which launches
+   Temporal, OpenCode, the API and the worker each in their own window (no Unix
+   process groups involved):
+   ```powershell
+   npm run win:start          # backend only
+   npm run win:start:web      # backend + web UI (http://127.0.0.1:5174)
+   npm run win:stop           # stop everything (by port)
+   ```
+   Flags: `-Web`, `-SkipTemporal`, `-SkipOpenCode` (e.g.
+   `powershell -ExecutionPolicy Bypass -File scripts\windows\start.ps1 -Web -SkipOpenCode`).
+   Or start each component manually — see
+   [Running components manually](#running-components-manually-no-supervisor).
    The API, worker, web and CLI are all cross‑platform; only the supervisor is
    not.
 

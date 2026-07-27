@@ -12,7 +12,8 @@ export function assertPosixRuntime(platform: NodeJS.Platform = process.platform)
     throw new RuntimeError(
       "The runtime supervisor (runtime:start/stop/status) is not supported on native Windows "
       + "because it relies on Unix process groups and the `ps`/`lsof` tools. "
-      + "Run it under WSL2, or start the components manually (see the Windows section of the README).",
+      + "Use `npm run win:start` (PowerShell), run it under WSL2, or start the components "
+      + "manually (see the Windows section of the README).",
       "RUNTIME_PLATFORM_UNSUPPORTED"
     );
   }
