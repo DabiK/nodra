@@ -101,6 +101,28 @@ Relay:
   relay --scratch
   relay --project <project-id>
       Show the mission relay, optionally filtered by project.
+Managers:
+  manager:create "<name>" --instruction "<text>"
+    [--provider <id> --model <id> --effort <effort> --permission <preset> --workspace <id>]
+      Create a manager (meta-agent that orchestrates DevFlow via its CLI).
+
+  manager:list [--all]
+  manager:show <manager-id>
+  manager:config <manager-id>
+    [--name <text>] [--instruction <text>]
+    [--provider <id>] [--model <id>] [--effort <effort>]
+    [--permission <preset>] [--workspace <id>]
+      Reconfigure a manager (new instruction versions are kept).
+
+  manager:message <manager-id> "<text>" [--new]
+      Send a brief to a manager (starts a run). --new opens a fresh conversation.
+
+  manager:messages <manager-id> [--role assistant|user|tool|all] [--last]
+  manager:conversations <manager-id>
+      Read a manager's conversation history.
+
+  manager:archive <manager-id>
+      Archive a manager.
 
 Pipelines:
   pipeline:create <name...>
@@ -248,7 +270,6 @@ Confirmations:
 Additional command groups:
   provider:*
       Provider status, probing and smoke-test commands.
-
   run:*
       Run cancellation, resumption and steering commands.
 

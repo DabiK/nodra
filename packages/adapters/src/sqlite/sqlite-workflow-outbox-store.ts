@@ -1,6 +1,6 @@
 import type { PendingWorkflowStart, WorkflowOutboxStore } from "@nodra/application";
 import { asId, DomainError } from "@nodra/domain";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { outbox } from "./schema/operations.js";
 import { runs } from "./schema/runs.js";
@@ -8,7 +8,8 @@ import { translateSqliteError } from "./sqlite-error-translation.js";
 
 interface StartPayload {
   schemaVersion: 1;
-  missionId: string;
+  missionId?: string;
+  managerId?: string;
   commandId: string;
   runId: string;
   executeProvider?: boolean;
@@ -22,23 +23,34 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
       const rows = this.database.orm
         .select()
         .from(outbox)
-        .where(and(eq(outbox.kind, "workflow.mission.start"), isNull(outbox.publishedAt)))
+        .where(and(inArray(outbox.kind, ["workflow.mission.start", "workflow.manager.start"]), isNull(outbox.publishedAt)))
         .orderBy(asc(outbox.createdAt), asc(outbox.id))
         .limit(limit)
         .all();
       return rows.map((row) => {
-        const payload = this.parsePayload(row.payloadJson);
-        this.validateIdentity(payload, row.dedupeKey);
+        const manager = row.kind === "workflow.manager.start";
+        const payload = this.parsePayload(row.payloadJson, manager);
+        this.validateIdentity(payload, row.dedupeKey, manager);
         return {
           id: asId(row.id),
           dedupeKey: row.dedupeKey,
-          input: {
-            missionId: asId(payload.missionId),
-            commandId: asId(payload.commandId),
-            runId: asId(payload.runId),
-            schemaVersion: 1,
-            executeProvider: payload.executeProvider === true
-          }
+          input: manager
+            ? {
+                managerId: asId(payload.managerId!),
+                subjectKind: "manager" as const,
+                commandId: asId(payload.commandId),
+                runId: asId(payload.runId),
+                schemaVersion: 1 as const,
+                executeProvider: payload.executeProvider === true
+              }
+            : {
+                missionId: asId(payload.missionId!),
+                subjectKind: "mission" as const,
+                commandId: asId(payload.commandId),
+                runId: asId(payload.runId),
+                schemaVersion: 1 as const,
+                executeProvider: payload.executeProvider === true
+              }
         };
       });
     } catch (error) {
@@ -58,7 +70,7 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
     }
   }
 
-  private parsePayload(value: string): StartPayload {
+  private parsePayload(value: string, manager: boolean): StartPayload {
     let payload: unknown;
     try {
       payload = JSON.parse(value);
@@ -69,9 +81,10 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
       throw new DomainError("Workflow outbox payload is invalid", "OUTBOX_PAYLOAD_INVALID");
     }
     const candidate = payload as Record<string, unknown>;
+    const subjectId = manager ? candidate.managerId : candidate.missionId;
     if (
       candidate.schemaVersion !== 1 ||
-      typeof candidate.missionId !== "string" || candidate.missionId.trim() === "" ||
+      typeof subjectId !== "string" || subjectId.trim() === "" ||
       typeof candidate.commandId !== "string" || candidate.commandId.trim() === "" ||
       typeof candidate.runId !== "string" || candidate.runId.trim() === "" ||
       (candidate.executeProvider !== undefined && typeof candidate.executeProvider !== "boolean")
@@ -81,8 +94,10 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
     return candidate as unknown as StartPayload;
   }
 
-  private validateIdentity(payload: StartPayload, dedupeKey: string): void {
-    if (dedupeKey !== `mission/${payload.missionId}/run/${payload.runId}`) {
+  private validateIdentity(payload: StartPayload, dedupeKey: string, manager: boolean): void {
+    const subjectId = manager ? payload.managerId! : payload.missionId!;
+    const prefix = manager ? "manager" : "mission";
+    if (dedupeKey !== `${prefix}/${subjectId}/run/${payload.runId}`) {
       throw new DomainError("Workflow outbox identity is inconsistent", "OUTBOX_PAYLOAD_INVALID");
     }
     const run = this.database.orm
@@ -90,7 +105,7 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
       .from(runs)
       .where(and(
         eq(runs.id, payload.runId),
-        eq(runs.missionId, payload.missionId),
+        manager ? eq(runs.managerId, subjectId) : eq(runs.missionId, subjectId),
         eq(runs.temporalWorkflowId, `run/${payload.runId}`)
       ))
       .get();

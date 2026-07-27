@@ -32,7 +32,7 @@ describe("migrateDatabase", () => {
 
     const result = await migrateDatabase(database, migrationsDirectory);
 
-    expect(result).toMatchObject({ version: 9, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9] });
+    expect(result).toMatchObject({ version: 10, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] });
     expect(registeredMigrations(database)).toEqual([
       expect.objectContaining({ version: 1 }),
       expect.objectContaining({ version: 2 }),
@@ -42,7 +42,8 @@ describe("migrateDatabase", () => {
       expect.objectContaining({ version: 6 }),
       expect.objectContaining({ version: 7 }),
       expect.objectContaining({ version: 8 }),
-      expect.objectContaining({ version: 9, checksum: result.checksum })
+      expect.objectContaining({ version: 9 }),
+      expect.objectContaining({ version: 10, checksum: result.checksum })
     ]);
   });
 
@@ -68,7 +69,7 @@ describe("migrateDatabase", () => {
 
     const upgraded = await migrateDatabase(database, resolve("packages/adapters/drizzle"));
 
-    expect(upgraded).toMatchObject({ version: 9, registeredVersions: [3, 4, 5, 6, 7, 8, 9] });
+    expect(upgraded).toMatchObject({ version: 10, registeredVersions: [3, 4, 5, 6, 7, 8, 9, 10] });
     expect(database.connection.prepare("select name from sqlite_master where type = 'index' and name = 'gate_override_approval_id_unique'").get()).toBeTruthy();
     expect(database.connection.prepare("select name from sqlite_master where type = 'index' and name = 'idx_confirmation_state_expires'").get()).toBeTruthy();
     expect(database.connection.prepare("select name from sqlite_master where type = 'trigger' and name = 'confirmation_exact_fields_immutable'").get()).toBeTruthy();
@@ -117,19 +118,19 @@ describe("migrateDatabase", () => {
       idx: nextIndex,
       version: first.version,
       when: last.when + 1,
-      tag: "0006_multi_migration_probe",
+      tag: "0010_multi_migration_probe",
       breakpoints: true
     });
     await writeFile(journalFile, `${JSON.stringify(journal, null, 2)}\n`);
     await writeFile(
-      join(migrationsDirectory, "0006_multi_migration_probe.sql"),
+      join(migrationsDirectory, "0010_multi_migration_probe.sql"),
       "CREATE TABLE `migration_probe` (`id` integer PRIMARY KEY NOT NULL);\n"
     );
 
     const result = await migrateDatabase(database, migrationsDirectory);
 
-    expect(result).toMatchObject({ version: 10, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] });
-    expect(registeredMigrations(database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(result).toMatchObject({ version: 11, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] });
+    expect(registeredMigrations(database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     expect(database.connection.prepare("select name from sqlite_master where name = 'migration_probe'").get()).toBeTruthy();
   });
 });

@@ -9,3 +9,11 @@ export {
   type MissionState,
   type ValidationSubmission
 } from "./mission.js";
+export {
+  Manager,
+  type ManagerConfig,
+  type ManagerPermissionPreset,
+  type ManagerProviderOptions,
+  type ManagerSnapshot,
+  type ManagerState
+} from "./manager.js";

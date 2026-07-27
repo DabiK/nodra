@@ -4,6 +4,7 @@ import { blobs, projects, workspaces } from "./core.js";
 
 export const managers = sqliteTable("manager", {
   id: text("id").primaryKey(),
+  name: text("name"),
   projectId: text("project_id").references(() => projects.id),
   state: text("state", { enum: ["draft", "ready", "active", "blocked", "archived"] }).notNull(),
   temporalParentWorkflowId: text("temporal_parent_workflow_id").unique(),

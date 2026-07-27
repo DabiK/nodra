@@ -60,6 +60,8 @@ export async function MissionWorkflow(input: MissionWorkflowInput): Promise<void
       cancellationType: ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
       args: [{
         missionId: input.missionId,
+        ...(input.managerId ? { managerId: input.managerId } : {}),
+        ...(input.subjectKind ? { subjectKind: input.subjectKind } : {}),
         commandId: input.commandId,
         runId: input.runId,
         snapshotVersion: 1,

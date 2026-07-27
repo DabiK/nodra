@@ -2,7 +2,8 @@ import type { Id } from "@nodra/domain";
 
 export interface ControllableRun {
   id: Id;
-  missionId: Id;
+  missionId: Id | null;
+  managerId: Id | null;
   temporalParentWorkflowId: string;
   state: string;
   providerSessionRef: string | null;

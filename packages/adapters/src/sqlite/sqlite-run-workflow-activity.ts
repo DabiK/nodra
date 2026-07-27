@@ -10,6 +10,7 @@ import { workspaces } from "./schema/core.js";
 import { businessAuditEvents, inbox, relayItems } from "./schema/operations.js";
 import { runConfigSnapshots, runs } from "./schema/runs.js";
 import { missions } from "./schema/missions.js";
+import { managers } from "./schema/managers.js";
 import { conversationItems } from "./schema/conversations.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
 import { asId, Mission } from "@nodra/domain";
@@ -21,6 +22,9 @@ export class SqliteRunWorkflowActivity {
   constructor(private readonly database: NodraSqliteDatabase) {}
 
   async recordStarted(input: RunWorkflowStartedInput): Promise<RunWorkflowStartedResult> {
+    if (input.subjectKind === "manager" && input.managerId) {
+      return this.recordManagerStarted(input);
+    }
     try {
       return this.database.orm.transaction((transaction) => {
         const inserted = transaction.insert(inbox).values({
@@ -51,6 +55,9 @@ export class SqliteRunWorkflowActivity {
   }
 
   async recordTerminal(input: RunWorkflowTerminalInput): Promise<RunWorkflowTerminalResult> {
+    if (input.subjectKind === "manager" && input.managerId) {
+      return this.recordManagerTerminal(input);
+    }
     try {
       return this.database.orm.transaction((transaction) => {
         const inserted = transaction.insert(inbox).values({
@@ -201,6 +208,104 @@ export class SqliteRunWorkflowActivity {
             ? "agent_result_requires_validation"
             : `run_${input.state.toLowerCase()}`
         }).where(eq(relayItems.missionId, input.missionId)).run();
+        return { applied: true };
+      });
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
+  private async recordManagerStarted(input: RunWorkflowStartedInput): Promise<RunWorkflowStartedResult> {
+    try {
+      return this.database.orm.transaction((transaction) => {
+        const inserted = transaction.insert(inbox).values({
+          consumer,
+          messageId: input.messageId,
+          processedAt: input.occurredAt
+        }).onConflictDoNothing().run();
+        if (inserted.changes === 0) return { applied: false };
+
+        const updated = transaction.update(runs).set({
+          state: "STARTING",
+          temporalRunId: input.temporalRunId
+        }).where(and(
+          eq(runs.id, input.runId),
+          eq(runs.managerId, input.managerId!),
+          inArray(runs.state, ["QUEUED", "STARTING"])
+        )).run();
+        if (updated.changes !== 1) {
+          throw new Error("Run Workflow Activity could not resolve its persisted manager run");
+        }
+        return { applied: true };
+      });
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
+  private async recordManagerTerminal(input: RunWorkflowTerminalInput): Promise<RunWorkflowTerminalResult> {
+    try {
+      return this.database.orm.transaction((transaction) => {
+        const inserted = transaction.insert(inbox).values({
+          consumer: terminalConsumer,
+          messageId: input.messageId,
+          processedAt: input.occurredAt
+        }).onConflictDoNothing().run();
+        if (inserted.changes === 0) return { applied: false };
+
+        const run = transaction.select({
+          state: runs.state,
+          temporalRunId: runs.temporalRunId,
+          workspaceId: runConfigSnapshots.workspaceId
+        }).from(runs)
+          .innerJoin(runConfigSnapshots, eq(runConfigSnapshots.runId, runs.id))
+          .where(and(eq(runs.id, input.runId), eq(runs.managerId, input.managerId!)))
+          .get();
+        if (!run || !run.workspaceId) {
+          throw new Error("Terminal Run Workflow Activity could not resolve its persisted manager run workspace");
+        }
+
+        const temporalRunMismatch = run.temporalRunId !== null && run.temporalRunId !== input.temporalRunId;
+        const missingTemporalRunOutsideQueued = run.temporalRunId === null && run.state !== "QUEUED";
+        if (temporalRunMismatch || missingTemporalRunOutsideQueued) {
+          throw new Error("Terminal Run Workflow Activity detected a Temporal run mismatch");
+        }
+        if (["SUCCEEDED", "FAILED", "CANCELLED"].includes(run.state)) return { applied: false };
+
+        const updated = transaction.update(runs).set({
+          state: input.state,
+          temporalRunId: input.temporalRunId,
+          endedAt: input.occurredAt
+        }).where(and(
+          eq(runs.id, input.runId),
+          eq(runs.managerId, input.managerId!),
+          or(
+            eq(runs.temporalRunId, input.temporalRunId),
+            and(isNull(runs.temporalRunId), eq(runs.state, "QUEUED"))
+          ),
+          inArray(runs.state, ["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"])
+        )).run();
+        if (updated.changes !== 1) {
+          throw new Error("Terminal Run Workflow Activity lost its manager run state transition");
+        }
+        const released = transaction.update(workspaces).set({ state: "ready" })
+          .where(and(eq(workspaces.id, run.workspaceId), eq(workspaces.state, "in_use"))).run();
+        if (released.changes !== 1) {
+          throw new Error("Terminal Run Workflow Activity could not release its manager workspace");
+        }
+        const managerState = input.state === "FAILED" ? "blocked" : "ready";
+        transaction.update(managers).set({ state: managerState })
+          .where(and(eq(managers.id, input.managerId!), eq(managers.state, "active"))).run();
+        transaction.insert(businessAuditEvents).values({
+          id: `audit/run-terminal/${input.messageId}`,
+          aggregateKind: "manager",
+          aggregateId: input.managerId!,
+          commandId: input.commandId,
+          eventType: "MANAGER_RUN_TERMINAL_RECORDED",
+          actor: "manager",
+          payloadJson: JSON.stringify({ schemaVersion: 1, managerId: input.managerId, runId: input.runId, state: input.state }),
+          occurredAt: input.occurredAt
+        }).run();
         return { applied: true };
       });
     } catch (error) {

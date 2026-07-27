@@ -135,3 +135,27 @@ export * from "./advance-pipeline.js";
 export * from "./set-pipeline-node-transition-mode.js";
 export * from "./approve-pipeline-node-transition.js";
 export * from "./publish-pipeline-node-handover.js";
+export type {
+  ManagerAuditRecord,
+  ManagerConversationTurn,
+  ManagerConversationView,
+  ManagerListFilter,
+  ManagerReadModel,
+  ManagerRepository,
+  ManagerView,
+  SaveManagerInput
+} from "./manager-repository.js";
+export type {
+  ManagerExecutionRepository,
+  ManagerStartValidation,
+  PersistManagerStartInput
+} from "./manager-execution-repository.js";
+export { CreateManager, type CreateManagerInput } from "./create-manager.js";
+export { UpdateManager, ArchiveManager, type UpdateManagerInput } from "./update-manager.js";
+export { ListManagers, ShowManager, ListManagerConversations } from "./list-managers.js";
+export {
+  StartManagerRun,
+  DEVFLOW_MANAGER_PREAMBLE,
+  type StartManagerRunCommand,
+  type StartManagerRunResult
+} from "./start-manager-run.js";

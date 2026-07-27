@@ -20,6 +20,9 @@ import {
   SqliteMissionReadModel,
   SqliteMissionRepository,
   SqliteMissionExecutionRepository,
+  SqliteManagerRepository,
+  SqliteManagerReadModel,
+  SqliteManagerExecutionRepository,
   SqlitePipelineRepository,
   SqliteProviderCatalogRepository,
   SqliteRunControlRepository,
@@ -32,10 +35,12 @@ import {
 import {
   AdvancePipeline,
   ApprovePipelineNodeTransition,
+  ArchiveManager,
   ChangeMissionState,
   CancelRun,
   CommitWorkspace,
   CollectEvidence,
+  CreateManager,
   CreateMission,
   CreatePipeline,
   CreateWorkspace,
@@ -47,6 +52,8 @@ import {
   GetProviderStatus,
   GetRelay,
   GetAgentConfig,
+  ListManagerConversations,
+  ListManagers,
   ListMissions,
   ManageApprovals,
   ManageConfirmations,
@@ -60,7 +67,9 @@ import {
   ShowPipeline,
   ShowPipelineRun,
   SetPipelineNodeTransitionMode,
+  ShowManager,
   SnapshotWorkspace,
+  StartManagerRun,
   StartMission,
   StartPipeline,
   SteerRun,
@@ -73,7 +82,8 @@ import {
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
   RestoreWorkspace,
-  UpdateAgentConfig
+  UpdateAgentConfig,
+  UpdateManager
 } from "@nodra/application";
 import { ConsoleOutput } from "./console-output.js";
 import {
@@ -93,6 +103,7 @@ import { ProviderSmokeCli } from "./provider-smoke-cli.js";
 import { AgentConfigCli } from "./agent-config-cli.js";
 import { PipelineCli } from "./pipeline-cli.js";
 import { ConversationCli } from "./conversation-cli.js";
+import { ManagerCli } from "./manager-cli.js";
 
 export const runCli = async (
   arguments_: readonly string[],
@@ -201,7 +212,23 @@ export const runCli = async (
             agentResolver
           )
         ),
-        new ConversationCli(database)
+        new ConversationCli(database),
+        new ManagerCli(
+          new CreateManager(new SqliteManagerRepository(database)),
+          new UpdateManager(new SqliteManagerRepository(database)),
+          new ArchiveManager(new SqliteManagerRepository(database)),
+          new ListManagers(new SqliteManagerReadModel(database)),
+          new ShowManager(new SqliteManagerReadModel(database)),
+          new ListManagerConversations(new SqliteManagerReadModel(database)),
+          new StartManagerRun(
+            new SqliteManagerRepository(database),
+            new SqliteManagerExecutionRepository(database),
+            temporal,
+            providerCatalog
+          ),
+          new DispatchWorkflowOutbox(new SqliteWorkflowOutboxStore(database), workflow),
+          database
+        )
       ]),
       new I6Cli(
         new GetProviderStatus(providerCatalog, providers),

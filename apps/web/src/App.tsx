@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { MissionInspector } from "./components/MissionInspector";
+import { ManagerDock } from "./components/ManagerDock";
+import { ManagersPage } from "./components/ManagersPage";
 import { MissionRelay } from "./components/MissionRelay";
 import { PipelinesPage } from "./components/PipelineFlux";
 import { PixelAvatar } from "./components/PixelAvatar";
 import { TaskIntakeCard } from "./components/TaskIntakeCard";
-import type { FolderBrowseResult, MissionIntakeDraft, MissionState, MissionView, PipelineListItem, ProviderOptionsCatalog } from "./types";
+import type { FolderBrowseResult, ManagerView, MissionIntakeDraft, MissionState, MissionView, PipelineListItem, ProviderOptionsCatalog } from "./types";
 import { filterMissions } from "./services/mission-filters";
 import { createInitialDraft, loadMissionIntake, submitMissionIntake } from "./services/mission-intake-service";
+import { listManagers } from "./services/manager-service";
 import { listMissions } from "./services/mission-service";
 import { listPipelines } from "./services/pipeline-service";
 import { probeProvider, selectDefaultModel } from "./services/provider-service";
@@ -30,6 +33,7 @@ function updateDraft(draft: MissionIntakeDraft, patch: Partial<MissionIntakeDraf
 export function App() {
   const [missions, setMissions] = useState<MissionView[]>([]);
   const [pipelines, setPipelines] = useState<PipelineListItem[]>([]);
+  const [managers, setManagers] = useState<ManagerView[]>([]);
   const [providerOptions, setProviderOptions] = useState<ProviderOptionsCatalog | null>(null);
   const [draft, setDraft] = useState<MissionIntakeDraft | null>(null);
   const [query, setQuery] = useState("");
@@ -42,7 +46,10 @@ export function App() {
   const [folderLoading, setFolderLoading] = useState(false);
   const [probingProviderId, setProbingProviderId] = useState<string | null>(null);
   const [inspectedMissionId, setInspectedMissionId] = useState<string | null>(null);
-  const [page, setPage] = useState<"tasks" | "pipelines">(() => new URLSearchParams(location.search).get("page") === "pipelines" ? "pipelines" : "tasks");
+  const [page, setPage] = useState<"tasks" | "pipelines" | "managers">(() => {
+    const value = new URLSearchParams(location.search).get("page");
+    return value === "pipelines" || value === "managers" ? value : "tasks";
+  });
   const [focusPipelineId, setFocusPipelineId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -63,6 +70,7 @@ export function App() {
     const tick = () => {
       void listMissions().then((next) => { if (!cancelled) setMissions(next); }).catch(() => undefined);
       void listPipelines().then((next) => { if (!cancelled) setPipelines(next); }).catch(() => undefined);
+      void listManagers().then((next) => { if (!cancelled) setManagers(next); }).catch(() => undefined);
     };
     tick();
     const timer = window.setInterval(tick, 2000);
@@ -72,14 +80,18 @@ export function App() {
   }, []);
 
   const refreshPipelines = () => void listPipelines().then(setPipelines).catch(() => undefined);
+  const refreshManagers = () => void listManagers().then(setManagers).catch(() => undefined);
 
   useEffect(() => {
-    const onPopState = () => setPage(new URLSearchParams(location.search).get("page") === "pipelines" ? "pipelines" : "tasks");
+    const onPopState = () => {
+      const value = new URLSearchParams(location.search).get("page");
+      setPage(value === "pipelines" || value === "managers" ? value : "tasks");
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const navigate = (next: "tasks" | "pipelines") => {
+  const navigate = (next: "tasks" | "pipelines" | "managers") => {
     const url = new URL(location.href);
     if (next === "tasks") url.searchParams.delete("page");
     else url.searchParams.set("page", next);
@@ -209,6 +221,7 @@ export function App() {
         <nav>
           <a className={page === "tasks" ? "active" : ""} href="/" onClick={(event) => { event.preventDefault(); navigate("tasks"); }}>Flux · Tâches</a>
           <a className={page === "pipelines" ? "active" : ""} href="/?page=pipelines" onClick={(event) => { event.preventDefault(); navigate("pipelines"); }}>Pipelines{activePipelineCount ? <span className="count">{activePipelineCount}</span> : null}</a>
+          <a className={page === "managers" ? "active" : ""} href="/?page=managers" onClick={(event) => { event.preventDefault(); navigate("managers"); }}>Managers{managers.some((manager) => manager.state === "active") ? <span className="count">•</span> : null}</a>
         </nav>
       </aside>
 
@@ -232,6 +245,21 @@ export function App() {
               onInspect={setInspectedMissionId}
               onChanged={refreshPipelines}
             />
+          </>
+        ) : page === "managers" ? (
+          <>
+            <header className="hero-row">
+              <div>
+                <p className="date-label">THE GUILD DESK</p>
+                <h1>Managers</h1>
+                <p className="subtitle">Des agents méta qui orchestrent DevFlow à ta place.</p>
+              </div>
+              <div className="focus-score">
+                <span>{managers.filter((manager) => manager.state !== "archived").length}</span>
+                <small>managers</small>
+              </div>
+            </header>
+            <ManagersPage managers={managers} providerOptions={providerOptions} onChanged={refreshManagers} />
           </>
         ) : (
           <>
@@ -359,6 +387,13 @@ export function App() {
             onSaved={() => void listMissions().then(setMissions)}
           />
         )}
+
+        <ManagerDock
+          managers={managers}
+          onManage={() => navigate("managers")}
+          onOpen={() => navigate("managers")}
+          onChanged={refreshManagers}
+        />
       </section>
     </main>
   );

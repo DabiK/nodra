@@ -1,5 +1,7 @@
 export interface MissionWorkflowInput {
   missionId: string;
+  managerId?: string;
+  subjectKind?: "mission" | "manager";
   commandId: string;
   runId: string;
   schemaVersion: 1;
@@ -8,6 +10,8 @@ export interface MissionWorkflowInput {
 
 export interface RunWorkflowInput {
   missionId: string;
+  managerId?: string;
+  subjectKind?: "mission" | "manager";
   commandId: string;
   runId: string;
   snapshotVersion: 1;
@@ -17,6 +21,8 @@ export interface RunWorkflowInput {
 
 export interface RunWorkflowStartedRequest {
   missionId: string;
+  managerId?: string;
+  subjectKind?: "mission" | "manager";
   commandId: string;
   runId: string;
   messageId: string;
@@ -36,6 +42,8 @@ export type RunTerminalState = "SUCCEEDED" | "FAILED" | "CANCELLED";
 
 export interface RunWorkflowTerminalRequest {
   missionId: string;
+  managerId?: string;
+  subjectKind?: "mission" | "manager";
   commandId: string;
   runId: string;
   messageId: string;

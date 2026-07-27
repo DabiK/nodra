@@ -16,14 +16,26 @@ export class TemporalWorkflowAdapter implements WorkflowPort {
   constructor(private readonly client: WorkflowClient) {}
 
   async start(input: StartMissionInput): Promise<{ workflowId: string; runId: string }> {
-    const workflowId = `mission/${input.missionId}/run/${input.runId}`;
+    const subjectKind = input.subjectKind ?? "mission";
+    const subjectId = subjectKind === "manager" ? input.managerId : input.missionId;
+    if (!subjectId) throw new DomainError("Workflow start subject is missing", "OUTBOX_PAYLOAD_INVALID");
+    const workflowId = `${subjectKind}/${subjectId}/run/${input.runId}`;
+    const args = {
+      missionId: input.missionId ?? subjectId,
+      ...(input.managerId ? { managerId: input.managerId } : {}),
+      subjectKind,
+      commandId: input.commandId,
+      runId: input.runId,
+      schemaVersion: input.schemaVersion,
+      ...(input.executeProvider === undefined ? {} : { executeProvider: input.executeProvider })
+    };
     try {
       const handle = await this.client.start(MISSION_WORKFLOW_NAME, {
         taskQueue: MISSION_TASK_QUEUE,
         workflowId,
         workflowIdConflictPolicy: WorkflowIdConflictPolicy.USE_EXISTING,
         workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
-        args: [input]
+        args: [args]
       });
       return { workflowId, runId: handle.firstExecutionRunId };
     } catch (error) {

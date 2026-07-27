@@ -197,3 +197,54 @@ export interface MissionInspectorData {
   mission: MissionView;
   config: AgentConfigView | null;
 }
+
+export type ManagerState = "draft" | "ready" | "active" | "blocked" | "archived";
+
+export interface ManagerView {
+  id: string;
+  projectId: string | null;
+  name: string;
+  instruction: string;
+  state: ManagerState;
+  providerId: string | null;
+  modelId: string | null;
+  reasoningEffort: string | null;
+  permissionPreset: ProviderPermissionPreset;
+  workspaceId: string | null;
+  workspacePath: string | null;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+  activeRunId: string | null;
+  currentThreadId: string | null;
+  lastMessage: string | null;
+  conversationCount: number;
+}
+
+export interface ManagerConversationTurn {
+  runId: string;
+  state: string;
+  createdAt: string;
+  endedAt: string | null;
+  summary: string | null;
+}
+
+export interface ManagerConversationView {
+  id: string;
+  managerId: string;
+  createdAt: string;
+  current: boolean;
+  providerSessionRef: string | null;
+  threadId: string;
+  turns: ManagerConversationTurn[];
+}
+
+export interface ManagerThreadView {
+  manager: ManagerView | null;
+  conversation: { id: string; providerSessionRef: string | null; state: string } | null;
+  run: { id: string; state: string; createdAt: string; endedAt: string | null } | null;
+  config: { promptEffective: string; promptManagerInstruction: string | null; cwd: string; permissionPreset: string } | null;
+  items: Array<{ id: string; kind: string; body: string | null; createdAt: string }>;
+  events: Array<{ id: string; sequence: number; type: string; payload: unknown; sourceAt: string | null; receivedAt: string }>;
+  threadId: string;
+}

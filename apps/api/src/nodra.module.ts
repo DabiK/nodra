@@ -22,6 +22,9 @@ import {
   SqliteMissionReadModel,
   SqliteMissionRepository,
   SqliteMissionExecutionRepository,
+  SqliteManagerRepository,
+  SqliteManagerReadModel,
+  SqliteManagerExecutionRepository,
   SqlitePipelineRepository,
   SqliteProviderCatalogRepository,
   SqliteRunControlRepository,
@@ -35,10 +38,12 @@ import {
   ChangeMissionState,
   AdvancePipeline,
   ApprovePipelineNodeTransition,
+  ArchiveManager,
   CancelRun,
   CatalogProviderHealthProbe,
   CommitWorkspace,
   CollectEvidence,
+  CreateManager,
   CreateMission,
   CreatePipeline,
   CreateWorkspace,
@@ -50,6 +55,8 @@ import {
   GetProviderStatus,
   GetRelay,
   ListMissions,
+  ListManagerConversations,
+  ListManagers,
   ManageApprovals,
   ManageConfirmations,
   ManageDelivery,
@@ -63,7 +70,9 @@ import {
   ListPipelines,
   SetPipelineNodeTransitionMode,
   ShowMission,
+  ShowManager,
   SnapshotWorkspace,
+  StartManagerRun,
   StartMission,
   StartPipeline,
   SteerRun,
@@ -75,7 +84,8 @@ import {
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
   RestoreWorkspace,
-  UpdateAgentConfig
+  UpdateAgentConfig,
+  UpdateManager
 } from "@nodra/application";
 import { ApprovalController } from "./approval.controller.js";
 import { AgentSessionController } from "./agent-session.controller.js";
@@ -88,6 +98,7 @@ import { GateController } from "./gate.controller.js";
 import { FolderController } from "./folder.controller.js";
 import { HealthController } from "./health.controller.js";
 import { MissionController } from "./mission.controller.js";
+import { ManagerController } from "./manager.controller.js";
 import { RelayController } from "./relay.controller.js";
 import { RuntimeController } from "./runtime.controller.js";
 import { RuntimeLifecycle } from "./runtime-lifecycle.js";
@@ -99,11 +110,13 @@ import {
   AGENT_CONFIG_REPOSITORY,
   ADVANCE_PIPELINE,
   APPROVE_PIPELINE_NODE_TRANSITION,
+  ARCHIVE_MANAGER,
   CANCEL_RUN,
   CHANGE_MISSION_STATE,
   COLLECT_EVIDENCE,
   COMMIT_WORKSPACE,
   CREATE_WORKSPACE,
+  CREATE_MANAGER,
   CREATE_MISSION,
   CREATE_PIPELINE,
   DATABASE,
@@ -113,6 +126,8 @@ import {
   GET_PROVIDER_STATUS,
   GET_RELAY,
   INTEGRATE_WORKSPACE,
+  LIST_MANAGER_CONVERSATIONS,
+  LIST_MANAGERS,
   LIST_MISSIONS,
   MANAGE_APPROVALS,
   MANAGE_CONFIRMATIONS,
@@ -127,16 +142,19 @@ import {
   RECONCILE_WORKFLOWS,
   RESTORE_WORKSPACE,
   RESUME_RUN,
+  SHOW_MANAGER,
   SHOW_MISSION,
   SHOW_PIPELINE,
   LIST_PIPELINES,
   SHOW_PIPELINE_RUN,
   SET_PIPELINE_NODE_TRANSITION_MODE,
   SNAPSHOT_WORKSPACE,
+  START_MANAGER_RUN,
   START_MISSION,
   START_PIPELINE,
   STEER_RUN,
   TEMPORAL_CONNECTION,
+  UPDATE_MANAGER,
   WORKSPACE_PORT,
   ENABLE_AGENT_CONFIG,
   GET_AGENT_CONFIG,
@@ -159,7 +177,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController, PipelineController],
+      controllers: [HealthController, MissionController, ManagerController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController, PipelineController],
       providers: [
         {
           provide: DATABASE,
@@ -476,6 +494,50 @@ export class NodraModule {
           provide: GET_RELAY,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new GetRelay(new SqliteMissionReadModel(database))
+        },
+        {
+          provide: CREATE_MANAGER,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new CreateManager(new SqliteManagerRepository(database))
+        },
+        {
+          provide: UPDATE_MANAGER,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new UpdateManager(new SqliteManagerRepository(database))
+        },
+        {
+          provide: ARCHIVE_MANAGER,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ArchiveManager(new SqliteManagerRepository(database))
+        },
+        {
+          provide: LIST_MANAGERS,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ListManagers(new SqliteManagerReadModel(database))
+        },
+        {
+          provide: SHOW_MANAGER,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ShowManager(new SqliteManagerReadModel(database))
+        },
+        {
+          provide: LIST_MANAGER_CONVERSATIONS,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ListManagerConversations(new SqliteManagerReadModel(database))
+        },
+        {
+          provide: START_MANAGER_RUN,
+          inject: [DATABASE, TEMPORAL_CONNECTION, PROVIDER_CATALOG],
+          useFactory: (
+            database: NodraSqliteDatabase,
+            temporal: LazyTemporalConnection,
+            catalog: SqliteProviderCatalogRepository
+          ) => new StartManagerRun(
+            new SqliteManagerRepository(database),
+            new SqliteManagerExecutionRepository(database),
+            temporal,
+            catalog
+          )
         },
         { provide: APP_FILTER, useClass: BusinessErrorFilter },
         DatabaseLifecycle,

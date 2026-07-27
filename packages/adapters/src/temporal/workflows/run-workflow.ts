@@ -42,6 +42,8 @@ export async function RunWorkflow(input: RunWorkflowInput): Promise<void> {
   try {
     await activities.recordStarted({
       missionId: input.missionId,
+      ...(input.managerId ? { managerId: input.managerId } : {}),
+      ...(input.subjectKind ? { subjectKind: input.subjectKind } : {}),
       commandId: input.commandId,
       runId: input.runId,
       messageId: `run/${input.runId}/activity/record-started/v${input.schemaVersion}`,
@@ -75,6 +77,8 @@ export async function RunWorkflow(input: RunWorkflowInput): Promise<void> {
     }
     await activities.recordTerminal({
       missionId: input.missionId,
+      ...(input.managerId ? { managerId: input.managerId } : {}),
+      ...(input.subjectKind ? { subjectKind: input.subjectKind } : {}),
       commandId: input.commandId,
       runId: input.runId,
       messageId: `run/${input.runId}/activity/record-terminal/v${input.schemaVersion}`,
@@ -84,6 +88,8 @@ export async function RunWorkflow(input: RunWorkflowInput): Promise<void> {
   } catch (error) {
     await CancellationScope.nonCancellable(() => activities.recordTerminal({
       missionId: input.missionId,
+      ...(input.managerId ? { managerId: input.managerId } : {}),
+      ...(input.subjectKind ? { subjectKind: input.subjectKind } : {}),
       commandId: input.commandId,
       runId: input.runId,
       messageId: `run/${input.runId}/activity/record-terminal/v${input.schemaVersion}`,
