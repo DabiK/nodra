@@ -127,6 +127,7 @@ export * from "./update-agent-config.js";
 export * from "./pipeline-model.js";
 export * from "./pipeline-repository.js";
 export * from "./create-pipeline.js";
+export * from "./list-pipelines.js";
 export * from "./show-pipeline.js";
 export * from "./show-pipeline-run.js";
 export * from "./start-pipeline.js";

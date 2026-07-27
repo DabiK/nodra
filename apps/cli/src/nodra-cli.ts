@@ -451,7 +451,7 @@ export class NodraCli {
     const [id, expectedVersionText, ...rest] = parameters;
     const expectedVersion = Number(expectedVersionText);
     if (!id || !Number.isInteger(expectedVersion) || expectedVersion < 0) return this.writeUsage();
-    if (!["prepare", "pickup", "block", "resume", "close", "abandon"].includes(action)) return this.writeUsage();
+    if (!["prepare", "pickup", "block", "resume", "close", "abandon", "accept", "request-correction"].includes(action)) return this.writeUsage();
     if (action === "block" && !rest.join(" ").trim()) return this.writeUsage();
     if (action !== "block" && rest.length > 0) return this.writeUsage();
     return this.write(

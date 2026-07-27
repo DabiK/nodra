@@ -63,6 +63,29 @@ export interface PipelineRunView {
   }>;
 }
 
+export interface PipelineListNodeView {
+  nodeKey: string;
+  missionId: Id;
+  missionTitle: string;
+  missionKind: string;
+  missionState: string;
+  nodeRunState: PipelineNodeRunState | null;
+  transitionMode: "auto" | "human";
+}
+
+export interface PipelineListItemView {
+  id: Id;
+  name: string;
+  state: PipelineState;
+  createdAt: string;
+  runId: Id | null;
+  runState: PipelineRunState | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  nodes: PipelineListNodeView[];
+  edges: Array<{ fromNodeKey: string; toNodeKey: string }>;
+}
+
 export interface PipelineAdvanceResult {
   pipelineRun: PipelineRunView;
   startedMissionIds: Id[];

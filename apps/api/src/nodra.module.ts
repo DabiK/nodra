@@ -60,6 +60,7 @@ import {
   ReconcileWorkflows,
   ShowPipeline,
   ShowPipelineRun,
+  ListPipelines,
   SetPipelineNodeTransitionMode,
   ShowMission,
   SnapshotWorkspace,
@@ -128,6 +129,7 @@ import {
   RESUME_RUN,
   SHOW_MISSION,
   SHOW_PIPELINE,
+  LIST_PIPELINES,
   SHOW_PIPELINE_RUN,
   SET_PIPELINE_NODE_TRANSITION_MODE,
   SNAPSHOT_WORKSPACE,
@@ -434,6 +436,11 @@ export class NodraModule {
           provide: SHOW_PIPELINE,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new ShowPipeline(new SqlitePipelineRepository(database))
+        },
+        {
+          provide: LIST_PIPELINES,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ListPipelines(new SqlitePipelineRepository(database))
         },
         {
           provide: SHOW_PIPELINE_RUN,

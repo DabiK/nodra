@@ -122,6 +122,31 @@ export interface PipelineView {
   name: string;
 }
 
+export type PipelineNodeRunState = "pending" | "ready" | "active" | "blocked" | "completed" | "failed" | "skipped";
+
+export interface PipelineListNode {
+  nodeKey: string;
+  missionId: string;
+  missionTitle: string;
+  missionKind: string;
+  missionState: MissionState;
+  nodeRunState: PipelineNodeRunState | null;
+  transitionMode: "auto" | "human";
+}
+
+export interface PipelineListItem {
+  id: string;
+  name: string;
+  state: "draft" | "active" | "completed" | "archived";
+  createdAt: string;
+  runId: string | null;
+  runState: "queued" | "active" | "blocked" | "completed" | "failed" | "cancelled" | "archived" | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  nodes: PipelineListNode[];
+  edges: Array<{ fromNodeKey: string; toNodeKey: string }>;
+}
+
 export interface AgentSessionView {
   run: {
     id: string;

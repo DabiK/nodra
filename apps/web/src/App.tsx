@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { MissionInspector } from "./components/MissionInspector";
 import { MissionRelay } from "./components/MissionRelay";
+import { PipelinesPage } from "./components/PipelineFlux";
 import { PixelAvatar } from "./components/PixelAvatar";
 import { TaskIntakeCard } from "./components/TaskIntakeCard";
-import type { FolderBrowseResult, MissionIntakeDraft, MissionState, MissionView, ProviderOptionsCatalog } from "./types";
+import type { FolderBrowseResult, MissionIntakeDraft, MissionState, MissionView, PipelineListItem, ProviderOptionsCatalog } from "./types";
 import { filterMissions } from "./services/mission-filters";
 import { createInitialDraft, loadMissionIntake, submitMissionIntake } from "./services/mission-intake-service";
 import { listMissions } from "./services/mission-service";
+import { listPipelines } from "./services/pipeline-service";
 import { probeProvider, selectDefaultModel } from "./services/provider-service";
 import { browseFolders } from "./services/workspace-service";
 
@@ -27,6 +29,7 @@ function updateDraft(draft: MissionIntakeDraft, patch: Partial<MissionIntakeDraf
 
 export function App() {
   const [missions, setMissions] = useState<MissionView[]>([]);
+  const [pipelines, setPipelines] = useState<PipelineListItem[]>([]);
   const [providerOptions, setProviderOptions] = useState<ProviderOptionsCatalog | null>(null);
   const [draft, setDraft] = useState<MissionIntakeDraft | null>(null);
   const [query, setQuery] = useState("");
@@ -39,6 +42,8 @@ export function App() {
   const [folderLoading, setFolderLoading] = useState(false);
   const [probingProviderId, setProbingProviderId] = useState<string | null>(null);
   const [inspectedMissionId, setInspectedMissionId] = useState<string | null>(null);
+  const [page, setPage] = useState<"tasks" | "pipelines">(() => new URLSearchParams(location.search).get("page") === "pipelines" ? "pipelines" : "tasks");
+  const [focusPipelineId, setFocusPipelineId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -55,12 +60,50 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    const tick = () => void listMissions().then((next) => { if (!cancelled) setMissions(next); }).catch(() => undefined);
+    const tick = () => {
+      void listMissions().then((next) => { if (!cancelled) setMissions(next); }).catch(() => undefined);
+      void listPipelines().then((next) => { if (!cancelled) setPipelines(next); }).catch(() => undefined);
+    };
+    tick();
     const timer = window.setInterval(tick, 2000);
     const onFocus = () => tick();
     window.addEventListener("focus", onFocus);
     return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
   }, []);
+
+  const refreshPipelines = () => void listPipelines().then(setPipelines).catch(() => undefined);
+
+  useEffect(() => {
+    const onPopState = () => setPage(new URLSearchParams(location.search).get("page") === "pipelines" ? "pipelines" : "tasks");
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const navigate = (next: "tasks" | "pipelines") => {
+    const url = new URL(location.href);
+    if (next === "tasks") url.searchParams.delete("page");
+    else url.searchParams.set("page", next);
+    history.pushState({}, "", `${url.pathname}${url.search}`);
+    setPage(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openPipeline = (pipelineId: string) => {
+    setFocusPipelineId(pipelineId);
+    navigate("pipelines");
+  };
+
+  const activePipelineCount = useMemo(() => pipelines.filter((pipeline) => pipeline.runState === "active" || pipeline.runState === "blocked").length, [pipelines]);
+
+  const missionPipelineIndex = useMemo(() => {
+    const index = new Map<string, { pipelineId: string; pipelineName: string; nodeKey: string }>();
+    for (const pipeline of pipelines) {
+      for (const node of pipeline.nodes) {
+        if (!index.has(node.missionId)) index.set(node.missionId, { pipelineId: pipeline.id, pipelineName: pipeline.name, nodeKey: node.nodeKey });
+      }
+    }
+    return index;
+  }, [pipelines]);
 
   const filtered = useMemo(
     () => filterMissions(missions, { query, state: stateFilter, kind: kindFilter, sort }),
@@ -164,27 +207,47 @@ export function App() {
           </div>
         </div>
         <nav>
-          <a className="active" href="#create">Créer</a>
-          <a href="#missions">Missions</a>
-          <a href="#providers">Providers</a>
-          <a href="#pipelines">Pipelines</a>
+          <a className={page === "tasks" ? "active" : ""} href="/" onClick={(event) => { event.preventDefault(); navigate("tasks"); }}>Flux · Tâches</a>
+          <a className={page === "pipelines" ? "active" : ""} href="/?page=pipelines" onClick={(event) => { event.preventDefault(); navigate("pipelines"); }}>Pipelines{activePipelineCount ? <span className="count">{activePipelineCount}</span> : null}</a>
         </nav>
       </aside>
 
       <section className="workspace">
-        <header className="hero-row">
-          <div>
-            <p className="date-label">TASK INTAKE</p>
-            <h1>Mes tâches</h1>
-            <p className="subtitle">Capture, configure et fais avancer ce qui compte.</p>
-          </div>
-          <div className="focus-score">
-            <span>{missions.filter((mission) => mission.state !== "DONE" && mission.state !== "ABANDONED").length}</span>
-            <small>missions ouvertes</small>
-          </div>
-        </header>
+        {page === "pipelines" ? (
+          <>
+            <header className="hero-row">
+              <div>
+                <p className="date-label">HANDOVER</p>
+                <h1>Pipelines</h1>
+                <p className="subtitle">Suis tes workflows multi-missions, étape par étape.</p>
+              </div>
+              <div className="focus-score">
+                <span>{activePipelineCount}</span>
+                <small>en cours</small>
+              </div>
+            </header>
+            <PipelinesPage
+              pipelines={pipelines}
+              focusPipelineId={focusPipelineId}
+              onInspect={setInspectedMissionId}
+              onChanged={refreshPipelines}
+            />
+          </>
+        ) : (
+          <>
+            <header className="hero-row">
+              <div>
+                <p className="date-label">TASK INTAKE</p>
+                <h1>Mes tâches</h1>
+                <p className="subtitle">Capture, configure et fais avancer ce qui compte.</p>
+              </div>
+              <div className="focus-score">
+                <span>{missions.filter((mission) => mission.state !== "DONE" && mission.state !== "ABANDONED").length}</span>
+                <small>missions ouvertes</small>
+              </div>
+            </header>
 
-        <TaskIntakeCard
+            <TaskIntakeCard
           draft={draft}
           providerOptions={providerOptions}
           selectedProvider={selectedProvider}
@@ -220,7 +283,9 @@ export function App() {
 
         <MissionRelay
           missions={missions}
+          missionPipelineIndex={missionPipelineIndex}
           onInspect={setInspectedMissionId}
+          onOpenPipeline={openPipeline}
           onNewTask={() => { setCreateExpanded(true); document.getElementById("create")?.scrollIntoView({ behavior: "smooth" }); }}
         />
 
@@ -282,6 +347,8 @@ export function App() {
             {!filtered.length && <p className="empty">Aucune mission ne correspond aux filtres.</p>}
           </div>
         </section>
+          </>
+        )}
 
         {inspectedMissionId && (
           <MissionInspector

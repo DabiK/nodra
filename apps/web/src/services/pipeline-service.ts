@@ -1,5 +1,32 @@
 import { api } from "../api";
-import type { MissionView, PipelineView } from "../types";
+import type { MissionView, PipelineListItem, PipelineView } from "../types";
+
+export async function listPipelines() {
+  return api<PipelineListItem[]>("/api/pipelines");
+}
+
+export async function startPipeline(pipelineId: string) {
+  return api(`/api/pipelines/${pipelineId}/start`, { method: "POST", body: "{}" });
+}
+
+export async function advancePipelineRun(runId: string) {
+  return api(`/api/pipelines/runs/${runId}/advance`, { method: "POST", body: "{}" });
+}
+
+export async function setNodeTransitionMode(runId: string, nodeKey: string, mode: "auto" | "human") {
+  return api(`/api/pipelines/runs/${runId}/nodes/${encodeURIComponent(nodeKey)}/mode`, {
+    method: "POST",
+    body: JSON.stringify({ mode })
+  });
+}
+
+export async function approveNodeTransition(runId: string, nodeKey: string) {
+  return api(`/api/pipelines/runs/${runId}/nodes/${encodeURIComponent(nodeKey)}/approve-transition`, { method: "POST", body: "{}" });
+}
+
+export async function publishNodeHandover(runId: string, nodeKey: string) {
+  return api(`/api/pipelines/runs/${runId}/nodes/${encodeURIComponent(nodeKey)}/publish-handover`, { method: "POST", body: "{}" });
+}
 
 export async function createPrerequisitePipeline(input: {
   mission: MissionView;

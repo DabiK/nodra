@@ -92,6 +92,7 @@ import { I6Cli } from "./i6-cli.js";
 import { ProviderSmokeCli } from "./provider-smoke-cli.js";
 import { AgentConfigCli } from "./agent-config-cli.js";
 import { PipelineCli } from "./pipeline-cli.js";
+import { ConversationCli } from "./conversation-cli.js";
 
 export const runCli = async (
   arguments_: readonly string[],
@@ -199,7 +200,8 @@ export const runCli = async (
             providerCatalog,
             agentResolver
           )
-        )
+        ),
+        new ConversationCli(database)
       ]),
       new I6Cli(
         new GetProviderStatus(providerCatalog, providers),

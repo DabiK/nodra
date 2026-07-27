@@ -3,6 +3,7 @@ import type { CommandContext } from "./command-context.js";
 import type {
   PipelineAdvanceResult,
   PipelineEdgeInput,
+  PipelineListItemView,
   PipelineNodeInput,
   PipelineTransitionApprovalResult,
   PipelineTransitionModeResult,
@@ -57,6 +58,7 @@ export interface PublishPipelineNodeHandoverInput {
 
 export interface PipelineRepository {
   create(input: CreatePipelineInput): Promise<PipelineView>;
+  list(): Promise<PipelineListItemView[]>;
   show(id: Id): Promise<PipelineView | null>;
   showRun(id: Id): Promise<PipelineRunView | null>;
   start(input: StartPipelineInput): Promise<PipelineAdvanceResult>;

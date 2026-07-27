@@ -3,6 +3,7 @@ import type {
   AdvancePipeline,
   ApprovePipelineNodeTransition,
   CreatePipeline,
+  ListPipelines,
   PublishPipelineNodeHandover,
   ShowMission,
   ShowPipeline,
@@ -20,6 +21,7 @@ import {
   ADVANCE_PIPELINE,
   APPROVE_PIPELINE_NODE_TRANSITION,
   CREATE_PIPELINE,
+  LIST_PIPELINES,
   PUBLISH_PIPELINE_NODE_HANDOVER,
   SET_PIPELINE_NODE_TRANSITION_MODE,
   SHOW_MISSION,
@@ -33,6 +35,7 @@ import {
 export class PipelineController {
   constructor(
     @Inject(CREATE_PIPELINE) private readonly createPipeline: CreatePipeline,
+    @Inject(LIST_PIPELINES) private readonly listPipelines: ListPipelines,
     @Inject(SHOW_PIPELINE) private readonly showPipeline: ShowPipeline,
     @Inject(SHOW_PIPELINE_RUN) private readonly showPipelineRun: ShowPipelineRun,
     @Inject(START_PIPELINE) private readonly startPipeline: StartPipeline,
@@ -57,6 +60,11 @@ export class PipelineController {
       ...(body.edges?.length ? { edges: body.edges } : {}),
       context: commandContext(body.commandId)
     });
+  }
+
+  @Get()
+  list() {
+    return this.listPipelines.execute();
   }
 
   @Get(":id")

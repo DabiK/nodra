@@ -2,6 +2,7 @@ import type {
   AdvancePipelineInput,
   CreatePipelineInput,
   PipelineAdvanceResult,
+  PipelineListItemView,
   PipelineRepository,
   PipelineRunView,
   PipelineView,
@@ -100,6 +101,15 @@ export class SqlitePipelineRepository implements PipelineRepository {
   async show(id: Id): Promise<PipelineView | null> {
     try {
       return this.readPipeline(id);
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
+  async list(): Promise<PipelineListItemView[]> {
+    try {
+      const rows = this.database.orm.select().from(pipelines).orderBy(desc(pipelines.createdAt)).all();
+      return rows.map((pipeline) => this.readListItem(pipeline));
     } catch (error) {
       throw translateSqliteError(error);
     }
@@ -375,6 +385,64 @@ export class SqlitePipelineRepository implements PipelineRepository {
     };
   }
 
+  private readListItem(pipeline: typeof pipelines.$inferSelect): PipelineListItemView {
+    const definition = this.database.orm.select().from(pipelineDefinitions)
+      .where(eq(pipelineDefinitions.pipelineId, pipeline.id))
+      .orderBy(asc(pipelineDefinitions.version))
+      .get();
+    const latestRun = this.database.orm.select().from(pipelineRuns)
+      .where(eq(pipelineRuns.pipelineId, pipeline.id))
+      .orderBy(desc(pipelineRuns.createdAt))
+      .get();
+    const nodeRunStateByNodeId = new Map<string, PipelineRunView["nodes"][number]["state"]>();
+    if (latestRun) {
+      for (const nodeRun of this.database.orm.select().from(pipelineNodeRuns)
+        .where(eq(pipelineNodeRuns.pipelineRunId, latestRun.id)).all()) {
+        nodeRunStateByNodeId.set(nodeRun.nodeId, nodeRun.state);
+      }
+    }
+    const nodeRows = definition
+      ? this.database.orm.select({ node: pipelineNodes, mission: missions })
+          .from(pipelineNodes)
+          .innerJoin(missions, eq(missions.id, pipelineNodes.missionId))
+          .where(eq(pipelineNodes.definitionId, definition.id))
+          .orderBy(asc(pipelineNodes.nodeKey), asc(pipelineNodes.id))
+          .all()
+      : [];
+    const nodeKeyById = new Map(nodeRows.map((row) => [row.node.id, row.node.nodeKey]));
+    const edges = definition
+      ? this.database.orm.select().from(pipelineEdges)
+          .where(eq(pipelineEdges.definitionId, definition.id))
+          .orderBy(asc(pipelineEdges.id))
+          .all()
+          .flatMap((edge) => {
+            const fromNodeKey = nodeKeyById.get(edge.fromNodeId);
+            const toNodeKey = nodeKeyById.get(edge.toNodeId);
+            return fromNodeKey && toNodeKey ? [{ fromNodeKey, toNodeKey }] : [];
+          })
+      : [];
+    return {
+      id: asId(pipeline.id),
+      name: pipeline.name,
+      state: pipeline.state,
+      createdAt: pipeline.createdAt,
+      runId: latestRun ? asId(latestRun.id) : null,
+      runState: latestRun ? latestRun.state : null,
+      startedAt: latestRun?.startedAt ?? null,
+      endedAt: latestRun?.endedAt ?? null,
+      nodes: nodeRows.map((row) => ({
+        nodeKey: row.node.nodeKey,
+        missionId: asId(row.mission.id),
+        missionTitle: row.mission.title,
+        missionKind: row.mission.executionKind,
+        missionState: row.mission.state,
+        nodeRunState: nodeRunStateByNodeId.get(row.node.id) ?? null,
+        transitionMode: row.node.startMode
+      })),
+      edges
+    };
+  }
+
   private readRun(id: Id): PipelineRunView | null {
     const run = this.database.orm.select().from(pipelineRuns).where(eq(pipelineRuns.id, id)).get();
     if (!run) return null;
@@ -432,15 +500,30 @@ export class SqlitePipelineRepository implements PipelineRepository {
         ))
         .get();
       if (existing) continue;
-      this.upsertHandover(predecessor.nodeRun.id, null, toNodeRunId, {
+      const message = this.latestAssistantMessage(predecessor.mission.id);
+      this.upsertHandover(predecessor.nodeRun.id, message?.runId ?? null, toNodeRunId, {
         schemaVersion: 1,
-        source: "mission_completion",
+        source: message?.body ? "assistant_message" : "mission_completion",
         fromNodeKey: predecessor.node.nodeKey,
         missionId: predecessor.mission.id,
         missionState: predecessor.mission.state,
-        completedAt: predecessor.mission.updatedAt
+        completedAt: predecessor.mission.updatedAt,
+        ...(message?.body ? { message: message.body } : {})
       }, now);
     }
+  }
+
+  private latestAssistantMessage(missionId: string): { body: string; runId: string } | null {
+    const latest = this.database.orm.select({ body: conversationItems.body, runId: runs.id })
+      .from(runs)
+      .innerJoin(conversationItems, eq(conversationItems.conversationId, runs.conversationId))
+      .where(and(
+        eq(runs.missionId, missionId),
+        eq(conversationItems.kind, "assistant")
+      ))
+      .orderBy(desc(conversationItems.createdAt), desc(conversationItems.ordinal))
+      .get();
+    return latest?.body?.trim() ? { body: latest.body, runId: latest.runId } : null;
   }
 
   private upsertHandover(
@@ -484,7 +567,7 @@ export class SqlitePipelineRepository implements PipelineRepository {
       const content = typeof payload.message === "string"
         ? payload.message
         : JSON.stringify(handover.payload);
-      return `From ${handover.fromNodeKey}:\n${content}`;
+      return `<resultat_etape_precedente id="${handover.fromNodeKey}">\n${content}\n</resultat_etape_precedente>`;
     }).join("\n\n");
   }
 }

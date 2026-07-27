@@ -38,6 +38,7 @@ export const PREVIEW_AGENT_CONFIG = Symbol("PREVIEW_AGENT_CONFIG");
 export const RESOLVE_AGENT_CONFIG = Symbol("RESOLVE_AGENT_CONFIG");
 export const CREATE_PIPELINE = Symbol("CREATE_PIPELINE");
 export const SHOW_PIPELINE = Symbol("SHOW_PIPELINE");
+export const LIST_PIPELINES = Symbol("LIST_PIPELINES");
 export const SHOW_PIPELINE_RUN = Symbol("SHOW_PIPELINE_RUN");
 export const START_PIPELINE = Symbol("START_PIPELINE");
 export const ADVANCE_PIPELINE = Symbol("ADVANCE_PIPELINE");

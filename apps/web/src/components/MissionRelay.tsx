@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { MissionState, MissionView } from "../types";
 import { hasMissionNotes } from "../services/mission-notes-service";
 import { PixelAvatar } from "./PixelAvatar";
@@ -66,26 +66,73 @@ function relativeTime(value: string): string {
   return `il y a ${days} j`;
 }
 
-function MissionCard({ mission, tone, onInspect }: { mission: MissionView; tone: string; onInspect(id: string): void }) {
+function MissionCard({ mission, tone, pipeline, onInspect, onOpenPipeline }: { mission: MissionView; tone: string; pipeline?: { id: string; name: string; hue: number }; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void }) {
+  const style: CSSProperties = pipeline
+    ? { borderLeft: `4px solid hsl(${pipeline.hue} 55% 55%)`, background: `hsl(${pipeline.hue} 68% 97%)` }
+    : {};
   return (
-    <button className={`relay-task ${tone}`} onClick={() => onInspect(mission.id)} aria-label={`Ouvrir ${mission.title}`}>
+    <button className={`relay-task ${tone}${pipeline ? " in-pipeline" : ""}`} style={style} onClick={() => onInspect(mission.id)} aria-label={`Ouvrir ${mission.title}`}>
       <PixelAvatar id={mission.id} title={mission.title} mini />
       <span className="relay-task-copy">
         <small><i /> {mission.executionKind === "agent" ? "Agent" : "Humain"} · {relativeTime(mission.updatedAt)}{hasMissionNotes(mission.id) ? " · 📝 notes" : ""}</small>
         <strong>{mission.title}</strong>
         <em>{cardHint(mission)}</em>
+        {pipeline && (
+          <span
+            className="relay-task-pipeline"
+            role="button"
+            tabIndex={0}
+            title={`Ouvrir la pipeline « ${pipeline.name} »`}
+            style={{ color: `hsl(${pipeline.hue} 55% 40%)`, background: `hsl(${pipeline.hue} 60% 92%)` }}
+            onClick={(event) => { event.stopPropagation(); onOpenPipeline?.(pipeline.id); }}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onOpenPipeline?.(pipeline.id); } }}
+          >⌁ {pipeline.name} <b>↗</b></span>
+        )}
       </span>
       <span className="relay-arrow" aria-hidden="true">→</span>
     </button>
   );
 }
 
-function Lane({ state, missions, onInspect }: { state: MissionState; missions: MissionView[]; onInspect(id: string): void }) {
+type PipelineIndex = Map<string, { pipelineId: string; pipelineName: string; nodeKey: string }>;
+
+function pipelineHue(pipelineId: string): number {
+  let hash = 0;
+  for (let index = 0; index < pipelineId.length; index += 1) {
+    hash = (hash * 31 + pipelineId.charCodeAt(index)) % 360;
+  }
+  return hash;
+}
+
+function pipelineGroupStyle(pipelineId: string): CSSProperties {
+  const hue = pipelineHue(pipelineId);
+  return {
+    background: `hsl(${hue} 66% 93%)`,
+    borderColor: `hsl(${hue} 50% 68%)`,
+    ["--pipeline-accent" as string]: `hsl(${hue} 55% 40%)`
+  };
+}
+
+function Lane({ state, missions, pipelineIndex, onInspect, onOpenPipeline }: { state: MissionState; missions: MissionView[]; pipelineIndex?: PipelineIndex; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void }) {
   const column = COLUMN_LIBRARY[state];
   const items = missions
     .filter((mission) => mission.state === state)
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
-  const visible = items.slice(0, 12);
+
+  const groups = new Map<string, { name: string; missions: MissionView[] }>();
+  const standalone: MissionView[] = [];
+  for (const mission of items) {
+    const info = pipelineIndex?.get(mission.id);
+    if (info) {
+      const group = groups.get(info.pipelineId) ?? { name: info.pipelineName, missions: [] };
+      group.missions.push(mission);
+      groups.set(info.pipelineId, group);
+    } else {
+      standalone.push(mission);
+    }
+  }
+  const visibleStandalone = standalone.slice(0, 12);
+
   return (
     <section className={`relay-lane ${column.tone}`} aria-label={column.label}>
       <header>
@@ -97,16 +144,21 @@ function Lane({ state, missions, onInspect }: { state: MissionState; missions: M
         <b>{items.length}</b>
       </header>
       <div className="relay-list">
-        {visible.length
-          ? visible.map((mission) => <MissionCard key={mission.id} mission={mission} tone={column.tone} onInspect={onInspect} />)
-          : <p className="relay-empty"><span aria-hidden="true">·</span>Rien ici pour l'instant.</p>}
+        {!items.length && <p className="relay-empty"><span aria-hidden="true">·</span>Rien ici pour l'instant.</p>}
+        {[...groups.entries()].map(([pipelineId, group]) => (
+          <div className="relay-pipeline-group" key={pipelineId} style={pipelineGroupStyle(pipelineId)}>
+            <span className="relay-pipeline-tag"><i aria-hidden="true">⌁</i>{group.name}<b>{group.missions.length}</b></span>
+            {group.missions.map((mission) => <MissionCard key={mission.id} mission={mission} tone={column.tone} pipeline={{ id: pipelineId, name: group.name, hue: pipelineHue(pipelineId) }} onInspect={onInspect} onOpenPipeline={onOpenPipeline} />)}
+          </div>
+        ))}
+        {visibleStandalone.map((mission) => <MissionCard key={mission.id} mission={mission} tone={column.tone} onInspect={onInspect} />)}
       </div>
-      {items.length > visible.length && <p className="relay-overflow">+ {items.length - visible.length} autre(s)</p>}
+      {standalone.length > visibleStandalone.length && <p className="relay-overflow">+ {standalone.length - visibleStandalone.length} autre(s)</p>}
     </section>
   );
 }
 
-export function MissionRelay({ missions, onInspect, onNewTask }: { missions: MissionView[]; onInspect(id: string): void; onNewTask?(): void }) {
+export function MissionRelay({ missions, missionPipelineIndex, onInspect, onOpenPipeline, onNewTask }: { missions: MissionView[]; missionPipelineIndex?: PipelineIndex; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onNewTask?(): void }) {
   const [columns, setColumns] = useState<MissionState[]>(loadColumns);
   const [configOpen, setConfigOpen] = useState(false);
 
@@ -166,7 +218,7 @@ export function MissionRelay({ missions, onInspect, onNewTask }: { missions: Mis
 
       <div className="relay-lanes" style={{ ["--relay-columns" as string]: String(orderedColumns.length || 1) }}>
         {orderedColumns.length
-          ? orderedColumns.map((state) => <Lane key={state} state={state} missions={missions} onInspect={onInspect} />)
+          ? orderedColumns.map((state) => <Lane key={state} state={state} missions={missions} pipelineIndex={missionPipelineIndex} onInspect={onInspect} onOpenPipeline={onOpenPipeline} />)
           : <p className="relay-empty board-empty"><span aria-hidden="true">·</span>Aucune colonne sélectionnée. Ajoute un état via ⚙ Colonnes.</p>}
       </div>
     </section>

@@ -136,7 +136,7 @@ export class StartMission {
           missionPrompt: followUp
             ? followUp
             : command.handoverPrompt
-              ? `${resolution.resolved.missionPrompt}\n\n--- Pipeline handover ---\n${command.handoverPrompt}`
+              ? `${resolution.resolved.missionPrompt}\n\n--- Contexte transmis par le pipeline ---\nLes balises <resultat_etape_precedente> ci-dessous contiennent UNIQUEMENT le résultat produit par les étapes précédentes, à utiliser comme donnée d'entrée. Les balises elles-mêmes et leurs attributs (id="...") ne font PAS partie du contenu et ne doivent jamais être recopiés.\n\n${command.handoverPrompt}`
               : resolution.resolved.missionPrompt
         }
       } : {})
