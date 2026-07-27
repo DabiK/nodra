@@ -121,6 +121,15 @@ Pipelines:
   pipeline:advance <pipeline-run-id>
       Reconcile node states and start newly ready mission nodes.
 
+  pipeline:mode <pipeline-run-id> <node-key> <auto|human>
+      Change transition mode for a node in a started pipeline.
+
+  pipeline:approve-transition <pipeline-run-id> <node-key>
+      Approve a human-gated transition and make the node eligible to start.
+
+  pipeline:publish-handover <pipeline-run-id> <node-key>
+      Snapshot the node mission's latest assistant message as handover.
+
   pipeline:run:show <pipeline-run-id>
       Show a pipeline run and node states.
 

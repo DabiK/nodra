@@ -13,6 +13,8 @@ export interface StartMissionCommand {
   conversationId: Id;
   auditId: Id;
   outboxId: Id;
+  handoverPrompt?: string | null;
+  followUpMessage?: string | null;
   context: CommandContext;
 }
 
@@ -115,7 +117,8 @@ export class StartMission {
         );
       }
     }
-    const workflowId = `mission/${command.missionId}`;
+    const workflowId = `mission/${command.missionId}/run/${command.runId}`;
+    const followUp = command.followUpMessage?.trim() ? command.followUpMessage.trim() : null;
     await this.executions.persistStart({
       mission,
       expectedVersion: command.expectedVersion,
@@ -125,8 +128,18 @@ export class StartMission {
       auditId: command.auditId,
       outboxId: command.outboxId,
       context: command.context,
+      ...(followUp ? { reuseProviderSession: true } : {}),
       ...(providerCatalogSnapshot ? { providerCatalogSnapshot } : {}),
-      ...(resolution ? { resolvedConfig: resolution.resolved } : {})
+      ...(resolution ? {
+        resolvedConfig: {
+          ...resolution.resolved,
+          missionPrompt: followUp
+            ? followUp
+            : command.handoverPrompt
+              ? `${resolution.resolved.missionPrompt}\n\n--- Pipeline handover ---\n${command.handoverPrompt}`
+              : resolution.resolved.missionPrompt
+        }
+      } : {})
     });
     return {
       commandId: command.context.commandId,

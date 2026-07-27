@@ -131,3 +131,6 @@ export * from "./show-pipeline.js";
 export * from "./show-pipeline-run.js";
 export * from "./start-pipeline.js";
 export * from "./advance-pipeline.js";
+export * from "./set-pipeline-node-transition-mode.js";
+export * from "./approve-pipeline-node-transition.js";
+export * from "./publish-pipeline-node-handover.js";

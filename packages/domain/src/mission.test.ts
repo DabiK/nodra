@@ -64,11 +64,11 @@ describe("Mission human lifecycle", () => {
     expectTransition(active, () => active.block(now, "Waiting for a decision"), "BLOCKED");
     const blocked = humanIn("BLOCKED");
     expectTransition(blocked, () => blocked.resume(now), "READY");
-    for (const state of ["DRAFT", "READY"] as const) {
+    for (const state of ["DRAFT", "READY", "ACTIVE"] as const) {
       const mission = humanIn(state);
       expectTransition(mission, () => mission.close(now), "DONE");
     }
-    for (const state of ["DRAFT", "READY", "BLOCKED"] as const) {
+    for (const state of ["DRAFT", "READY", "BLOCKED", "VALIDATION"] as const) {
       const mission = humanIn(state);
       expectTransition(mission, () => mission.abandon(now), "ABANDONED");
     }
@@ -79,8 +79,8 @@ describe("Mission human lifecycle", () => {
     expectForbiddenEverywhereExcept(["READY"], humanIn, (mission) => mission.pickup(now));
     expectForbiddenEverywhereExcept(["ACTIVE"], humanIn, (mission) => mission.block(now, "blocked"));
     expectForbiddenEverywhereExcept(["BLOCKED"], humanIn, (mission) => mission.resume(now));
-    expectForbiddenEverywhereExcept(["DRAFT", "READY"], humanIn, (mission) => mission.close(now));
-    expectForbiddenEverywhereExcept(["DRAFT", "READY", "BLOCKED"], humanIn, (mission) => mission.abandon(now));
+    expectForbiddenEverywhereExcept(["DRAFT", "READY", "ACTIVE"], humanIn, (mission) => mission.close(now));
+    expectForbiddenEverywhereExcept(["DRAFT", "READY", "BLOCKED", "VALIDATION"], humanIn, (mission) => mission.abandon(now));
   });
 
   it("requires a structured blocking reason", () => {

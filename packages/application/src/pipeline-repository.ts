@@ -4,6 +4,9 @@ import type {
   PipelineAdvanceResult,
   PipelineEdgeInput,
   PipelineNodeInput,
+  PipelineTransitionApprovalResult,
+  PipelineTransitionModeResult,
+  PipelineHandoverPublishResult,
   PipelineRunView,
   PipelineView
 } from "./pipeline-model.js";
@@ -30,7 +33,26 @@ export interface StartPipelineInput {
 export interface AdvancePipelineInput {
   pipelineRunId: Id;
   context: CommandContext;
-  startMission: (missionId: Id) => Promise<void>;
+  startMission: (missionId: Id, handoverPrompt: string | null) => Promise<void>;
+}
+
+export interface SetPipelineNodeTransitionModeInput {
+  pipelineRunId: Id;
+  nodeKey: string;
+  mode: "auto" | "human";
+  context: CommandContext;
+}
+
+export interface ApprovePipelineNodeTransitionInput {
+  pipelineRunId: Id;
+  nodeKey: string;
+  context: CommandContext;
+}
+
+export interface PublishPipelineNodeHandoverInput {
+  pipelineRunId: Id;
+  nodeKey: string;
+  context: CommandContext;
 }
 
 export interface PipelineRepository {
@@ -39,4 +61,7 @@ export interface PipelineRepository {
   showRun(id: Id): Promise<PipelineRunView | null>;
   start(input: StartPipelineInput): Promise<PipelineAdvanceResult>;
   advance(input: AdvancePipelineInput): Promise<PipelineAdvanceResult>;
+  setNodeTransitionMode(input: SetPipelineNodeTransitionModeInput): Promise<PipelineTransitionModeResult>;
+  approveNodeTransition(input: ApprovePipelineNodeTransitionInput): Promise<PipelineTransitionApprovalResult>;
+  publishNodeHandover(input: PublishPipelineNodeHandoverInput): Promise<PipelineHandoverPublishResult>;
 }

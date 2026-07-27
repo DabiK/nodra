@@ -1,0 +1,536 @@
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import type { AgentConfigView, MissionInspectorData, MissionView, ProviderOptionsCatalog, ProviderReasoningEffort, WorkspaceDraftKind } from "../types";
+import { permissionLabels, reasoningLabels, selectDefaultModel } from "../services/provider-service";
+import { loadMissionInspector, updateAgentConfig } from "../services/mission-service";
+import { createWorkspace, workspacePathFromName } from "../services/workspace-service";
+import { createPrerequisitePipeline } from "../services/pipeline-service";
+import { loadMissionResult, type MissionResultView } from "../services/mission-result-service";
+import { loadMissionNotes, saveMissionNotes } from "../services/mission-notes-service";
+import { performMissionAction } from "../services/mission-action-service";
+import { getMissionUiPolicy, type MissionUiAction, type MissionUiPolicy } from "../services/mission-ui-policy";
+import { PixelAvatar } from "./PixelAvatar";
+
+interface InspectorForm {
+  providerId: string;
+  modelId: string;
+  reasoningEffort: ProviderReasoningEffort;
+  missionPrompt: string;
+  permissionPreset: NonNullable<AgentConfigView["permissionPreset"]>;
+  workspaceId: string;
+  autoCommitAuthorized: boolean;
+  integrationTargetRef: string;
+  workspaceKind: WorkspaceDraftKind;
+  workspacePath: string;
+  workspaceName: string;
+  sourceWorkspaceId: string;
+  sourceRepositoryPath: string;
+  baseRef: string;
+  branchName: string;
+  prerequisiteMissionIds: string[];
+}
+
+export function MissionInspector({
+  missionId,
+  missions,
+  providerOptions,
+  onClose,
+  onSaved
+}: {
+  missionId: string;
+  missions: MissionView[];
+  providerOptions: ProviderOptionsCatalog | null;
+  onClose(): void;
+  onSaved(): void;
+}) {
+  const [step, setStep] = useState<"inspect" | "configure">("inspect");
+  const [data, setData] = useState<MissionInspectorData | null>(null);
+  const [result, setResult] = useState<MissionResultView | null>(null);
+  const [form, setForm] = useState<InspectorForm | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadMissionInspector(missionId)
+      .then((result) => {
+        setData(result);
+        setForm(formFrom(result, providerOptions));
+      })
+      .catch((reason: Error) => setError(reason.message));
+  }, [missionId, providerOptions]);
+  useEffect(() => {
+    let cancelled = false;
+    void loadMissionResult(missionId)
+      .then((next) => { if (!cancelled) setResult(next); })
+      .catch(() => { if (!cancelled) setResult(null); });
+    return () => { cancelled = true; };
+  }, [missionId, data?.mission.state]);
+
+  const sequenceCandidates = useMemo(
+    () => missions.filter((mission) => mission.id !== missionId),
+    [missionId, missions]
+  );
+  const selectedProvider = providerOptions?.providers.find((provider) => provider.id === form?.providerId);
+  const selectedModel = selectedProvider?.models.find((model) => model.id === form?.modelId);
+  const reasoningOptions = selectedModel?.supportedReasoningEfforts.length
+    ? selectedModel.supportedReasoningEfforts
+    : providerOptions?.reasoningEfforts ?? [];
+  const policy = data?.mission ? getMissionUiPolicy({
+    mission: data.mission,
+    hasAgentConfig: Boolean(data.config),
+    latestRunId: result?.latestRunId ?? null,
+    latestRunState: result?.latestRunState ?? null,
+    hasDelivery: Boolean(result?.hasStructuredDelivery),
+    hasResultText: Boolean(result?.assistantMessage?.trim())
+  }) : null;
+
+  const patch = (patchValue: Partial<InspectorForm>) => setForm((current) => current ? { ...current, ...patchValue } : current);
+  const setProvider = (providerId: string) => {
+    if (!providerOptions) return;
+    const modelId = selectDefaultModel(providerOptions, providerId);
+    const model = providerOptions.providers.find((provider) => provider.id === providerId)?.models.find((item) => item.id === modelId);
+    patch({ providerId, modelId, reasoningEffort: model?.defaultReasoningEffort ?? providerOptions.defaults.reasoningEffort });
+  };
+  const togglePrerequisite = (missionIdValue: string) => {
+    if (!form) return;
+    const selected = new Set(form.prerequisiteMissionIds);
+    if (selected.has(missionIdValue)) selected.delete(missionIdValue);
+    else selected.add(missionIdValue);
+    patch({ prerequisiteMissionIds: [...selected] });
+  };
+
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!data?.config || !data.mission || !form) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const workspace = await createWorkspaceFromForm(form, data.mission.title);
+      await updateAgentConfig({
+        missionId,
+        config: data.config,
+        values: {
+          providerId: form.providerId,
+          modelId: form.modelId,
+          reasoningEffort: form.reasoningEffort,
+          missionPrompt: form.missionPrompt,
+          permissionPreset: form.permissionPreset,
+          workspaceId: workspace.id,
+          autoCommitAuthorized: form.autoCommitAuthorized,
+          integrationTargetRef: form.integrationTargetRef || null
+        }
+      });
+      if (form.prerequisiteMissionIds.length) {
+        await createPrerequisitePipeline({
+          mission: data.mission,
+          prerequisiteMissionIds: form.prerequisiteMissionIds
+        });
+      }
+      onSaved();
+      setNotice("Configuration sauvegardée");
+      setStep("inspect");
+      const reloaded = await loadMissionInspector(missionId);
+      setData(reloaded);
+      setForm(formFrom(reloaded, providerOptions));
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runAction = async (action: MissionUiAction) => {
+    if (!data?.mission || !policy) return;
+    if (action.id === "configure") {
+      setStep("configure");
+      return;
+    }
+    if (!action.enabled) {
+      setError(action.disabledReason ?? "Action indisponible pour cet état de mission.");
+      return;
+    }
+    setBusyAction(action.id);
+    setError("");
+    setNotice("");
+    try {
+      await performMissionAction({
+        actionId: action.id,
+        mission: data.mission,
+        latestRunId: result?.latestRunId ?? null
+      });
+      const [reloaded, reloadedResult] = await Promise.all([
+        loadMissionInspector(missionId),
+        loadMissionResult(missionId)
+      ]);
+      setData(reloaded);
+      setForm(formFrom(reloaded, providerOptions));
+      setResult(reloadedResult);
+      setNotice(`${action.label} · action appliquée`);
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  return (
+    <div className="inspector-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="agent-inspector" role="dialog" aria-modal="true" aria-labelledby="agentInspectorTitle">
+        <header className="agent-modal-head">
+          {data?.mission && <PixelAvatar id={data.mission.id} title={data.mission.title} />}
+          <div>
+            <span className="eyebrow">{step === "inspect" ? "FICHE DE MISSION" : "CONFIGURATION"}</span>
+            <h2 id="agentInspectorTitle">{data?.mission.title ?? "Chargement..."}</h2>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fermer la fiche de mission">×</button>
+        </header>
+
+        {step === "inspect" ? (
+          <InspectStep data={data} result={result} policy={policy} />
+        ) : (
+          <form id="mission-inspector-form" className="mission-configurator" onSubmit={save}>
+            {!data?.config || !form ? (
+              <p className="empty">Cette mission n'a pas encore de configuration agent éditable.</p>
+            ) : (
+              <ConfigureStep
+                form={form}
+                providerOptions={providerOptions}
+                selectedProvider={selectedProvider}
+                reasoningOptions={reasoningOptions}
+                sequenceCandidates={sequenceCandidates}
+                onPatch={patch}
+                onProviderChange={setProvider}
+                onTogglePrerequisite={togglePrerequisite}
+              />
+            )}
+          </form>
+        )}
+
+        {error && <p className="inspector-error" role="alert">{error}</p>}
+        {notice && <p className="inspector-notice" role="status">{notice}</p>}
+        <footer>
+          {step === "configure" && <button className="secondary-button" type="button" onClick={() => setStep("inspect")}>Retour</button>}
+          <button className="secondary-button" type="button" onClick={onClose}>Fermer</button>
+          {step === "inspect" && policy?.actions.map((action) => (
+            <button
+              className={`${action.primary ? "primary-button" : "secondary-button"} ${action.danger ? "danger-action" : ""}`}
+              type="button"
+              disabled={busyAction !== null || !action.enabled}
+              title={action.enabled ? undefined : action.disabledReason}
+              onClick={() => void runAction(action)}
+              key={action.id}
+            >
+              {busyAction === action.id ? "Patiente..." : action.label}
+            </button>
+          ))}
+          {step === "configure" && data?.config && <button className="primary-button session-button" type="submit" form="mission-inspector-form" disabled={saving}>{saving ? "Sauvegarde..." : "Sauvegarder →"}</button>}
+        </footer>
+        <p className="inspector-safety">Configuration en deux étapes : lecture d'abord, édition explicite ensuite.</p>
+      </section>
+    </div>
+  );
+}
+
+function MissionNotesPanel({ missionId }: { missionId: string }) {
+  const [notes, setNotes] = useState("");
+  const [saved, setSaved] = useState(true);
+
+  useEffect(() => { setNotes(loadMissionNotes(missionId)); setSaved(true); }, [missionId]);
+  useEffect(() => {
+    if (saved) return;
+    const timer = window.setTimeout(() => { saveMissionNotes(missionId, notes); setSaved(true); }, 500);
+    return () => window.clearTimeout(timer);
+  }, [notes, saved, missionId]);
+
+  return (
+    <section className="mission-notes-panel" aria-label="Espace de travail · notes">
+      <header>
+        <div>
+          <span className="eyebrow">ESPACE DE TRAVAIL</span>
+          <strong>Bloc-notes de la mission</strong>
+        </div>
+        <span className={`notes-save-state${saved ? " saved" : ""}`}>{saved ? "✓ Enregistré" : "Enregistrement…"}</span>
+      </header>
+      <textarea
+        value={notes}
+        onChange={(event) => { setNotes(event.target.value); setSaved(false); }}
+        onBlur={() => { saveMissionNotes(missionId, notes); setSaved(true); }}
+        rows={8}
+        maxLength={20000}
+        placeholder="Contexte, étapes, liens, checklist, décisions… Tout ce qui t'aide à avancer sur cette tâche."
+      />
+    </section>
+  );
+}
+
+function InspectStep({
+  data,
+  result,
+  policy
+}: {
+  data: MissionInspectorData | null;
+  result: MissionResultView | null;
+  policy: MissionUiPolicy | null;
+}) {
+  return (
+    <div className="agent-modal-body">
+      <section className="agent-modal-context" aria-label="Contexte de la mission">
+        <div className={`inspector-status ${data?.mission.state.toLowerCase() ?? "loading"}`}>
+          <i />
+          <span>
+            <small>État mission</small>
+            <strong>{data?.mission.state ?? "Chargement"}</strong>
+          </span>
+        </div>
+        <dl>
+          <div><dt>Type</dt><dd>{data?.mission.executionKind ?? "-"}</dd></div>
+          <div><dt>Version mission</dt><dd>{data?.mission.version ?? "-"}</dd></div>
+          <div><dt>Config agent</dt><dd>{data?.config ? `v${data.config.version}` : "Non activée"}</dd></div>
+          <div><dt>Workspace</dt><dd>{data?.config?.workspaceId ?? "Non assigné"}</dd></div>
+          <div><dt>Modèle</dt><dd>{data?.config?.modelId ?? "Non configuré"}</dd></div>
+          <div><dt>Dernier run</dt><dd>{result?.latestRunId ?? "Aucun"}</dd></div>
+          <div><dt>État run</dt><dd>{result?.latestRunState ?? "-"}</dd></div>
+        </dl>
+        <section className="inspector-prompt">
+          <span>Mission confiée</span>
+          <p>{data?.config?.missionPrompt || "Aucun prompt configuré."}</p>
+        </section>
+      </section>
+      <section className="agent-modal-delivery" aria-label="Résumé mission">
+        <div className={`agent-result-card ${data?.mission.state.toLowerCase() ?? "idle"}`}>
+          <span className="eyebrow">{policy?.phaseLabel.toUpperCase() ?? "MISSION"}</span>
+          <h3>{policy?.headline ?? "Chargement"}</h3>
+          <p>{policy?.description ?? "Lecture de l'état mission..."}</p>
+        </div>
+        {data?.mission && <MissionNotesPanel missionId={data.mission.id} />}
+        {policy?.showResultPanel && (
+          <section className="mission-result-panel" aria-label="Résultat produit">
+            <header>
+              <div>
+                <span className="eyebrow">RÉSULTAT PRODUIT</span>
+                <strong>{result?.hasStructuredDelivery ? "Delivery structurée" : "Fallback conversation"}</strong>
+              </div>
+              {result?.latestRunId && <code>{result.latestRunId}</code>}
+            </header>
+            <pre>{result?.assistantMessage || "Aucun message assistant exploitable pour l'instant."}</pre>
+          </section>
+        )}
+        {policy?.showValidationActions && !result?.hasStructuredDelivery && (
+          <p className="mission-result-warning">Cette mission attend une validation, mais aucun objet delivery structuré n'existe encore. Le résultat affiché vient du dernier message assistant.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ConfigureStep({
+  form,
+  providerOptions,
+  selectedProvider,
+  reasoningOptions,
+  sequenceCandidates,
+  onPatch,
+  onProviderChange,
+  onTogglePrerequisite
+}: {
+  form: InspectorForm;
+  providerOptions: ProviderOptionsCatalog | null;
+  selectedProvider: ProviderOptionsCatalog["providers"][number] | undefined;
+  reasoningOptions: ProviderReasoningEffort[];
+  sequenceCandidates: MissionView[];
+  onPatch(patch: Partial<InspectorForm>): void;
+  onProviderChange(providerId: string): void;
+  onTogglePrerequisite(missionId: string): void;
+}) {
+  return (
+    <div className="mission-config-scroll">
+      <div className="mission-config-intro">
+        <div>
+          <span className="eyebrow">RÉGLAGES DE MISSION</span>
+          <h3>Modifier l'agent, le workspace et la séquence</h3>
+        </div>
+        <span>PRÊT À AJUSTER</span>
+      </div>
+
+      <label>
+        Prompt agent
+        <textarea value={form.missionPrompt} onChange={(event) => onPatch({ missionPrompt: event.target.value })} rows={8} />
+      </label>
+
+      <section className="mission-config-agent">
+        <div className="mission-config-grid agent-options">
+          <label>
+            Moteur
+            <select value={form.providerId} onChange={(event) => onProviderChange(event.target.value)}>
+              {providerOptions?.providers.map((provider) => <option value={provider.id} key={provider.id}>{provider.label}</option>)}
+            </select>
+          </label>
+          <label>
+            Modèle
+            <select value={form.modelId} onChange={(event) => onPatch({ modelId: event.target.value })}>
+              {selectedProvider?.models.map((model) => <option value={model.id} key={model.id}>{model.label}</option>)}
+            </select>
+          </label>
+          <label>
+            Réflexion
+            <select value={form.reasoningEffort} onChange={(event) => onPatch({ reasoningEffort: event.target.value as ProviderReasoningEffort })}>
+              {reasoningOptions.map((effort) => <option value={effort} key={effort}>{reasoningLabels[effort] ?? effort}</option>)}
+            </select>
+          </label>
+          <label>
+            Permissions
+            <select value={form.permissionPreset} onChange={(event) => onPatch({ permissionPreset: event.target.value as InspectorForm["permissionPreset"] })}>
+              {providerOptions?.permissionPresets.map((preset) => <option value={preset} key={preset}>{permissionLabels[preset] ?? preset}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <WorkspaceModeEditor form={form} onPatch={onPatch} />
+      </section>
+
+      <section className="task-sequence-picker">
+        <div className="task-sequence-head">
+          <div>
+            <span className="eyebrow">SÉQUENCE PIPELINE</span>
+            <strong>Pré-requis avant cette mission</strong>
+          </div>
+          <span className="task-sequence-count">{form.prerequisiteMissionIds.length}</span>
+        </div>
+        <div className="task-sequence-list">
+          {sequenceCandidates.slice(0, 12).map((mission) => (
+            <button
+              type="button"
+              className={form.prerequisiteMissionIds.includes(mission.id) ? "selected" : ""}
+              onClick={() => onTogglePrerequisite(mission.id)}
+              key={mission.id}
+            >
+              <strong>{mission.title}</strong>
+              <small>{mission.state} · {mission.executionKind}</small>
+            </button>
+          ))}
+          {!sequenceCandidates.length && <p className="empty">Aucune autre mission disponible.</p>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function WorkspaceModeEditor({ form, onPatch }: { form: InspectorForm; onPatch(patch: Partial<InspectorForm>): void }) {
+  const generatedScratchPath = workspacePathFromName(form.workspaceName || form.missionPrompt.slice(0, 40) || "workspace");
+  return (
+    <div className="workspace-mode-field">
+      <fieldset className="workspace-mode-picker">
+        <legend>Terrain de travail</legend>
+        {[
+          ["repo", "Dépôt existant", "Travaille dans un dossier ou repo existant."],
+          ["scratch", "Workspace neuf", "Génère un dossier managé."],
+          ["worktree", "Git worktree", "Crée une branche isolée depuis un workspace source."]
+        ].map(([kind, title, description]) => (
+          <button type="button" className={form.workspaceKind === kind ? "active" : ""} onClick={() => onPatch({ workspaceKind: kind as WorkspaceDraftKind })} key={kind}>
+            <strong>{title}</strong>
+            <small>{description}</small>
+          </button>
+        ))}
+      </fieldset>
+
+      {form.workspaceKind === "repo" && (
+        <label>
+          Dossier dépôt
+          <input value={form.workspacePath} onChange={(event) => onPatch({ workspacePath: event.target.value })} placeholder="/Users/.../repo-ou-folder" />
+        </label>
+      )}
+      {form.workspaceKind === "scratch" && (
+        <div className="mission-config-grid identity">
+          <label>
+            Nom du workspace
+            <input value={form.workspaceName} onChange={(event) => onPatch({ workspaceName: event.target.value })} placeholder="nom du folder" />
+          </label>
+          <label>
+            Dossier généré
+            <input value={generatedScratchPath} readOnly />
+          </label>
+        </div>
+      )}
+      {form.workspaceKind === "worktree" && (
+        <div className="mission-config-grid identity">
+          <label>
+            Dépôt Git source
+            <input value={form.sourceRepositoryPath} onChange={(event) => onPatch({ sourceRepositoryPath: event.target.value })} placeholder="/Users/.../repo-source" />
+          </label>
+          <label>
+            Révision de base optionnelle
+            <input value={form.baseRef} onChange={(event) => onPatch({ baseRef: event.target.value })} placeholder="HEAD, main ou SHA" />
+          </label>
+          <label>
+            Branche
+            <input value={form.branchName} onChange={(event) => onPatch({ branchName: event.target.value })} placeholder="nodra/ma-mission" />
+          </label>
+          <label>
+            Chemin worktree optionnel
+            <input value={form.workspacePath} onChange={(event) => onPatch({ workspacePath: event.target.value })} placeholder="Généré par Nodra si vide" />
+          </label>
+        </div>
+      )}
+      <div className="mission-config-grid identity">
+        <label>
+          Target ref
+          <input value={form.integrationTargetRef} onChange={(event) => onPatch({ integrationTargetRef: event.target.value })} placeholder="optionnel" />
+        </label>
+        <label className="toggle-label">
+          Auto commit
+          <input type="checkbox" checked={form.autoCommitAuthorized} onChange={(event) => onPatch({ autoCommitAuthorized: event.target.checked })} />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+async function createWorkspaceFromForm(form: InspectorForm, fallbackName: string) {
+  if (form.workspaceKind === "repo") {
+    if (!form.workspacePath.trim()) {
+      return createWorkspace({ kind: "scratch", path: workspacePathFromName(form.workspaceName || fallbackName) });
+    }
+    return createWorkspace({ kind: "repo", path: form.workspacePath });
+  }
+  if (form.workspaceKind === "scratch") {
+    return createWorkspace({ kind: "scratch", path: workspacePathFromName(form.workspaceName || fallbackName) });
+  }
+  if (!form.sourceWorkspaceId && !form.sourceRepositoryPath.trim()) {
+    throw new Error("Choisis un dépôt Git source pour créer un worktree.");
+  }
+  return createWorkspace({
+    kind: "worktree",
+    ...(form.workspacePath.trim() ? { path: form.workspacePath.trim() } : {}),
+    ...(form.sourceWorkspaceId ? { sourceWorkspaceId: form.sourceWorkspaceId } : { sourceRepositoryPath: form.sourceRepositoryPath }),
+    baseRef: form.baseRef || "HEAD",
+    branchName: form.branchName || `nodra/${fallbackName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`,
+    integrationTargetRef: form.integrationTargetRef || null
+  });
+}
+
+function formFrom(data: MissionInspectorData, catalog: ProviderOptionsCatalog | null): InspectorForm | null {
+  const config = data.config;
+  if (!config) return null;
+  const providerId = config.providerId ?? catalog?.defaults.providerId ?? "opencode";
+  const titleSlug = data.mission.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return {
+    providerId,
+    modelId: config.modelId ?? (catalog ? selectDefaultModel(catalog, providerId) : "default"),
+    reasoningEffort: config.reasoningEffort ?? catalog?.defaults.reasoningEffort ?? "provider_default",
+    missionPrompt: config.missionPrompt,
+    permissionPreset: config.permissionPreset ?? catalog?.defaults.permissionPreset ?? "workspace",
+    workspaceId: config.workspaceId ?? "",
+    autoCommitAuthorized: config.autoCommitAuthorized,
+    integrationTargetRef: config.integrationTargetRef ?? "",
+    workspaceKind: "scratch",
+    workspacePath: "",
+    workspaceName: titleSlug,
+    sourceWorkspaceId: config.workspaceId ?? "",
+    sourceRepositoryPath: "",
+    baseRef: "HEAD",
+    branchName: `nodra/${titleSlug || data.mission.id}`,
+    prerequisiteMissionIds: []
+  };
+}

@@ -25,6 +25,13 @@ export interface OpenCodeProviderAdapterOptions {
   executionTimeoutMs?: number;
 }
 
+interface OpenCodePromptRequest {
+  cwd: string;
+  modelId: string;
+  reasoningEffort: ProviderReasoningEffort;
+  text: string;
+}
+
 export class OpenCodeProviderAdapter implements ProviderPort {
   readonly providerId = "opencode";
   private readonly baseUrl: string;
@@ -113,7 +120,13 @@ export class OpenCodeProviderAdapter implements ProviderPort {
           throwOnError: true
         })).data;
     const stopEvents = new AbortController();
-    this.supervisor.attach(input.runId, { sessionId: session.id, stopEvents });
+    this.supervisor.attach(input.runId, {
+      sessionId: session.id,
+      cwd: input.cwd,
+      modelId: input.modelId,
+      reasoningEffort: input.reasoningEffort,
+      stopEvents
+    });
     await sink.session(session.id);
     const runRef = `${session.id}/${input.runId}`;
     await sink.runRef(runRef);
@@ -130,8 +143,12 @@ export class OpenCodeProviderAdapter implements ProviderPort {
       stopEvents.signal
     );
     try {
-      const model = this.parseModelId(input.modelId);
-      await this.promptAsync(session.id, input, model);
+      await this.promptAsync(session.id, {
+        cwd: input.cwd,
+        modelId: input.modelId,
+        reasoningEffort: input.reasoningEffort,
+        text: input.prompt
+      });
       let timeout: NodeJS.Timeout | undefined;
 
       try {
@@ -186,8 +203,15 @@ export class OpenCodeProviderAdapter implements ProviderPort {
     if (result.data !== true) throw new Error("OpenCode session abort was not acknowledged");
   }
 
-  async steer(_runId: string, _text: string): Promise<void> {
-    throw new Error("OpenCode steer is unavailable: opencode_steer_not_certified_i8");
+  async steer(runId: string, text: string): Promise<void> {
+    const active = this.supervisor.get(runId);
+    if (!active) throw new Error("No active OpenCode session is available");
+    await this.promptAsync(active.sessionId, {
+      cwd: active.cwd,
+      modelId: active.modelId,
+      reasoningEffort: active.reasoningEffort,
+      text
+    });
   }
 
   private async consumeEvents(
@@ -296,10 +320,10 @@ export class OpenCodeProviderAdapter implements ProviderPort {
 
   private async promptAsync(
     sessionId: string,
-    input: ProviderRunConfiguration,
-    model: { providerID: string; modelID: string }
+    request: OpenCodePromptRequest
   ): Promise<void> {
-    const query = new URLSearchParams({ directory: input.cwd });
+    const model = this.parseModelId(request.modelId);
+    const query = new URLSearchParams({ directory: request.cwd });
     const response = await this.fetchImplementation(
       `${this.baseUrl}/session/${encodeURIComponent(sessionId)}/prompt_async?${query}`,
       {
@@ -307,13 +331,13 @@ export class OpenCodeProviderAdapter implements ProviderPort {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           model,
-          ...(input.reasoningEffort === "provider_default"
+          ...(request.reasoningEffort === "provider_default"
             ? {}
-            : { variant: input.reasoningEffort }),
+            : { variant: request.reasoningEffort }),
           parts: [
             {
               type: "text",
-              text: input.prompt
+              text: request.text
             }
           ]
         })
@@ -399,9 +423,9 @@ export class OpenCodeProviderAdapter implements ProviderPort {
       cancel: capability(ready, reason),
       resume: capability(ready, reason),
       steer: {
-        available: false,
-        reason: "opencode_steer_not_certified_i8",
-        mode: "none"
+        available: ready,
+        reason,
+        mode: ready ? "immediate" : "none"
       },
       usage: {
         available: false,

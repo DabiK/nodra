@@ -57,7 +57,7 @@ describe("LocalWorkspaceAdapter", () => {
     expect(snapshot.treeDigest).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("refuses traversal, symlink escape, subdirectory repositories and existing targets", async () => {
+  it("refuses traversal, symlink escape and existing targets", async () => {
     await expect(adapter.createScratch(join(managedRoot, "..", "escape"))).rejects.toMatchObject({
       code: "WORKSPACE_PATH_CONFLICT"
     });
@@ -71,8 +71,8 @@ describe("LocalWorkspaceAdapter", () => {
       canonicalPath: repositoryPath
     });
     await exec("mkdir", [join(repositoryPath, "subdirectory")]);
-    await expect(adapter.inspectRepository(join(repositoryPath, "subdirectory"))).rejects.toMatchObject({
-      code: "WORKSPACE_PATH_CONFLICT"
+    await expect(adapter.inspectRepository(join(repositoryPath, "subdirectory"))).resolves.toMatchObject({
+      canonicalPath: repositoryPath
     });
     await writeFile(join(managedRoot, "occupied"), "do not overwrite");
     await expect(adapter.createScratch(join(managedRoot, "occupied"))).rejects.toMatchObject({

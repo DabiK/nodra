@@ -31,6 +31,7 @@ import {
 } from "@nodra/adapters";
 import {
   AdvancePipeline,
+  ApprovePipelineNodeTransition,
   ChangeMissionState,
   CancelRun,
   CommitWorkspace,
@@ -58,6 +59,7 @@ import {
   ShowMission,
   ShowPipeline,
   ShowPipelineRun,
+  SetPipelineNodeTransitionMode,
   SnapshotWorkspace,
   StartMission,
   StartPipeline,
@@ -65,6 +67,7 @@ import {
   ProbeProvider,
   ProviderRegistry,
   PreviewAgentConfig,
+  PublishPipelineNodeHandover,
   ResolveAgentConfig,
   SmokeProvider,
   StructuredGateEvaluatorRegistry,
@@ -185,6 +188,9 @@ export const runCli = async (
           new ShowPipelineRun(pipelineRepository),
           new StartPipeline(pipelineRepository),
           new AdvancePipeline(pipelineRepository),
+          new SetPipelineNodeTransitionMode(pipelineRepository),
+          new ApprovePipelineNodeTransition(pipelineRepository),
+          new PublishPipelineNodeHandover(pipelineRepository),
           new ShowMission(readModel),
           new StartMission(
             repository,

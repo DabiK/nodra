@@ -9,11 +9,13 @@
     "packages/adapters",
     "apps/api",
     "apps/cli",
+    "apps/web",
     "apps/worker"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev": "npm run dev -w @nodra/api",
+    "web": "npm run dev -w @nodra/web",
     "cli": "npm run dev -w @nodra/cli --",
     "start": "npm run start -w @nodra/api",
     "worker": "npm run start -w @nodra/worker",

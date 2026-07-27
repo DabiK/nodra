@@ -7,6 +7,7 @@ export type PipelineNodeRunState = "pending" | "ready" | "active" | "blocked" | 
 export interface PipelineNodeInput {
   nodeKey: string;
   missionId: Id;
+  transitionMode?: "auto" | "human";
 }
 
 export interface PipelineEdgeInput {
@@ -53,11 +54,29 @@ export interface PipelineRunView {
     missionKind: string;
     missionState: string;
     state: PipelineNodeRunState;
+    transitionMode: "auto" | "human";
     userAttempt: number;
+    handovers: Array<{
+      fromNodeKey: string;
+      payload: unknown;
+    }>;
   }>;
 }
 
 export interface PipelineAdvanceResult {
   pipelineRun: PipelineRunView;
   startedMissionIds: Id[];
+}
+
+export interface PipelineTransitionModeResult {
+  pipelineRun: PipelineRunView;
+}
+
+export interface PipelineTransitionApprovalResult {
+  pipelineRun: PipelineRunView;
+}
+
+export interface PipelineHandoverPublishResult {
+  pipelineRun: PipelineRunView;
+  handoverCount: number;
 }

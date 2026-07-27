@@ -14,6 +14,7 @@ export interface PersistMissionStartInput {
   context: CommandContext;
   providerCatalogSnapshot?: ProviderCatalogSnapshot;
   resolvedConfig?: ResolvedAgentConfig;
+  reuseProviderSession?: boolean;
 }
 
 export interface MissionExecutionRepository {

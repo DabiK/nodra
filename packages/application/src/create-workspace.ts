@@ -25,16 +25,24 @@ export class CreateWorkspace {
     if (replay) return replay;
     if (!input.path.trim()) throw new DomainError("Workspace path is required", "REQUEST_INVALID");
     if (input.kind === "repo") {
-      const identity = await this.workspace.inspectRepository(input.path);
-      const snapshot = await this.workspace.snapshot(identity.canonicalPath);
+      const fallbackPath = await this.workspace.canonicalizeExisting(input.path);
+      let identity: Awaited<ReturnType<WorkspacePort["inspectRepository"]>> | null = null;
+      let snapshot: Awaited<ReturnType<WorkspacePort["snapshot"]>> | null = null;
+      try {
+        identity = await this.workspace.inspectRepository(input.path);
+        snapshot = await this.workspace.snapshot(identity.canonicalPath);
+      } catch {
+        identity = null;
+        snapshot = null;
+      }
       return this.repository.create({
         id: input.id,
         projectId: input.projectId ?? null,
         kind: input.kind,
-        path: identity.canonicalPath,
+        path: identity?.canonicalPath ?? fallbackPath,
         repository: identity,
-        baseRef: identity.head,
-        branchName: identity.branchName,
+        baseRef: identity?.head ?? null,
+        branchName: identity?.branchName ?? null,
         integrationTargetRef: input.integrationTargetRef ?? null,
         snapshot,
         context: input.context
@@ -44,7 +52,13 @@ export class CreateWorkspace {
       if (input.sourceWorkspaceId || input.baseRef || input.branchName) {
         throw new DomainError("Scratch workspace cannot have Git source options", "REQUEST_INVALID");
       }
-      const path = await this.workspace.createScratch(input.path);
+      let path: string;
+      try {
+        path = await this.workspace.createScratch(input.path);
+      } catch (error) {
+        if (!(error instanceof DomainError) || error.code !== "WORKSPACE_PATH_CONFLICT") throw error;
+        path = await this.workspace.canonicalizeExisting(input.path);
+      }
       return this.repository.create({
         id: input.id,
         projectId: input.projectId ?? null,

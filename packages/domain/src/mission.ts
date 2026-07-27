@@ -109,11 +109,11 @@ export class Mission {
 
   close(now: string): void {
     this.requireHuman("Only a human mission can be closed without acceptance evidence");
-    this.transitionFrom(["DRAFT", "READY"], "DONE", now);
+    this.transitionFrom(["DRAFT", "READY", "ACTIVE"], "DONE", now);
   }
 
   abandon(now: string): void {
-    this.transitionFrom(["DRAFT", "READY", "BLOCKED"], "ABANDONED", now);
+    this.transitionFrom(["DRAFT", "READY", "BLOCKED", "VALIDATION"], "ABANDONED", now);
   }
 
   submitForValidation(now: string, submission: ValidationSubmission): void {

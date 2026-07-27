@@ -72,3 +72,6 @@ export {
 export { SqliteProviderRunStore } from "./sqlite/sqlite-provider-run-store.js";
 export { SqliteProviderPermissionHandler } from "./sqlite/sqlite-provider-permission-handler.js";
 export * from "./sqlite/sqlite-agent-config-repository.js";
+export { conversations, conversationItems } from "./sqlite/schema/conversations.js";
+export { providerEvents } from "./sqlite/schema/provider-events.js";
+export { runConfigSnapshots, runs } from "./sqlite/schema/runs.js";

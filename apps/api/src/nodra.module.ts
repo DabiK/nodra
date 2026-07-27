@@ -34,6 +34,7 @@ import {
 import {
   ChangeMissionState,
   AdvancePipeline,
+  ApprovePipelineNodeTransition,
   CancelRun,
   CatalogProviderHealthProbe,
   CommitWorkspace,
@@ -59,12 +60,14 @@ import {
   ReconcileWorkflows,
   ShowPipeline,
   ShowPipelineRun,
+  SetPipelineNodeTransitionMode,
   ShowMission,
   SnapshotWorkspace,
   StartMission,
   StartPipeline,
   SteerRun,
   ProbeProvider,
+  PublishPipelineNodeHandover,
   ProviderRegistry,
   PreviewAgentConfig,
   ResolveAgentConfig,
@@ -74,12 +77,14 @@ import {
   UpdateAgentConfig
 } from "@nodra/application";
 import { ApprovalController } from "./approval.controller.js";
+import { AgentSessionController } from "./agent-session.controller.js";
 import { BusinessErrorFilter } from "./business-error.filter.js";
 import { DatabaseLifecycle } from "./database-lifecycle.js";
 import { DeliveryController } from "./delivery.controller.js";
 import { ConfirmationController } from "./confirmation.controller.js";
 import { EvidenceController } from "./evidence.controller.js";
 import { GateController } from "./gate.controller.js";
+import { FolderController } from "./folder.controller.js";
 import { HealthController } from "./health.controller.js";
 import { MissionController } from "./mission.controller.js";
 import { RelayController } from "./relay.controller.js";
@@ -92,6 +97,7 @@ import { RunController } from "./run.controller.js";
 import {
   AGENT_CONFIG_REPOSITORY,
   ADVANCE_PIPELINE,
+  APPROVE_PIPELINE_NODE_TRANSITION,
   CANCEL_RUN,
   CHANGE_MISSION_STATE,
   COLLECT_EVIDENCE,
@@ -112,6 +118,7 @@ import {
   MANAGE_DELIVERY,
   MANAGE_GATES,
   PROBE_PROVIDER,
+  PUBLISH_PIPELINE_NODE_HANDOVER,
   PROVIDER_CATALOG,
   PROVIDER_REGISTRY,
   READ_EVIDENCE,
@@ -122,6 +129,7 @@ import {
   SHOW_MISSION,
   SHOW_PIPELINE,
   SHOW_PIPELINE_RUN,
+  SET_PIPELINE_NODE_TRANSITION_MODE,
   SNAPSHOT_WORKSPACE,
   START_MISSION,
   START_PIPELINE,
@@ -149,7 +157,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController, PipelineController],
+      controllers: [HealthController, MissionController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController, PipelineController],
       providers: [
         {
           provide: DATABASE,
@@ -441,6 +449,21 @@ export class NodraModule {
           provide: ADVANCE_PIPELINE,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new AdvancePipeline(new SqlitePipelineRepository(database))
+        },
+        {
+          provide: SET_PIPELINE_NODE_TRANSITION_MODE,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new SetPipelineNodeTransitionMode(new SqlitePipelineRepository(database))
+        },
+        {
+          provide: APPROVE_PIPELINE_NODE_TRANSITION,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ApprovePipelineNodeTransition(new SqlitePipelineRepository(database))
+        },
+        {
+          provide: PUBLISH_PIPELINE_NODE_HANDOVER,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new PublishPipelineNodeHandover(new SqlitePipelineRepository(database))
         },
         {
           provide: GET_RELAY,

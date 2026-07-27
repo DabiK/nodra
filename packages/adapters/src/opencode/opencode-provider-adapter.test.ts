@@ -95,7 +95,7 @@ describe("OpenCodeProviderAdapter", () => {
         start: { available: true },
         events: { available: true },
         cancel: { available: true },
-        steer: { available: false, reason: "opencode_steer_not_certified_i8" }
+        steer: { available: true, mode: "immediate" }
       }
     });
     expect(result.contractDigest).toMatch(/^[a-f0-9]{64}$/);
@@ -182,7 +182,39 @@ describe("OpenCodeProviderAdapter", () => {
     expect(promptBodies[0]).not.toHaveProperty("messageID");
   });
 
-  const fixtureServer = async (requests: string[], promptBodies: Array<Record<string, unknown>> = []): Promise<string> => {
+  it("forwards steer text through prompt_async on the active OpenCode session", async () => {
+    const requests: string[] = [];
+    const promptBodies: Array<Record<string, unknown>> = [];
+    const adapter = new OpenCodeProviderAdapter({ baseUrl: await fixtureServer(requests, promptBodies, { terminalAfterPrompts: 2 }) });
+    const run = adapter.execute({
+      runId: asId("run-forward"),
+      providerId: "opencode",
+      modelId: "local-engine/gemma3:4b",
+      reasoningEffort: "provider_default",
+      prompt: "Initial prompt",
+      cwd: "/workspace",
+      permissionPreset: "read_only",
+      capabilityVersion: "fixture",
+      contractStatus: "compatible_unverified",
+      session: null
+    }, {
+      session: async () => undefined,
+      runRef: async () => undefined,
+      event: async () => undefined,
+      permission: async () => "denied"
+    });
+    await waitFor(() => promptBodies.length === 1);
+    await adapter.steer("run-forward", "Queued follow-up");
+    await run;
+    expect(promptBodies.map((body) => (body.parts as Array<{ text: string }>)[0]?.text))
+      .toEqual(["Initial prompt", "Queued follow-up"]);
+  });
+
+  const fixtureServer = async (
+    requests: string[],
+    promptBodies: Array<Record<string, unknown>> = [],
+    options: { terminalAfterPrompts?: number } = {}
+  ): Promise<string> => {
     let eventResponse: ServerResponse | undefined;
     const server = createServer(async (request, response) => {
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -234,6 +266,7 @@ describe("OpenCodeProviderAdapter", () => {
         }
 
         promptBodies.push(body);
+        const shouldTerminate = promptBodies.length >= (options.terminalAfterPrompts ?? 1);
 
         if (typeof body.variant === "string") {
           requests.push(`VARIANT ${body.variant}`);
@@ -270,7 +303,7 @@ describe("OpenCodeProviderAdapter", () => {
               time: { created: 1 }
             }
           });
-          send({ type: "session.idle", properties: { sessionID: session.id } });
+          if (shouldTerminate) send({ type: "session.idle", properties: { sessionID: session.id } });
         });
         return;
       }
@@ -330,3 +363,11 @@ const json = (response: ServerResponse, value: unknown): void => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+const waitFor = async (predicate: () => boolean): Promise<void> => {
+  const deadline = Date.now() + 1_000;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("Timed out waiting for condition");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+};

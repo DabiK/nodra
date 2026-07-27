@@ -82,7 +82,7 @@ describe("SqliteMissionExecutionRepository", () => {
     seedReadyAgent();
     await executeStart();
     expect(database.orm.select().from(missions).where(eq(missions.id, "mission-agent")).get())
-      .toMatchObject({ state: "ACTIVE", version: 2, temporalParentWorkflowId: "mission/mission-agent" });
+      .toMatchObject({ state: "ACTIVE", version: 2, temporalParentWorkflowId: "mission/mission-agent/run/run-mission-agent" });
     expect(database.orm.select().from(conversations).all()).toHaveLength(1);
     expect(database.orm.select().from(runs).all()).toEqual([
       expect.objectContaining({ id: "run-mission-agent", state: "QUEUED", temporalWorkflowId: "run/run-mission-agent" })
@@ -95,7 +95,7 @@ describe("SqliteMissionExecutionRepository", () => {
     expect(database.orm.select().from(workspaces).where(eq(workspaces.id, "workspace-mission-agent")).get())
       .toMatchObject({ state: "in_use" });
     expect(database.orm.select().from(outbox).where(eq(outbox.kind, "workflow.mission.start")).all())
-      .toEqual([expect.objectContaining({ dedupeKey: "mission/mission-agent", publishedAt: null })]);
+      .toEqual([expect.objectContaining({ dedupeKey: "mission/mission-agent/run/run-mission-agent", publishedAt: null })]);
     expect(database.orm.select().from(relayItems).where(eq(relayItems.missionId, "mission-agent")).get())
       .toMatchObject({ queue: "active", reasonCode: "workflow_dispatch_pending" });
   });

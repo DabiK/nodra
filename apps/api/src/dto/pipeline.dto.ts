@@ -57,3 +57,12 @@ export class AdvancePipelineDto {
   @IsString()
   commandId?: string;
 }
+
+export class SetPipelineTransitionModeDto {
+  @IsString()
+  mode!: "auto" | "human";
+
+  @IsOptional()
+  @IsString()
+  commandId?: string;
+}

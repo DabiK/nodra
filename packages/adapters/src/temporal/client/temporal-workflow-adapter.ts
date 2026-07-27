@@ -16,7 +16,7 @@ export class TemporalWorkflowAdapter implements WorkflowPort {
   constructor(private readonly client: WorkflowClient) {}
 
   async start(input: StartMissionInput): Promise<{ workflowId: string; runId: string }> {
-    const workflowId = `mission/${input.missionId}`;
+    const workflowId = `mission/${input.missionId}/run/${input.runId}`;
     try {
       const handle = await this.client.start(MISSION_WORKFLOW_NAME, {
         taskQueue: MISSION_TASK_QUEUE,

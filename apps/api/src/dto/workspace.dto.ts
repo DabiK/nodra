@@ -4,8 +4,9 @@ export class CreateWorkspaceDto {
   @IsOptional() @IsString() id?: string;
   @IsOptional() @IsString() projectId?: string;
   @IsIn(["repo", "scratch", "worktree"]) kind!: "repo" | "scratch" | "worktree";
-  @IsString() @IsNotEmpty() @Matches(/\S/) path!: string;
+  @IsOptional() @IsString() @IsNotEmpty() @Matches(/\S/) path?: string;
   @IsOptional() @IsString() sourceWorkspaceId?: string;
+  @IsOptional() @IsString() sourceRepositoryPath?: string;
   @IsOptional() @IsString() baseRef?: string;
   @IsOptional() @IsString() branchName?: string;
   @IsOptional() @IsString() integrationTargetRef?: string | null;

@@ -1,4 +1,4 @@
-import { asId, DomainError, type Id, type Mission, type MissionSnapshot } from "@nodra/domain";
+import { asId, DomainError, type AgentBlockReason, type Id, type Mission, type MissionSnapshot } from "@nodra/domain";
 import type { CommandContext } from "./command-context.js";
 import type { MissionRelayRecord, MissionRepository, RelayQueue } from "./mission-repository.js";
 import type { ResolveAgentConfig } from "./resolve-agent-config.js";
@@ -8,6 +8,8 @@ export type HumanMissionAction =
   | { type: "pickup" }
   | { type: "block"; reason: string }
   | { type: "resume" }
+  | { type: "request-correction" }
+  | { type: "accept" }
   | { type: "close" }
   | { type: "abandon" };
 
@@ -23,6 +25,8 @@ const eventTypes: Record<HumanMissionAction["type"], string> = {
   pickup: "MISSION_PICKED_UP",
   block: "MISSION_BLOCKED",
   resume: "MISSION_RESUMED",
+  "request-correction": "MISSION_CORRECTION_REQUESTED",
+  accept: "MISSION_ACCEPTED",
   close: "MISSION_CLOSED",
   abandon: "MISSION_ABANDONED"
 };
@@ -86,7 +90,7 @@ export class ChangeMissionState {
       outbox: {
         id: asId(`outbox/${input.context.commandId}`),
         kind: "mission.changed",
-        dedupeKey: `mission/${after.id}/version/${after.version}`,
+        dedupeKey: `mission/${after.id}/version/${after.version}/${input.action.type}`,
         payload: { ...payload, missionId: after.id },
         createdAt: input.context.occurredAt
       },
@@ -98,8 +102,19 @@ export class ChangeMissionState {
   private apply(mission: Mission, action: HumanMissionAction, now: string): void {
     if (action.type === "prepare") mission.prepare(now);
     else if (action.type === "pickup") mission.pickup(now);
-    else if (action.type === "block") mission.block(now, action.reason);
+    else if (action.type === "block") {
+      if (mission.snapshot().executionKind === "agent") {
+        const agentReason: AgentBlockReason = (["dependency", "provider", "budget"] as const).includes(action.reason as AgentBlockReason)
+          ? (action.reason as AgentBlockReason)
+          : "provider";
+        mission.blockAgent(now, agentReason);
+      } else {
+        mission.block(now, action.reason);
+      }
+    }
     else if (action.type === "resume") mission.resume(now);
+    else if (action.type === "request-correction") mission.requestCorrection(now);
+    else if (action.type === "accept") mission.accept(now, { accepted: true, actor: "user" });
     else if (action.type === "close") mission.close(now);
     else mission.abandon(now);
   }

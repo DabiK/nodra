@@ -82,7 +82,7 @@ export class SqliteWorkflowOutboxStore implements WorkflowOutboxStore {
   }
 
   private validateIdentity(payload: StartPayload, dedupeKey: string): void {
-    if (dedupeKey !== `mission/${payload.missionId}`) {
+    if (dedupeKey !== `mission/${payload.missionId}/run/${payload.runId}`) {
       throw new DomainError("Workflow outbox identity is inconsistent", "OUTBOX_PAYLOAD_INVALID");
     }
     const run = this.database.orm

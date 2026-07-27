@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -50,6 +50,47 @@ describe("I5 SQLite workspace use cases", () => {
   });
 
   afterEach(() => database.close());
+
+  it("allows an existing non-git folder as an agent workspace", async () => {
+    const folder = join(root, "plain-folder");
+    await mkdir(folder);
+    const workspace = await new CreateWorkspace(repository, adapter).execute({
+      id: toId("plain-workspace"),
+      kind: "repo",
+      path: folder,
+      context: at("create-plain")
+    });
+    expect(workspace).toMatchObject({
+      id: "plain-workspace",
+      kind: "repo",
+      path: folder,
+      repository: null
+    });
+    expect(database.orm.select().from(workspaceGitSnapshots).all()).toHaveLength(0);
+    await expect(new CreateWorkspace(repository, adapter).execute({
+      id: toId("plain-workspace-reuse"),
+      kind: "repo",
+      path: folder,
+      context: at("create-plain-reuse")
+    })).resolves.toMatchObject({ id: "plain-workspace" });
+  });
+
+  it("reuses an existing scratch workspace path", async () => {
+    const scratchPath = join(root, "managed", "scratch-reuse");
+    const create = new CreateWorkspace(repository, adapter);
+    const first = await create.execute({
+      id: toId("scratch-reuse-1"),
+      kind: "scratch",
+      path: scratchPath,
+      context: at("create-scratch-reuse-1")
+    });
+    await expect(create.execute({
+      id: toId("scratch-reuse-2"),
+      kind: "scratch",
+      path: scratchPath,
+      context: at("create-scratch-reuse-2")
+    })).resolves.toMatchObject({ id: first.id });
+  });
 
   it("requires exact confirmation for commit unless mission auto-commit is authorized", async () => {
     const repositoryPath = join(root, "repository");

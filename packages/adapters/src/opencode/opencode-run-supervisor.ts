@@ -1,7 +1,11 @@
 import type { Id } from "@nodra/domain";
+import type { ProviderReasoningEffort } from "@nodra/application";
 
 export interface OpenCodeActiveRun {
   sessionId: string;
+  cwd: string;
+  modelId: string;
+  reasoningEffort: ProviderReasoningEffort;
   stopEvents: AbortController;
 }
 

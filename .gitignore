@@ -7,4 +7,5 @@ data/
 *.db
 *.db-shm
 *.db-wal
+*.tsbuildinfo
 .DS_Store

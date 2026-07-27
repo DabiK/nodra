@@ -44,9 +44,6 @@ export class LocalWorkspaceAdapter implements WorkspacePort {
     const requested = await this.real(requestedPath, "Repository path does not exist");
     const root = await this.git(requested, ["rev-parse", "--show-toplevel"]);
     const canonicalRoot = await realpath(root);
-    if (canonicalRoot !== requested) {
-      throw new DomainError("Requested path must be the repository root", "WORKSPACE_PATH_CONFLICT");
-    }
     const commonDirectory = await this.git(canonicalRoot, ["rev-parse", "--git-common-dir"]);
     const canonicalCommonDirectory = await realpath(resolve(canonicalRoot, commonDirectory));
     const head = await this.git(canonicalRoot, ["rev-parse", "--verify", "HEAD"]);

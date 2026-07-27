@@ -43,6 +43,12 @@ export class SqliteWorkspaceRepository implements WorkspaceRepository {
         ))
         .get();
       if (replay) return this.readFrom(tx, replay.aggregateId);
+      const existingPath = tx
+        .select({ id: workspaces.id })
+        .from(workspaces)
+        .where(eq(workspaces.path, input.path))
+        .get();
+      if (existingPath) return this.readFrom(tx, existingPath.id);
       tx.insert(workspaces).values({
         id: input.id,
         projectId: input.projectId,

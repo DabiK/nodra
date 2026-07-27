@@ -21,8 +21,14 @@ export class SqliteDeliveryRepository implements DeliveryRepository {
         this.fresh(tx, input.context.commandId);
         const run = tx.select({ missionId: runs.missionId }).from(runs).where(eq(runs.id, input.runId)).get();
         if (!run?.missionId) throw new DomainError("Mission run was not found", "RUN_NOT_FOUND");
-        const changed = tx.update(missions).set({ state: "VALIDATION", version: input.expectedMissionVersion + 1, updatedAt: input.context.occurredAt }).where(and(eq(missions.id, run.missionId), eq(missions.version, input.expectedMissionVersion), eq(missions.state, "ACTIVE"))).run();
-        if (changed.changes !== 1) throw new DomainError("Mission version conflict or delivery transition forbidden", "MISSION_VERSION_CONFLICT");
+        const mission = tx.select({ state: missions.state }).from(missions).where(and(eq(missions.id, run.missionId), eq(missions.version, input.expectedMissionVersion))).get();
+        if (!mission) throw new DomainError("Mission version conflict or delivery transition forbidden", "MISSION_VERSION_CONFLICT");
+        if (mission.state === "ACTIVE") {
+          const changed = tx.update(missions).set({ state: "VALIDATION", version: input.expectedMissionVersion + 1, updatedAt: input.context.occurredAt }).where(and(eq(missions.id, run.missionId), eq(missions.version, input.expectedMissionVersion), eq(missions.state, "ACTIVE"))).run();
+          if (changed.changes !== 1) throw new DomainError("Mission version conflict or delivery transition forbidden", "MISSION_VERSION_CONFLICT");
+        } else if (mission.state !== "VALIDATION") {
+          throw new DomainError("Mission delivery transition forbidden", "TRANSITION_FORBIDDEN");
+        }
         const value = { id: input.id, runId: input.runId, agentDeclaration: input.agentDeclaration.trim(), observationSummary: input.observationSummary.trim() || null, resultState: "delivered" as const, acceptedAt: null, decisionComment: null, createdAt: input.context.occurredAt, updatedAt: input.context.occurredAt };
         tx.insert(runDeliveries).values(value).run();
         tx.insert(relayItems).values({ id: `relay/mission/${run.missionId}`, missionId: run.missionId, pipelineRunId: null, queue: "decision_required", state: "unread", reasonCode: "delivery_pending", createdAt: input.context.occurredAt }).onConflictDoUpdate({ target: relayItems.id, set: { queue: "decision_required", state: "unread", reasonCode: "delivery_pending", createdAt: input.context.occurredAt, readAt: null, snoozedUntil: null, resolvedAt: null } }).run();

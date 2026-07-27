@@ -8,8 +8,9 @@ import type {
   RestoreWorkspace,
   SnapshotWorkspace,
 } from "@nodra/application";
-import { toId } from "@nodra/application";
+import { DomainError, toId } from "@nodra/application";
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 import { commandContext } from "./command-context.js";
 /* eslint-disable @typescript-eslint/consistent-type-imports */
 import { CreateWorkspaceDto } from "./dto/workspace.dto.js";
@@ -41,14 +42,16 @@ export class WorkspaceController {
   ) {}
 
   @Post()
-  create(@Body() body: CreateWorkspaceDto) {
+  async create(@Body() body: CreateWorkspaceDto) {
+    const workspaceId = body.id ?? randomUUID();
+    const sourceWorkspaceId = body.sourceWorkspaceId ?? await this.createSourceWorkspace(body);
     return this.createWorkspace.execute({
-      id: toId(body.id ?? randomUUID()),
+      id: toId(workspaceId),
       ...(body.projectId === undefined ? {} : { projectId: toId(body.projectId) }),
       kind: body.kind,
-      path: body.path,
-      ...(body.sourceWorkspaceId !== undefined
-        ? { sourceWorkspaceId: toId(body.sourceWorkspaceId) }
+      path: this.workspacePath(body.kind, workspaceId, body.path),
+      ...(sourceWorkspaceId !== undefined
+        ? { sourceWorkspaceId: toId(sourceWorkspaceId) }
         : {}),
       ...(body.baseRef !== undefined ? { baseRef: body.baseRef } : {}),
       ...(body.branchName !== undefined ? { branchName: body.branchName } : {}),
@@ -57,6 +60,27 @@ export class WorkspaceController {
         : {}),
       context: commandContext(body.commandId)
     });
+  }
+
+  private async createSourceWorkspace(body: CreateWorkspaceDto) {
+    if (body.kind !== "worktree" || !body.sourceRepositoryPath?.trim()) return undefined;
+    const sourceId = randomUUID();
+    const source = await this.createWorkspace.execute({
+      id: toId(sourceId),
+      ...(body.projectId === undefined ? {} : { projectId: toId(body.projectId) }),
+      kind: "repo",
+      path: body.sourceRepositoryPath,
+      context: commandContext(body.commandId)
+    });
+    return source.id;
+  }
+
+  private workspacePath(kind: CreateWorkspaceDto["kind"], workspaceId: string, path?: string) {
+    if (path?.trim()) return path;
+    if (kind === "repo") {
+      throw new DomainError("Workspace path is required", "REQUEST_INVALID");
+    }
+    return join(process.env.NODRA_DATA_ROOT ?? join(process.cwd(), "data", "local"), "workspaces", workspaceId);
   }
 
   @Get(":id")

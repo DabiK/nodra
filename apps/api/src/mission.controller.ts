@@ -150,6 +150,11 @@ export class MissionController {
     return this.transition(id, body, { type: "close" });
   }
 
+  @Post(":id/accept")
+  accept(@Param("id") id: string, @Body() body: MissionTransitionDto) {
+    return this.transition(id, body, { type: "accept" });
+  }
+
   @Post(":id/abandon")
   abandon(@Param("id") id: string, @Body() body: MissionTransitionDto) {
     return this.transition(id, body, { type: "abandon" });

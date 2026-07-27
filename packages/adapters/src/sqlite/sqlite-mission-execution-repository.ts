@@ -149,7 +149,7 @@ export class SqliteMissionExecutionRepository implements MissionExecutionReposit
         }
 
         const previousRun = transaction
-          .select({ userAttempt: runs.userAttempt })
+          .select({ userAttempt: runs.userAttempt, conversationId: runs.conversationId })
           .from(runs)
           .where(eq(runs.missionId, mission.id))
           .orderBy(desc(runs.userAttempt))
@@ -157,12 +157,22 @@ export class SqliteMissionExecutionRepository implements MissionExecutionReposit
           .get();
         const userAttempt = (previousRun?.userAttempt ?? 0) + 1;
 
+        let reusedSessionRef: string | null = null;
+        if (input.reuseProviderSession && previousRun?.conversationId) {
+          const previousConversation = transaction
+            .select({ providerSessionRef: conversations.providerSessionRef })
+            .from(conversations)
+            .where(eq(conversations.id, previousRun.conversationId))
+            .get();
+          reusedSessionRef = previousConversation?.providerSessionRef ?? null;
+        }
+
         transaction.insert(conversations).values({
           id: input.conversationId,
           missionId: mission.id,
           managerId: null,
           providerId: config.providerId,
-          providerSessionRef: null,
+          providerSessionRef: reusedSessionRef,
           state: "open",
           createdAt: input.context.occurredAt,
           deletedAt: null

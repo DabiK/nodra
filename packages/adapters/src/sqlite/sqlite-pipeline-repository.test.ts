@@ -7,6 +7,8 @@ import { migrateDatabase } from "./migrate-database.js";
 import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { SqlitePipelineRepository } from "./sqlite-pipeline-repository.js";
 import { missions } from "./schema/missions.js";
+import { conversationItems, conversations } from "./schema/conversations.js";
+import { runs } from "./schema/runs.js";
 import { eq, inArray } from "drizzle-orm";
 
 const now = "2026-07-26T21:00:00.000Z";
@@ -168,7 +170,128 @@ describe("SqlitePipelineRepository", () => {
       startMission: async () => undefined
     });
 
-    expect(joined.pipelineRun.nodes.find((node) => node.nodeKey === "d")?.state).toBe("ready");
+    const joinedNode = joined.pipelineRun.nodes.find((node) => node.nodeKey === "d");
+    expect(joinedNode?.state).toBe("ready");
+    expect(joinedNode?.handovers.map((handover) => handover.fromNodeKey).sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("can switch a started pipeline transition from auto to human", async () => {
+    await repository.create({
+      pipelineId: asId("pipeline-human-gate"),
+      definitionId: asId("pipeline-human-gate/definition/1"),
+      nodeIdPrefix: "pipeline-human-gate/node",
+      edgeIdPrefix: "pipeline-human-gate/edge",
+      name: "Pipeline human gate",
+      nodes: [
+        { nodeKey: "a", missionId: asId("mission-a") },
+        { nodeKey: "b", missionId: asId("mission-b") }
+      ],
+      context: context("create-human-gate")
+    });
+    await repository.start({
+      pipelineId: asId("pipeline-human-gate"),
+      pipelineRunId: asId("pipeline-run-human-gate"),
+      nodeRunIdPrefix: "pipeline-run-human-gate/node-run",
+      context: context("start-human-gate")
+    });
+    await repository.setNodeTransitionMode({
+      pipelineRunId: asId("pipeline-run-human-gate"),
+      nodeKey: "b",
+      mode: "human",
+      context: context("mode-human")
+    });
+    database.orm.update(missions).set({ state: "DONE", version: 3 }).where(eq(missions.id, "mission-a")).run();
+
+    const blocked = await repository.advance({
+      pipelineRunId: asId("pipeline-run-human-gate"),
+      context: context("advance-blocked"),
+      startMission: async () => undefined
+    });
+    expect(blocked.pipelineRun.state).toBe("blocked");
+    expect(blocked.pipelineRun.nodes.find((node) => node.nodeKey === "b")?.state).toBe("pending");
+    expect(blocked.pipelineRun.nodes.find((node) => node.nodeKey === "b")?.transitionMode).toBe("human");
+
+    const approved = await repository.approveNodeTransition({
+      pipelineRunId: asId("pipeline-run-human-gate"),
+      nodeKey: "b",
+      context: context("approve-human-gate")
+    });
+    const node = approved.pipelineRun.nodes.find((candidate) => candidate.nodeKey === "b");
+    expect(node?.state).toBe("ready");
+    expect(node?.transitionMode).toBe("auto");
+    expect(node?.handovers).toHaveLength(1);
+  });
+
+  it("publishes latest assistant message and injects aggregate handover on successor start", async () => {
+    await repository.create({
+      pipelineId: asId("pipeline-publish"),
+      definitionId: asId("pipeline-publish/definition/1"),
+      nodeIdPrefix: "pipeline-publish/node",
+      edgeIdPrefix: "pipeline-publish/edge",
+      name: "Pipeline publish",
+      nodes: [
+        { nodeKey: "a", missionId: asId("mission-a") },
+        { nodeKey: "b", missionId: asId("mission-b") }
+      ],
+      context: context("create-publish")
+    });
+    await repository.start({
+      pipelineId: asId("pipeline-publish"),
+      pipelineRunId: asId("pipeline-run-publish"),
+      nodeRunIdPrefix: "pipeline-run-publish/node-run",
+      context: context("start-publish")
+    });
+    database.orm.insert(conversations).values({
+      id: "conversation-a",
+      missionId: "mission-a",
+      managerId: null,
+      providerId: "opencode",
+      providerSessionRef: null,
+      state: "open",
+      createdAt: now,
+      deletedAt: null
+    }).run();
+    database.orm.insert(runs).values({
+      id: "run-a",
+      missionId: "mission-a",
+      managerId: null,
+      conversationId: "conversation-a",
+      userAttempt: 1,
+      state: "SUCCEEDED",
+      temporalWorkflowId: "run/run-a",
+      temporalRunId: "temporal-run-a",
+      providerId: "opencode",
+      modelId: "model",
+      reasoningEffort: "provider_default",
+      createdAt: now
+    }).run();
+    database.orm.insert(conversationItems).values({
+      id: "assistant-a",
+      conversationId: "conversation-a",
+      ordinal: 0,
+      kind: "assistant",
+      deliveryState: "acknowledged",
+      body: "HANDOVER_FROM_A",
+      providerItemRef: "assistant-a",
+      createdAt: now,
+      acknowledgedAt: now
+    }).run();
+    await repository.publishNodeHandover({
+      pipelineRunId: asId("pipeline-run-publish"),
+      nodeKey: "a",
+      context: context("publish-a")
+    });
+    database.orm.update(missions).set({ state: "DONE", version: 3 }).where(eq(missions.id, "mission-a")).run();
+    let received: string | null = null;
+    const result = await repository.advance({
+      pipelineRunId: asId("pipeline-run-publish"),
+      context: context("advance-publish"),
+      startMission: async (_missionId, handoverPrompt) => { received = handoverPrompt; }
+    });
+
+    expect(result.pipelineRun.nodes.find((node) => node.nodeKey === "b")?.handovers[0]?.payload)
+      .toMatchObject({ message: "HANDOVER_FROM_A" });
+    expect(received).toContain("HANDOVER_FROM_A");
   });
 
   it("blocks when a mission waits for human validation", async () => {

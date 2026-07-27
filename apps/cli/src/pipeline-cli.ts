@@ -1,9 +1,12 @@
 import type {
   AdvancePipeline,
+  ApprovePipelineNodeTransition,
   CreatePipeline,
+  PublishPipelineNodeHandover,
   ShowPipeline,
   ShowPipelineRun,
   ShowMission,
+  SetPipelineNodeTransitionMode,
   StartMission,
   StartPipeline
 } from "@nodra/application";
@@ -18,6 +21,9 @@ export class PipelineCli implements I4CliHandler {
     private readonly showPipelineRun: ShowPipelineRun,
     private readonly startPipeline: StartPipeline,
     private readonly advancePipeline: AdvancePipeline,
+    private readonly setTransitionMode: SetPipelineNodeTransitionMode,
+    private readonly approveTransition: ApprovePipelineNodeTransition,
+    private readonly publishHandover: PublishPipelineNodeHandover,
     private readonly showMission: ShowMission,
     private readonly startMission: StartMission
   ) {}
@@ -28,6 +34,9 @@ export class PipelineCli implements I4CliHandler {
     if (request.command === "pipeline:run:show") return this.showRun(request);
     if (request.command === "pipeline:start") return this.start(request);
     if (request.command === "pipeline:advance") return this.advance(request);
+    if (request.command === "pipeline:mode") return this.mode(request);
+    if (request.command === "pipeline:approve-transition") return this.approve(request);
+    if (request.command === "pipeline:publish-handover") return this.publish(request);
     return undefined;
   }
 
@@ -99,11 +108,42 @@ export class PipelineCli implements I4CliHandler {
     return this.advanceWithMissionStart(toId(request.args[0]), request);
   }
 
+  private mode(request: I4CliRequest) {
+    const [runId, nodeKey, mode] = request.args;
+    if (!runId || !nodeKey || (mode !== "auto" && mode !== "human") || request.args.length !== 3) this.usage();
+    return this.setTransitionMode.execute({
+      pipelineRunId: toId(runId),
+      nodeKey,
+      mode,
+      context: request.context
+    });
+  }
+
+  private approve(request: I4CliRequest) {
+    const [runId, nodeKey] = request.args;
+    if (!runId || !nodeKey || request.args.length !== 2) this.usage();
+    return this.approveTransition.execute({
+      pipelineRunId: toId(runId),
+      nodeKey,
+      context: request.context
+    });
+  }
+
+  private publish(request: I4CliRequest) {
+    const [runId, nodeKey] = request.args;
+    if (!runId || !nodeKey || request.args.length !== 2) this.usage();
+    return this.publishHandover.execute({
+      pipelineRunId: toId(runId),
+      nodeKey,
+      context: request.context
+    });
+  }
+
   private advanceWithMissionStart(pipelineRunId: ReturnType<typeof toId>, request: I4CliRequest) {
     return this.advancePipeline.execute({
       pipelineRunId,
       context: request.context,
-      startMission: async (missionId) => {
+      startMission: async (missionId, handoverPrompt) => {
         const commandId = toId(randomUUID());
         await this.startMission.execute({
           missionId,
@@ -112,6 +152,7 @@ export class PipelineCli implements I4CliHandler {
           conversationId: toId(randomUUID()),
           auditId: toId(`audit/${commandId}`),
           outboxId: toId(`outbox/${commandId}`),
+          handoverPrompt,
           context: {
             commandId,
             actor: request.context.actor,
@@ -139,7 +180,7 @@ export class PipelineCli implements I4CliHandler {
 
   private usage(): never {
     throw new DomainError(
-      "Usage: pipeline:create <name...> --node <key:missionId> --node <key:missionId> [--edge <from:to>] [--id <id>] | pipeline:show <id> | pipeline:start <id> [--run-id <id>] | pipeline:advance <runId> | pipeline:run:show <runId>",
+      "Usage: pipeline:create <name...> --node <key:missionId> --node <key:missionId> [--edge <from:to>] [--id <id>] | pipeline:show <id> | pipeline:start <id> [--run-id <id>] | pipeline:advance <runId> | pipeline:mode <runId> <nodeKey> <auto|human> | pipeline:publish-handover <runId> <nodeKey> | pipeline:approve-transition <runId> <nodeKey> | pipeline:run:show <runId>",
       "CLI_USAGE_ERROR"
     );
   }

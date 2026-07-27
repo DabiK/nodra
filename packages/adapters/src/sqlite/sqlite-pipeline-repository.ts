@@ -5,12 +5,17 @@ import type {
   PipelineRepository,
   PipelineRunView,
   PipelineView,
+  PublishPipelineNodeHandoverInput,
+  SetPipelineNodeTransitionModeInput,
+  ApprovePipelineNodeTransitionInput,
   StartPipelineInput
 } from "@nodra/application";
 import { asId, DomainError, type Id } from "@nodra/domain";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { missions } from "./schema/missions.js";
+import { conversationItems } from "./schema/conversations.js";
+import { runs } from "./schema/runs.js";
 import { businessAuditEvents, relayItems } from "./schema/operations.js";
 import {
   pipelineDefinitions,
@@ -18,7 +23,8 @@ import {
   pipelineNodeRuns,
   pipelineNodes,
   pipelineRuns,
-  pipelines
+  pipelines,
+  handovers
 } from "./schema/pipelines.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
 
@@ -56,7 +62,7 @@ export class SqlitePipelineRepository implements PipelineRepository {
           definitionId: input.definitionId,
           missionId: node.missionId,
           nodeKey: node.nodeKey,
-          startMode: "auto" as const
+          startMode: node.transitionMode ?? "auto" as const
         }));
         transaction.insert(pipelineNodes).values(nodeRows).run();
         const nodeByKey = new Map(nodeRows.map((node) => [node.nodeKey, node]));
@@ -182,7 +188,7 @@ export class SqlitePipelineRepository implements PipelineRepository {
     if (!run) throw new DomainError("Pipeline run was not found", "PIPELINE_RUN_NOT_FOUND");
     for (const node of run.nodes.filter((candidate) => candidate.state === "ready")) {
       if (node.missionKind === "agent" && node.missionState === "READY") {
-        await input.startMission(node.missionId);
+        await input.startMission(node.missionId, this.handoverPrompt(node.handovers));
         startedMissionIds.push(node.missionId);
         this.database.orm.update(pipelineNodeRuns).set({ state: "active" })
           .where(eq(pipelineNodeRuns.id, node.id)).run();
@@ -194,8 +200,84 @@ export class SqlitePipelineRepository implements PipelineRepository {
     return { pipelineRun: updated, startedMissionIds };
   }
 
+  async setNodeTransitionMode(input: SetPipelineNodeTransitionModeInput) {
+    try {
+      const row = this.nodeRunByKey(input.pipelineRunId, input.nodeKey);
+      if (!row) throw new DomainError("Pipeline node run was not found", "PIPELINE_NODE_NOT_FOUND");
+      this.database.orm.update(pipelineNodes).set({ startMode: input.mode })
+        .where(eq(pipelineNodes.id, row.node.id)).run();
+      const pipelineRun = await this.showRun(input.pipelineRunId);
+      if (!pipelineRun) throw new DomainError("Pipeline run was not found", "PIPELINE_RUN_NOT_FOUND");
+      return { pipelineRun };
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
+  async approveNodeTransition(input: ApprovePipelineNodeTransitionInput) {
+    try {
+      const row = this.nodeRunByKey(input.pipelineRunId, input.nodeKey);
+      if (!row) throw new DomainError("Pipeline node run was not found", "PIPELINE_NODE_NOT_FOUND");
+      this.database.orm.update(pipelineNodes).set({ startMode: "auto" })
+        .where(eq(pipelineNodes.id, row.node.id)).run();
+      await this.reconcile(input.pipelineRunId, input.context.occurredAt);
+      const pipelineRun = await this.showRun(input.pipelineRunId);
+      if (!pipelineRun) throw new DomainError("Pipeline run was not found", "PIPELINE_RUN_NOT_FOUND");
+      return { pipelineRun };
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
+  async publishNodeHandover(input: PublishPipelineNodeHandoverInput) {
+    try {
+      const row = this.nodeRunByKey(input.pipelineRunId, input.nodeKey);
+      if (!row) throw new DomainError("Pipeline node run was not found", "PIPELINE_NODE_NOT_FOUND");
+      const latest = this.database.orm.select({ body: conversationItems.body, runId: runs.id })
+        .from(runs)
+        .innerJoin(conversationItems, eq(conversationItems.conversationId, runs.conversationId))
+        .where(and(
+          eq(runs.missionId, row.mission.id),
+          eq(conversationItems.kind, "assistant")
+        ))
+        .orderBy(desc(conversationItems.createdAt), desc(conversationItems.ordinal))
+        .get();
+      if (!latest?.body?.trim()) {
+        throw new DomainError("No assistant message is available for handover", "HANDOVER_SOURCE_MISSING");
+      }
+      const incoming = this.database.orm.select().from(pipelineEdges)
+        .where(eq(pipelineEdges.fromNodeId, row.node.id)).all();
+      let count = 0;
+      for (const edge of incoming) {
+        const target = this.nodeRows(input.pipelineRunId).find((candidate) => candidate.node.id === edge.toNodeId);
+        if (!target) continue;
+        this.upsertHandover(
+          row.nodeRun.id,
+          latest.runId,
+          target.nodeRun.id,
+          {
+            schemaVersion: 1,
+            source: "assistant_message",
+            fromNodeKey: row.node.nodeKey,
+            missionId: row.mission.id,
+            message: latest.body,
+            publishedAt: input.context.occurredAt
+          },
+          input.context.occurredAt
+        );
+        count += 1;
+      }
+      const pipelineRun = await this.showRun(input.pipelineRunId);
+      if (!pipelineRun) throw new DomainError("Pipeline run was not found", "PIPELINE_RUN_NOT_FOUND");
+      return { pipelineRun, handoverCount: count };
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
   private async reconcile(pipelineRunId: Id, now: string): Promise<void> {
     this.database.orm.transaction((transaction) => {
+      let transitionBlocked = false;
       const rows = this.nodeRows(pipelineRunId);
       for (const row of rows) {
         if (["ready", "active"].includes(row.nodeRun.state) && row.mission.state === "DONE") {
@@ -221,9 +303,16 @@ export class SqlitePipelineRepository implements PipelineRepository {
         const predecessorsDone = incoming.every((edge) =>
           fresh.some((candidate) => candidate.node.id === edge.fromNodeId && candidate.nodeRun.state === "completed")
         );
-        if (predecessorsDone) {
+        if (predecessorsDone && row.node.startMode === "auto") {
+          this.createIncomingHandovers(row.nodeRun.id, incoming, fresh, now);
           transaction.update(pipelineNodeRuns).set({ state: "ready" })
             .where(eq(pipelineNodeRuns.id, row.nodeRun.id)).run();
+        } else if (predecessorsDone && row.node.startMode === "human") {
+          transitionBlocked = true;
+          transaction.update(pipelineRuns).set({ state: "blocked" })
+            .where(eq(pipelineRuns.id, pipelineRunId)).run();
+          transaction.update(relayItems).set({ queue: "decision_required", reasonCode: "pipeline_transition_requires_human" })
+            .where(eq(relayItems.pipelineRunId, pipelineRunId)).run();
         }
       }
       const finalRows = this.nodeRows(pipelineRunId);
@@ -237,7 +326,7 @@ export class SqlitePipelineRepository implements PipelineRepository {
           .where(eq(pipelineRuns.id, pipelineRunId)).run();
         transaction.update(relayItems).set({ queue: "blocked", reasonCode: "pipeline_node_failed" })
           .where(eq(relayItems.pipelineRunId, pipelineRunId)).run();
-      } else {
+      } else if (!transitionBlocked) {
         transaction.update(pipelineRuns).set({ state: "active" })
           .where(eq(pipelineRuns.id, pipelineRunId)).run();
         transaction.update(relayItems).set({ queue: "active", reasonCode: "pipeline_active" })
@@ -306,7 +395,9 @@ export class SqlitePipelineRepository implements PipelineRepository {
         missionKind: row.mission.executionKind,
         missionState: row.mission.state,
         state: row.nodeRun.state,
-        userAttempt: row.nodeRun.userAttempt
+        transitionMode: row.node.startMode,
+        userAttempt: row.nodeRun.userAttempt,
+        handovers: this.incomingHandovers(row.nodeRun.id)
       }))
     };
   }
@@ -319,5 +410,81 @@ export class SqlitePipelineRepository implements PipelineRepository {
       .where(eq(pipelineNodeRuns.pipelineRunId, pipelineRunId))
       .orderBy(asc(pipelineNodes.nodeKey), asc(pipelineNodes.id))
       .all();
+  }
+
+  private nodeRunByKey(pipelineRunId: Id, nodeKey: string) {
+    return this.nodeRows(pipelineRunId).find((row) => row.node.nodeKey === nodeKey) ?? null;
+  }
+
+  private createIncomingHandovers(
+    toNodeRunId: string,
+    incoming: Array<typeof pipelineEdges.$inferSelect>,
+    rows: ReturnType<SqlitePipelineRepository["nodeRows"]>,
+    now: string
+  ): void {
+    for (const edge of incoming) {
+      const predecessor = rows.find((row) => row.node.id === edge.fromNodeId);
+      if (!predecessor) continue;
+      const existing = this.database.orm.select({ id: handovers.id }).from(handovers)
+        .where(and(
+          eq(handovers.pipelineNodeRunId, predecessor.nodeRun.id),
+          eq(handovers.toNodeRunId, toNodeRunId)
+        ))
+        .get();
+      if (existing) continue;
+      this.upsertHandover(predecessor.nodeRun.id, null, toNodeRunId, {
+        schemaVersion: 1,
+        source: "mission_completion",
+        fromNodeKey: predecessor.node.nodeKey,
+        missionId: predecessor.mission.id,
+        missionState: predecessor.mission.state,
+        completedAt: predecessor.mission.updatedAt
+      }, now);
+    }
+  }
+
+  private upsertHandover(
+    fromNodeRunId: string,
+    fromRunId: string | null,
+    toNodeRunId: string,
+    payload: unknown,
+    now: string
+  ): void {
+    this.database.orm.insert(handovers).values({
+      id: `handover/${fromNodeRunId}/${toNodeRunId}`,
+      pipelineNodeRunId: fromNodeRunId,
+      fromRunId,
+      toNodeRunId,
+      payloadJson: JSON.stringify(payload),
+      createdAt: now
+    }).onConflictDoUpdate({
+      target: handovers.id,
+      set: {
+        fromRunId,
+        payloadJson: JSON.stringify(payload),
+        createdAt: now
+      }
+    }).run();
+  }
+
+  private incomingHandovers(toNodeRunId: string) {
+    return this.database.orm.select({ source: pipelineNodes.nodeKey, payload: handovers.payloadJson })
+      .from(handovers)
+      .innerJoin(pipelineNodeRuns, eq(pipelineNodeRuns.id, handovers.pipelineNodeRunId))
+      .innerJoin(pipelineNodes, eq(pipelineNodes.id, pipelineNodeRuns.nodeId))
+      .where(eq(handovers.toNodeRunId, toNodeRunId))
+      .all()
+      .map((row) => ({ fromNodeKey: row.source, payload: JSON.parse(row.payload) as unknown }));
+  }
+
+  private handoverPrompt(handovers: Array<{ fromNodeKey: string; payload: unknown }>): string | null {
+    if (handovers.length === 0) return null;
+    return handovers.map((handover) => {
+      const payload = handover.payload as { message?: unknown };
+      const content = typeof payload.message === "string"
+        ? payload.message
+        : JSON.stringify(handover.payload);
+      return `From ${handover.fromNodeKey}:\n${content}`;
+    }).join("\n\n");
   }
 }
