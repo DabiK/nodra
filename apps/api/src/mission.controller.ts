@@ -160,6 +160,16 @@ export class MissionController {
     return this.transition(id, body, { type: "abandon" });
   }
 
+  @Post(":id/reopen-ready")
+  reopenReady(@Param("id") id: string, @Body() body: MissionTransitionDto) {
+    return this.transition(id, body, { type: "reopen-ready" });
+  }
+
+  @Post(":id/reopen-active")
+  reopenActive(@Param("id") id: string, @Body() body: MissionTransitionDto) {
+    return this.transition(id, body, { type: "reopen-active" });
+  }
+
   private transition(id: string, body: MissionTransitionDto | BlockMissionDto, action: HumanMissionAction) {
     return this.changeMissionState.execute({
       missionId: toId(id),

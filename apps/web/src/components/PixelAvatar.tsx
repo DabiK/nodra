@@ -11,7 +11,7 @@ export function PixelAvatar({ id, title, mini = false }: { id: string; title: st
       <span className="dice-fallback">{initials}</span>
       <img
         className="dice-avatar"
-        src={`https://api.dicebear.com/10.x/pixel-art/svg?seed=${seed}&size=96`}
+        src={`https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=${seed}&size=96`}
         alt=""
         loading="lazy"
         referrerPolicy="no-referrer"

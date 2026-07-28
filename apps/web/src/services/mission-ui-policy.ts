@@ -13,7 +13,9 @@ export type MissionActionId =
   | "abandon"
   | "mark-ready"
   | "pickup"
-  | "complete-human";
+  | "complete-human"
+  | "reopen-ready"
+  | "reopen-active";
 
 export interface MissionUiContext {
   mission: MissionView;
@@ -163,6 +165,12 @@ function humanActions(context: MissionUiContext): MissionUiAction[] {
       return [
         action({ id: "resume", label: "Reprendre", enabled: true, primary: true }),
         action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
+      ];
+    case "DONE":
+    case "ABANDONED":
+      return [
+        action({ id: "reopen-ready", label: "Remettre prête", enabled: true, primary: true }),
+        action({ id: "reopen-active", label: "Remettre en cours", enabled: true })
       ];
     default:
       return [];

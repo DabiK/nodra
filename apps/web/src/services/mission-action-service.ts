@@ -31,9 +31,11 @@ export async function performMissionAction(input: MissionActionInput) {
   if (actionId === "mark-ready") return transition(mission, "ready");
   if (actionId === "pickup") return transition(mission, "pickup");
   if (actionId === "complete-human") return transition(mission, "complete");
+  if (actionId === "reopen-ready") return transition(mission, "reopen-ready");
+  if (actionId === "reopen-active") return transition(mission, "reopen-active");
 }
 
-async function transition(mission: MissionView, route: "ready" | "pickup" | "unblock" | "complete" | "abandon" | "accept") {
+async function transition(mission: MissionView, route: "ready" | "pickup" | "unblock" | "complete" | "abandon" | "accept" | "reopen-ready" | "reopen-active") {
   return api<MissionView>(`/api/missions/${mission.id}/${route}`, {
     method: "POST",
     body: JSON.stringify({ expectedVersion: mission.version })

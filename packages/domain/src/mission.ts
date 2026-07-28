@@ -119,6 +119,16 @@ export class Mission {
     this.transitionFrom(["DRAFT", "READY", "BLOCKED", "VALIDATION"], "ABANDONED", now);
   }
 
+  reopenReady(now: string): void {
+    this.requireHuman("Only a human mission can be reopened manually");
+    this.transitionFrom(["DONE", "ABANDONED"], "READY", now);
+  }
+
+  reopenActive(now: string): void {
+    this.requireHuman("Only a human mission can be reopened manually");
+    this.transitionFrom(["DONE", "ABANDONED"], "ACTIVE", now);
+  }
+
   submitForValidation(now: string, submission: ValidationSubmission): void {
     if (this.snapshotValue.executionKind !== "agent") {
       throw new DomainError("A human mission cannot submit an agent result", "TRANSITION_FORBIDDEN");

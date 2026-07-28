@@ -11,7 +11,9 @@ export type HumanMissionAction =
   | { type: "request-correction" }
   | { type: "accept" }
   | { type: "close" }
-  | { type: "abandon" };
+  | { type: "abandon" }
+  | { type: "reopen-ready" }
+  | { type: "reopen-active" };
 
 export interface ChangeMissionStateInput {
   missionId: Id;
@@ -28,7 +30,9 @@ const eventTypes: Record<HumanMissionAction["type"], string> = {
   "request-correction": "MISSION_CORRECTION_REQUESTED",
   accept: "MISSION_ACCEPTED",
   close: "MISSION_CLOSED",
-  abandon: "MISSION_ABANDONED"
+  abandon: "MISSION_ABANDONED",
+  "reopen-ready": "MISSION_REOPENED_READY",
+  "reopen-active": "MISSION_REOPENED_ACTIVE"
 };
 
 const queueForState = (state: MissionSnapshot["state"]): RelayQueue | null => {
@@ -116,6 +120,8 @@ export class ChangeMissionState {
     else if (action.type === "request-correction") mission.requestCorrection(now);
     else if (action.type === "accept") mission.accept(now, { accepted: true, actor: "user" });
     else if (action.type === "close") mission.close(now);
-    else mission.abandon(now);
+    else if (action.type === "abandon") mission.abandon(now);
+    else if (action.type === "reopen-ready") mission.reopenReady(now);
+    else mission.reopenActive(now);
   }
 }

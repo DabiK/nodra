@@ -72,6 +72,12 @@ describe("Mission human lifecycle", () => {
       const mission = humanIn(state);
       expectTransition(mission, () => mission.abandon(now), "ABANDONED");
     }
+    for (const state of ["DONE", "ABANDONED"] as const) {
+      const ready = humanIn(state);
+      expectTransition(ready, () => ready.reopenReady(now), "READY");
+      const active = humanIn(state);
+      expectTransition(active, () => active.reopenActive(now), "ACTIVE");
+    }
   });
 
   it("rejects every forbidden source state for human commands", () => {
@@ -81,6 +87,8 @@ describe("Mission human lifecycle", () => {
     expectForbiddenEverywhereExcept(["BLOCKED"], humanIn, (mission) => mission.resume(now));
     expectForbiddenEverywhereExcept(["DRAFT", "READY", "ACTIVE"], humanIn, (mission) => mission.close(now));
     expectForbiddenEverywhereExcept(["DRAFT", "READY", "BLOCKED", "VALIDATION"], humanIn, (mission) => mission.abandon(now));
+    expectForbiddenEverywhereExcept(["DONE", "ABANDONED"], humanIn, (mission) => mission.reopenReady(now));
+    expectForbiddenEverywhereExcept(["DONE", "ABANDONED"], humanIn, (mission) => mission.reopenActive(now));
   });
 
   it("requires a structured blocking reason", () => {

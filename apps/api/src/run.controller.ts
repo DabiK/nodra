@@ -1,7 +1,8 @@
 import { Body, Controller, HttpCode, Inject, Param, Post } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, eq, max } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import type { NodraSqliteDatabase } from "@nodra/adapters";
-import { conversations, managers, runs } from "@nodra/adapters";
+import { conversationItems, conversations, managers, runConfigSnapshots, runs, workspaces } from "@nodra/adapters";
 import type { CancelRun, ChangeMissionState, ResumeRun, ShowMission, SteerRun } from "@nodra/application";
 import { DomainError, toId } from "@nodra/application";
 import { commandContext } from "./command-context.js";
@@ -36,8 +37,28 @@ export class RunController {
 
   @Post(":id/steer")
   @HttpCode(202)
-  steer(@Param("id") id: string, @Body() body: SteerRunDto) {
-    return this.steerRun.execute(toId(id), body.text);
+  async steer(@Param("id") id: string, @Body() body: SteerRunDto) {
+    const result = await this.steerRun.execute(toId(id), body.text);
+    const run = this.database.orm.select({ conversationId: runs.conversationId })
+      .from(runs).where(eq(runs.id, id)).get();
+    if (!run) throw new DomainError(`Run ${id} was not found`, "RUN_NOT_FOUND");
+    const now = new Date().toISOString();
+    this.database.orm.transaction((transaction: NodraSqliteDatabase["orm"]) => {
+      const ordinal = (transaction.select({ value: max(conversationItems.ordinal) })
+        .from(conversationItems).where(eq(conversationItems.conversationId, run.conversationId)).get()?.value ?? -1) + 1;
+      transaction.insert(conversationItems).values({
+        id: `conversation-item/${id}/steer/${randomUUID()}`,
+        conversationId: run.conversationId,
+        ordinal,
+        kind: "steer",
+        deliveryState: "sent",
+        body: body.text.trim(),
+        providerItemRef: null,
+        createdAt: now,
+        acknowledgedAt: null
+      }).run();
+    });
+    return result;
   }
 
   // Hard kill for a runaway agent. Best-effort cancels the workflow and the
@@ -46,34 +67,42 @@ export class RunController {
   @Post(":id/force-stop")
   @HttpCode(202)
   async forceStop(@Param("id") id: string) {
-    const run = this.database.orm.select().from(runs).where(eq(runs.id, id)).get();
+    const run = this.database.orm.select({
+      run: runs,
+      workspaceId: runConfigSnapshots.workspaceId
+    }).from(runs).innerJoin(runConfigSnapshots, eq(runConfigSnapshots.runId, runs.id))
+      .where(eq(runs.id, id)).get();
     if (!run) throw new DomainError(`Run ${id} was not found`, "RUN_NOT_FOUND");
 
     // 1. Best-effort: signal the Temporal workflow to cancel.
     await this.cancelRun.execute(toId(id)).catch(() => undefined);
 
     // 2. Best-effort: abort the provider session directly (kills OpenCode agent).
-    const conversation = this.database.orm.select().from(conversations).where(eq(conversations.id, run.conversationId)).get();
-    await this.abortProviderSession(run.providerId, conversation?.providerSessionRef ?? null);
+    const conversation = this.database.orm.select().from(conversations).where(eq(conversations.id, run.run.conversationId)).get();
+    await this.abortProviderSession(run.run.providerId, conversation?.providerSessionRef ?? null);
 
     // 3. Force the run into a terminal state so the UI stops "thinking".
     const now = new Date().toISOString();
-    if (!TERMINAL_RUN_STATES.includes(run.state)) {
+    if (!TERMINAL_RUN_STATES.includes(run.run.state)) {
       this.database.orm.update(runs).set({ state: "CANCELLED", endedAt: now }).where(eq(runs.id, id)).run();
       if (conversation && conversation.state !== "closed" && conversation.state !== "deleted") {
         this.database.orm.update(conversations).set({ state: "idle" }).where(eq(conversations.id, conversation.id)).run();
       }
     }
+    if (run.workspaceId) {
+      this.database.orm.update(workspaces).set({ state: "ready" })
+        .where(and(eq(workspaces.id, run.workspaceId), eq(workspaces.state, "in_use"))).run();
+    }
 
     // 4. Unblock the subject. An ACTIVE agent mission moves to BLOCKED; an
     //    ACTIVE manager returns to ready so the operator can chat again.
     let missionState: string | null = null;
-    if (run.missionId) {
-      const mission = await this.showMission.execute(toId(run.missionId));
+    if (run.run.missionId) {
+      const mission = await this.showMission.execute(toId(run.run.missionId));
       missionState = mission?.state ?? null;
       if (mission && mission.state === "ACTIVE") {
         const changed = await this.changeMissionState.execute({
-          missionId: toId(run.missionId),
+          missionId: toId(run.run.missionId),
           expectedVersion: mission.version,
           action: { type: "block", reason: "provider" },
           context: commandContext()
@@ -81,9 +110,9 @@ export class RunController {
         missionState = changed?.state ?? missionState;
       }
     }
-    if (run.managerId) {
+    if (run.run.managerId) {
       this.database.orm.update(managers).set({ state: "ready" })
-        .where(and(eq(managers.id, run.managerId), eq(managers.state, "active"))).run();
+        .where(and(eq(managers.id, run.run.managerId), eq(managers.state, "active"))).run();
     }
 
     return { runId: id, state: "force_stopped", runState: "CANCELLED", missionState };

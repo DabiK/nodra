@@ -71,7 +71,7 @@ function MissionCard({ mission, tone, pipeline, onInspect, onOpenPipeline }: { m
     ? { borderLeft: `4px solid hsl(${pipeline.hue} 55% 55%)`, background: `hsl(${pipeline.hue} 68% 97%)` }
     : {};
   return (
-    <button className={`relay-task ${tone}${pipeline ? " in-pipeline" : ""}`} style={style} onClick={() => onInspect(mission.id)} aria-label={`Ouvrir ${mission.title}`}>
+    <button className={`relay-task ${tone}${mission.executionKind === "agent" ? " agent-idle" : ""}${pipeline ? " in-pipeline" : ""}`} style={style} onClick={() => onInspect(mission.id)} aria-label={`Ouvrir ${mission.title}`}>
       <PixelAvatar id={mission.id} title={mission.title} mini />
       <span className="relay-task-copy">
         <small><i /> {mission.executionKind === "agent" ? "Agent" : "Humain"} · {relativeTime(mission.updatedAt)}{hasMissionNotes(mission.id) ? " · 📝 notes" : ""}</small>

@@ -59,13 +59,18 @@ describe("mission and Relay API", () => {
     });
     await request(app.getHttpServer()).post(`/api/missions/${id}/unblock`).send({ expectedVersion: 3 }).expect(201);
     await request(app.getHttpServer()).post(`/api/missions/${id}/complete`).send({ expectedVersion: 4 }).expect(201);
+    await request(app.getHttpServer()).post(`/api/missions/${id}/reopen-ready`).send({ expectedVersion: 5 }).expect(201);
+    await request(app.getHttpServer()).post(`/api/missions/${id}/pickup`).send({ expectedVersion: 6 }).expect(201);
+    await request(app.getHttpServer()).post(`/api/missions/${id}/block`).send({ expectedVersion: 7, reason: "Paused again" }).expect(201);
+    await request(app.getHttpServer()).post(`/api/missions/${id}/abandon`).send({ expectedVersion: 8 }).expect(201);
+    await request(app.getHttpServer()).post(`/api/missions/${id}/reopen-active`).send({ expectedVersion: 9 }).expect(201);
 
     const list = await request(app.getHttpServer()).get("/api/missions").expect(200);
-    expect(list.body).toEqual([expect.objectContaining({ id, state: "DONE", version: 5 })]);
+    expect(list.body).toEqual([expect.objectContaining({ id, state: "ACTIVE", version: 10 })]);
     const shown = await request(app.getHttpServer()).get(`/api/missions/${id}`).expect(200);
-    expect(shown.body).toMatchObject({ id, state: "DONE", version: 5 });
+    expect(shown.body).toMatchObject({ id, state: "ACTIVE", version: 10 });
     const relay = await request(app.getHttpServer()).get("/api/relay").expect(200);
-    expect(relay.body).toEqual({ ready: [], active: [], blocked: [], decision_required: [] });
+    expect(relay.body).toEqual({ ready: [], active: [expect.objectContaining({ id, state: "ACTIVE" })], blocked: [], decision_required: [] });
   });
 
   it("returns normative problem details for forbidden and stale transitions", async () => {

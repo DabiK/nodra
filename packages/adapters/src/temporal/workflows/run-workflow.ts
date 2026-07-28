@@ -61,7 +61,10 @@ export async function RunWorkflow(input: RunWorkflowInput): Promise<void> {
         .catch((error: unknown) => { providerError = error; });
       while (!outcome && !providerError) {
         await condition(() => outcome !== null || providerError !== null || steerQueue.length > 0);
+        // A terminal provider result wins over a concurrently queued instruction.
+        if (outcome || providerError) break;
         while (steerQueue.length > 0) {
+          if (outcome || providerError) break;
           const text = steerQueue.shift();
           if (text) await controlActivities.steerProvider({ runId: input.runId, text });
         }
