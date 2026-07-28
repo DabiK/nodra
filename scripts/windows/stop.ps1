@@ -18,7 +18,7 @@ param(
 
 $ErrorActionPreference = "SilentlyContinue"
 
-Write-Host "Nodra — stopping components on ports: $($Ports -join ', ')" -ForegroundColor Cyan
+Write-Host "Nodra - stopping components on ports: $($Ports -join ', ')" -ForegroundColor Cyan
 
 $stopped = @{}
 foreach ($port in $Ports) {
@@ -38,5 +38,5 @@ foreach ($port in $Ports) {
 if ($stopped.Count -eq 0) {
     Write-Host "Nothing was listening on the Nodra ports." -ForegroundColor Yellow
 } else {
-    Write-Host "Stopped $($stopped.Count) process tree(s)." -ForegroundColor Green
+    Write-Host ("Stopped {0} process tree(s)." -f $stopped.Count) -ForegroundColor Green
 }

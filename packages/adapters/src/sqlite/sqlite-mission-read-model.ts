@@ -18,6 +18,7 @@ const toView = (row: MissionRow): MissionView => ({
   id: asId(row.id),
   projectId: row.projectId ? asId(row.projectId) : null,
   title: row.title,
+  description: row.description,
   executionKind: row.executionKind,
   state: row.state,
   version: row.version,

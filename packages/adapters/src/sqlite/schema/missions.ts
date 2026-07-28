@@ -6,6 +6,7 @@ export const missions = sqliteTable("mission", {
   id: text("id").primaryKey(),
   projectId: text("project_id").references(() => projects.id),
   title: text("title").notNull(),
+  description: text("description").notNull().default(""),
   executionKind: text("execution_kind", { enum: ["human", "agent"] }).notNull(),
   state: text("state", { enum: ["DRAFT", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"] }).notNull(),
   version: integer("version").notNull().default(0),

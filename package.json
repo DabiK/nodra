@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "nodra": "scripts/nodra-cli.cjs"
+  },
   "workspaces": [
     "packages/domain",
     "packages/application",
@@ -16,7 +19,7 @@
     "build": "npm run build --workspaces --if-present",
     "dev": "npm run dev -w @nodra/api",
     "web": "npm run dev -w @nodra/web",
-    "cli": "npm run dev -w @nodra/cli --",
+    "cli": "tsx apps/cli/src/main.ts",
     "start": "npm run start -w @nodra/api",
     "worker": "npm run start -w @nodra/worker",
     "typecheck": "tsc -p tsconfig.check.json --noEmit --pretty false",
@@ -31,6 +34,8 @@
     "win:start": "powershell -ExecutionPolicy Bypass -File scripts/windows/start.ps1",
     "win:start:web": "powershell -ExecutionPolicy Bypass -File scripts/windows/start.ps1 -Web",
     "win:stop": "powershell -ExecutionPolicy Bypass -File scripts/windows/stop.ps1",
+    "runtime:windows:start": "npm run win:start:web",
+    "runtime:windows:stop": "npm run win:stop",
     "temporal:dev": "tsx scripts/start-temporal-dev.ts",
     "temporal:health": "tsx scripts/diagnose-temporal.ts",
     "test:poc:temporal": "tsx poc/temporal/i6-2-poc.ts",

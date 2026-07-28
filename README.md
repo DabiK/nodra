@@ -233,14 +233,15 @@ which do not exist on native Windows. You have two options:
    npm run web
    ```
 2. **Native Windows (PowerShell)** — use the bundled starter, which launches
-   Temporal, OpenCode, the API and the worker each in their own window (no Unix
-   process groups involved):
+   Temporal, OpenCode, the API, worker and web UI as hidden background
+   processes (no Unix process groups involved). Logs are under
+   `data/local/logs/`:
    ```powershell
-   npm run win:start          # backend only
-   npm run win:start:web      # backend + web UI (http://127.0.0.1:5174)
-   npm run win:stop           # stop everything (by port)
+   npm run runtime:windows:start # backend + web UI (http://127.0.0.1:5174)
+   npm run runtime:windows:stop  # stop everything (by port)
    ```
-   Flags: `-Web`, `-SkipTemporal`, `-SkipOpenCode` (e.g.
+   `npm run win:start` remains available to start only the backend. Flags:
+   `-Web`, `-SkipTemporal`, `-SkipOpenCode` (e.g.
    `powershell -ExecutionPolicy Bypass -File scripts\windows\start.ps1 -Web -SkipOpenCode`).
    Or start each component manually — see
    [Running components manually](#running-components-manually-no-supervisor).

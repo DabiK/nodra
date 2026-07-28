@@ -20,8 +20,9 @@ start the components manually.
 
 ### Native Windows startup scripts
 
-`scripts/windows/start.ps1` / `stop.ps1` (exposed as `npm run win:start` /
-`win:start:web` / `win:stop`) launch Temporal, OpenCode, the API and the worker
+`scripts/windows/start.ps1` / `stop.ps1` (exposed as
+`npm run runtime:windows:start` / `runtime:windows:stop`, with the lower-level
+`win:start` / `win:start:web` / `win:stop` aliases) launch Temporal, OpenCode, the API and the worker
 each in their own PowerShell window — no Unix process groups, no `ps`/`lsof`.
 `stop.ps1` terminates whatever listens on the Nodra ports (7233/4096/4100/5174)
 via `Get-NetTCPConnection` + `taskkill /T /F`.

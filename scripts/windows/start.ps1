@@ -4,9 +4,9 @@
     runtime supervisor.
 
 .DESCRIPTION
-    Launches Temporal, OpenCode, the API and the worker, each in its own titled
-    PowerShell window so their logs stay separate and any of them can be stopped
-    individually (Ctrl+C in the window, or scripts\windows\stop.ps1).
+    Launches Temporal, OpenCode, the API and the worker as hidden background
+    processes. Logs are written under data\local\logs and every component can
+    be stopped with scripts\windows\stop.ps1.
 
     On Windows the runtime supervisor (npm run runtime:start) is not supported
     because it relies on Unix process groups and ps/lsof. This script is the
@@ -38,13 +38,19 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 Set-Location $repoRoot
 
+# Manager analyses may need several CLI and network calls; retain a user-supplied
+# timeout but avoid classifying normal five-minute work as a provider failure.
+if (-not $env:NODRA_OPENCODE_EXECUTION_TIMEOUT_MS) {
+    $env:NODRA_OPENCODE_EXECUTION_TIMEOUT_MS = "900000"
+}
+
 function Assert-Command($name, $hint) {
     if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
         throw "'$name' was not found on PATH. $hint"
     }
 }
 
-Write-Host "Nodra — starting on Windows from $repoRoot" -ForegroundColor Cyan
+Write-Host "Nodra - starting on Windows from $repoRoot" -ForegroundColor Cyan
 
 Assert-Command "node" "Install Node.js >= 22.12.0 from https://nodejs.org"
 Assert-Command "npm"  "npm ships with Node.js."
@@ -58,18 +64,25 @@ if (-not $SkipOpenCode) {
 # Ensure the local data directories exist.
 $temporalDbDir = Join-Path $repoRoot "data\local\temporal"
 New-Item -ItemType Directory -Force -Path $temporalDbDir | Out-Null
+$logDir = Join-Path $repoRoot "data\local\logs"
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
 # Make sure the SQLite database is migrated before the API/worker boot.
 Write-Host "Preparing the local database (npm run db:setup)..." -ForegroundColor DarkGray
 & npm run db:setup | Out-Null
 
 function Start-Component($title, $command) {
-    # Each component runs in its own PowerShell window, in the repo root.
-    $inner = "Set-Location `"$repoRoot`"; `$Host.UI.RawUI.WindowTitle = `"$title`"; Write-Host `"$title`" -ForegroundColor Green; $command"
+    # Use hidden PowerShell hosts so native Windows startup does not create console windows.
+    $inner = "Set-Location `"$repoRoot`"; $command"
+    $stdout = Join-Path $logDir "$title.out.log"
+    $stderr = Join-Path $logDir "$title.err.log"
     Start-Process -FilePath "powershell.exe" `
-        -ArgumentList @("-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $inner) `
-        -WorkingDirectory $repoRoot | Out-Null
-    Write-Host "  started: $title" -ForegroundColor DarkGray
+        -ArgumentList @("-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", $inner) `
+        -WorkingDirectory $repoRoot `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $stdout `
+        -RedirectStandardError $stderr | Out-Null
+    Write-Host "  started: $title (logs: $stdout)" -ForegroundColor DarkGray
 }
 
 if (-not $SkipTemporal) {
@@ -86,7 +99,7 @@ if (-not $SkipOpenCode) {
 
 Start-Component "nodra-api"    "npm run dev"
 Start-Sleep -Seconds 2
-Start-Component "nodra-worker" "npm run worker"
+Start-Component "nodra-worker" "npm run dev -w @nodra/worker"
 
 if ($Web) {
     Start-Sleep -Seconds 1
@@ -100,4 +113,4 @@ Write-Host "  Temporal   : 127.0.0.1:7233"
 Write-Host "  OpenCode   : http://127.0.0.1:4096"
 if ($Web) { Write-Host "  Web UI     : http://127.0.0.1:5174" }
 Write-Host ""
-Write-Host "Stop everything with: powershell -ExecutionPolicy Bypass -File scripts\windows\stop.ps1" -ForegroundColor DarkGray
+Write-Host "Stop everything with: npm run runtime:windows:stop" -ForegroundColor DarkGray

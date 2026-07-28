@@ -47,6 +47,7 @@ export interface MissionView {
   id: Id;
   projectId: Id | null;
   title: string;
+  description: string;
   executionKind: "human" | "agent";
   state: MissionState;
   version: number;

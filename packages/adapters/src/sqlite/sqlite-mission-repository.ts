@@ -18,6 +18,7 @@ export class SqliteMissionRepository implements MissionRepository {
         id: asId(row.id),
         projectId: row.projectId ? asId(row.projectId) : null,
         title: row.title,
+        description: row.description,
         executionKind: row.executionKind,
         state: row.state,
         version: row.version,
@@ -41,13 +42,14 @@ export class SqliteMissionRepository implements MissionRepository {
         if (input.expectedVersion === -1) {
           const existingMission = transaction.select({ id: missions.id }).from(missions).where(eq(missions.id, snapshot.id)).get();
           if (existingMission) throw new DomainError(`Mission ${snapshot.id} already exists`, "MISSION_ALREADY_EXISTS");
-          transaction.insert(missions).values({ ...snapshot, projectId: snapshot.projectId }).run();
+          transaction.insert(missions).values({ ...snapshot, description: snapshot.description ?? "", projectId: snapshot.projectId }).run();
         } else {
           const result = transaction
             .update(missions)
             .set({
               projectId: snapshot.projectId,
               title: snapshot.title,
+              description: snapshot.description ?? "",
               executionKind: snapshot.executionKind,
               state: snapshot.state,
               version: snapshot.version,

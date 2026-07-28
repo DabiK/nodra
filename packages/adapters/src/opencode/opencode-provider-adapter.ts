@@ -183,11 +183,7 @@ export class OpenCodeProviderAdapter implements ProviderPort {
     } catch (error) {
       stopEvents.abort();
       if (error instanceof ProviderProtocolIncompatibleError) throw error;
-      throw new ProviderProtocolIncompatibleError(
-        error instanceof Error ? error.message : "OpenCode execution failed",
-        this.providerId,
-        input.capabilityVersion
-      );
+      throw error;
     } finally {
       this.supervisor.release(input.runId);
     }

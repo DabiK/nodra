@@ -40,6 +40,7 @@ General:
 Missions:
   mission:create <title...>
     [--project <project-id>]
+    [--description <text>]
     [--command-id <command-id>]
       Create a mission.
 
@@ -442,12 +443,20 @@ export class NodraCli {
     const values = [...parameters];
     let projectId;
     let commandId;
+    let description;
     const projectIndex = values.indexOf("--project");
     if (projectIndex >= 0) {
       const project = values[projectIndex + 1];
       if (!project) return this.writeUsage();
       projectId = toId(project);
       values.splice(projectIndex, 2);
+    }
+    const descriptionIndex = values.indexOf("--description");
+    if (descriptionIndex >= 0) {
+      const value = values[descriptionIndex + 1];
+      if (value === undefined) return this.writeUsage();
+      description = value;
+      values.splice(descriptionIndex, 2);
     }
     const commandIndex = values.indexOf("--command-id");
     if (commandIndex >= 0) {
@@ -462,6 +471,7 @@ export class NodraCli {
       await this.createMission.execute({
         id: toId(randomUUID()),
         title,
+        ...(description === undefined ? {} : { description }),
         context: this.context(commandId),
         ...(projectId === undefined ? {} : { projectId })
       })

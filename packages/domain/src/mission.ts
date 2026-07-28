@@ -16,6 +16,7 @@ export interface MissionSnapshot {
   id: Id;
   projectId: Id | null;
   title: string;
+  description?: string;
   executionKind: ExecutionKind;
   state: MissionState;
   version: number;
@@ -42,6 +43,7 @@ export class Mission {
   static create(input: {
     id: Id;
     title: string;
+    description?: string;
     executionKind: ExecutionKind;
     projectId?: Id | null;
     now: string;
@@ -52,6 +54,7 @@ export class Mission {
       id: input.id,
       projectId: input.projectId ?? null,
       title,
+      description: input.description?.trim() ?? "",
       executionKind: input.executionKind,
       state: "DRAFT",
       version: 0,
@@ -60,7 +63,7 @@ export class Mission {
     });
   }
 
-  static createHuman(input: { id: Id; title: string; projectId?: Id | null; now: string }): Mission {
+  static createHuman(input: { id: Id; title: string; description?: string; projectId?: Id | null; now: string }): Mission {
     return Mission.create({ ...input, executionKind: "human" });
   }
 

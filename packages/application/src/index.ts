@@ -158,7 +158,7 @@ export { UpdateManager, ArchiveManager, type UpdateManagerInput } from "./update
 export { ListManagers, ShowManager, ListManagerConversations } from "./list-managers.js";
 export {
   StartManagerRun,
-  DEVFLOW_MANAGER_PREAMBLE,
+  NODRA_MANAGER_PREAMBLE,
   type StartManagerRunCommand,
   type StartManagerRunResult
 } from "./start-manager-run.js";

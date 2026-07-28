@@ -71,6 +71,13 @@
       "when": 1785067327498,
       "tag": "0009_manager_name",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785067327499,
+      "tag": "0010_mission_description",
+      "breakpoints": true
     }
   ]
 }

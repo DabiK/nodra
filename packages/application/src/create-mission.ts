@@ -6,6 +6,7 @@ export interface CreateMissionInput {
   id: Id;
   projectId?: Id | null;
   title: string;
+  description?: string;
   context: CommandContext;
 }
 
@@ -15,7 +16,8 @@ export class CreateMission {
   async execute(input: CreateMissionInput): Promise<MissionSnapshot> {
     const mission = Mission.createHuman({
       id: input.id,
-      title: input.title,
+        title: input.title,
+        ...(input.description === undefined ? {} : { description: input.description }),
       now: input.context.occurredAt,
       ...(input.projectId === undefined ? {} : { projectId: input.projectId })
     });

@@ -5,9 +5,9 @@ import type { ManagerRepository } from "./manager-repository.js";
 import type { ProviderCatalogRepository } from "./provider-catalog-repository.js";
 import type { RuntimeHealthProbe } from "./runtime-health-probe.js";
 
-export const DEVFLOW_MANAGER_PREAMBLE = `--- Environnement DevFlow ---
-Tu es un manager DevFlow: un agent méta qui orchestre le travail. Ton répertoire de travail courant est le dépôt "devflow-next". Tu pilotes DevFlow en exécutant son CLI via bash, toujours sous cette forme:
-  npm --silent run dev -w @nodra/cli -- <commande>
+export const NODRA_MANAGER_PREAMBLE = `--- Environnement Nodra ---
+Tu es un manager Nodra: un agent méta qui orchestre le travail. Ton répertoire de travail courant est le workspace Nodra configuré pour ce manager. Tu pilotes Nodra avec sa CLI globale:
+  nodra <commande>
 Commandes utiles:
   mission:create "<titre>"                      créer une mission (revient en DRAFT)
   mission:list                                    lister les missions
@@ -95,7 +95,7 @@ export class StartManagerRun {
     const reuseConversationId = command.newConversation ? null : command.conversationId;
     const isFirstTurn = reuseConversationId === null;
     const effectivePrompt = isFirstTurn
-      ? `${before.instruction}\n\n${DEVFLOW_MANAGER_PREAMBLE}\n\n--- Demande de l'utilisateur ---\n${brief}`
+      ? `${before.instruction}\n\n${NODRA_MANAGER_PREAMBLE}\n\n--- Demande de l'utilisateur ---\n${brief}`
       : brief;
 
     const workflowId = `manager/${command.managerId}/run/${command.runId}`;

@@ -32,9 +32,11 @@ interface CanonicalItem {
   summary?: string;
   command?: unknown;
   aggregated_output?: string;
+  aggregatedOutput?: string;
   output?: string;
   status?: string;
   exit_code?: number;
+  exitCode?: number;
   changes?: Array<{ kind?: string; type?: string; path?: string; file?: string }>;
   query?: string;
   server?: string;
@@ -57,7 +59,7 @@ export function normalizeAgentConversation(session: AgentSessionView | null): Ag
   const completedItemIds = new Set<string>();
   for (const event of rawEvents) {
     const item = canonicalItem(event.payload);
-    if (event.type === "item.completed" && item?.id) completedItemIds.add(item.id);
+    if ((event.type === "item.completed" || event.type === "item/completed") && item?.id) completedItemIds.add(item.id);
   }
   const toolFinalEventIds = finalToolEventIds(rawEvents);
   const messageRoles = messageRoleIndex(rawEvents);
@@ -182,36 +184,61 @@ function normalizeProviderEvent(event: RawEvent, finalTextPartIds: Set<string>, 
   }
   const item = canonicalItem(event.payload);
   if (!item) return [];
-  if (event.type === "item.started" && item.id && completedItemIds.has(item.id)) return [];
+  if ((event.type === "item.started" || event.type === "item/started") && item.id && completedItemIds.has(item.id)) return [];
   return normalizeCanonicalItem(event, item, at, providerId);
 }
 
 function normalizeCanonicalItem(event: RawEvent, item: CanonicalItem, at: string, providerId: string): AgentConversationEvent[] {
-  const running = event.type === "item.started";
-  if (item.type === "agent_message" && item.text?.trim()) return [{ kind: "assistant", id: event.id, text: agentMessageText(item.text), at, providerId }];
-  if (item.type === "reasoning") return providerId.includes("copilot") ? [] : [{ kind: "reasoning", id: event.id, text: item.text ?? item.summary ?? "Analyse terminée", at }];
-  if (item.type === "command_execution") {
+  const running = event.type === "item.started" || event.type === "item/started";
+  const itemType = normalizedItemType(item.type);
+  if (itemType === "user_message" && item.text?.trim()) return [{ kind: "user", id: event.id, text: cleanUserText(item.text), at }];
+  if (itemType === "agent_message" && item.text?.trim()) return [{ kind: "assistant", id: event.id, text: agentMessageText(item.text), at, providerId }];
+  if (itemType === "reasoning") return providerId.includes("copilot") ? [] : [{ kind: "reasoning", id: event.id, text: item.text ?? item.summary ?? "Analyse terminée", at }];
+  if (itemType === "command_execution") {
+    const exitCode = item.exit_code ?? item.exitCode;
     return [{
       kind: "tool",
       id: event.id,
-      title: running ? "● Commande en cours" : `⌘ Commande · ${item.status ?? "terminée"}${item.exit_code != null ? ` · code ${item.exit_code}` : ""}`,
+      title: running ? "● Commande en cours" : `⌘ Commande · ${item.status ?? "terminée"}${exitCode != null ? ` · code ${exitCode}` : ""}`,
       command: stringContent(item.command),
-      output: item.aggregated_output ?? item.output,
+      output: item.aggregated_output ?? item.aggregatedOutput ?? item.output,
       status: item.status,
       at
     }];
   }
-  if (item.type === "file_change") return [{ kind: "tool", id: event.id, title: "Fichiers modifiés", output: item.changes?.map((change) => `${change.kind ?? change.type ?? "modifié"} · ${change.path ?? change.file ?? ""}`).join("\n") ?? item.text, at }];
-  if (item.type === "web_search") return [{ kind: "tool", id: event.id, title: "Recherche web", output: item.query ?? item.text ?? "Recherche terminée", at }];
-  if (item.type === "mcp_tool_call") return [{ kind: "tool", id: event.id, title: `MCP · ${item.server ?? ""} ${item.tool ?? ""}`, output: stringContent(item.result ?? item.error ?? item.arguments), at }];
-  if (item.type === "collab_tool_call") return [{ kind: "tool", id: event.id, title: "Sous-agent", output: item.text ?? item.status ?? stringContent(item), at }];
+  if (itemType === "file_change") return [{ kind: "tool", id: event.id, title: "Fichiers modifiés", output: item.changes?.map((change) => `${change.kind ?? change.type ?? "modifié"} · ${change.path ?? change.file ?? ""}`).join("\n") ?? item.text, at }];
+  if (itemType === "web_search") return [{ kind: "tool", id: event.id, title: "Recherche web", output: item.query ?? item.text ?? "Recherche terminée", at }];
+  if (itemType === "mcp_tool_call") return [{ kind: "tool", id: event.id, title: `MCP · ${item.server ?? ""} ${item.tool ?? ""}`, output: stringContent(item.result ?? item.error ?? item.arguments), at }];
+  if (itemType === "collab_tool_call") return [{ kind: "tool", id: event.id, title: "Sous-agent", output: item.text ?? item.status ?? stringContent(item), at }];
   return [];
+}
+
+function normalizedItemType(type?: string) {
+  return ({
+    userMessage: "user_message",
+    agentMessage: "agent_message",
+    commandExecution: "command_execution",
+    fileChange: "file_change",
+    webSearch: "web_search",
+    mcpToolCall: "mcp_tool_call",
+    collabToolCall: "collab_tool_call"
+  } as Record<string, string>)[type ?? ""] ?? type;
 }
 
 function canonicalItem(payload: unknown): CanonicalItem | null {
   const record = payloadRecord(payload);
   const item = payloadRecord(record?.item);
-  if (item) return item as CanonicalItem;
+  if (item) {
+    const canonical = item as CanonicalItem;
+    const contentText = Array.isArray(item.content)
+      ? item.content
+          .map((part) => payloadRecord(part))
+          .filter((part) => part?.type === "text" && typeof part.text === "string")
+          .map((part) => String(part?.text))
+          .join("")
+      : "";
+    return canonical.text || !contentText ? canonical : { ...canonical, text: contentText };
+  }
   const properties = payloadRecord(record?.properties);
   const tool = payloadRecord(properties?.tool) ?? payloadRecord(properties?.call);
   if (tool) {
@@ -231,13 +258,14 @@ function agentMessageText(text: string) {
   return text;
 }
 
-function visibleUserMessage(text: string) {
+function visibleUserMessage(value: unknown) {
+  const text = stringContent(value);
   const marker = "--- USER REQUEST ---";
   if (!text.includes("--- DEVFLOW MANAGER BRIEF ---") || !text.includes(marker)) return text;
   return text.split(marker)[1]?.split("--- END USER REQUEST ---")[0]?.trim() || text;
 }
 
-function cleanUserText(text: string) {
+function cleanUserText(text: unknown) {
   return visibleUserMessage(text)
     .replace(/\s*<system-reminder>[\s\S]*?<\/system-reminder>\s*/g, "")
     .trim();

@@ -9,6 +9,7 @@ import { getMissionUiPolicy, type MissionUiAction } from "../services/mission-ui
 import { performMissionAction } from "../services/mission-action-service";
 import { loadProviderOptions, reasoningLabels } from "../services/provider-service";
 import { PixelAvatar } from "./PixelAvatar";
+import { MarkdownMessage } from "./MarkdownMessage";
 
 const SIDEBAR_OPEN_KEY = "nodra.agent.sidebar.open";
 
@@ -45,7 +46,7 @@ function Bubble({ kind, author, text }: { kind: "user" | "assistant" | "error"; 
     <div className={`event ${kind}`}>
       <div className="bubble">
         <div className="bubble-head"><div className="author">{author}</div><button type="button" className={`message-copy-button${copied ? " copied" : ""}`} onClick={() => void copyMessage()}>{copied ? "✓ Copié" : "Copier"}</button></div>
-        <div className="message-text markdown">{text}</div>
+        <div className="message-text markdown"><MarkdownMessage>{text}</MarkdownMessage></div>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import type { AgentSessionView, ManagerConversationView, ManagerThreadView, Mana
 import { latestManagerThread, listManagerConversations, loadManagerThread, sendManagerMessage, stopManager, deleteManagerThread } from "../services/manager-service";
 import { normalizeAgentConversation, type AgentConversationEvent } from "../services/agent-conversation-normalizer";
 import { PixelAvatar } from "./PixelAvatar";
+import { MarkdownMessage } from "./MarkdownMessage";
 
 const ACTIVE_RUN = new Set(["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"]);
 
@@ -44,14 +45,14 @@ function ManagerEvent({ event, manager }: { event: AgentConversationEvent; manag
   if (event.kind === "error") {
     return (
       <div className="manager-bubble from-agent">
-        <div className="manager-bubble-body error">⚠ {event.text}</div>
+        <div className="manager-bubble-body error">⚠ <MarkdownMessage>{event.text}</MarkdownMessage></div>
       </div>
     );
   }
   return (
     <div className={`manager-bubble ${event.kind === "user" ? "from-user" : "from-agent"}`}>
       {event.kind !== "user" && <PixelAvatar id={manager.id} title={manager.name} mini />}
-      <div className="manager-bubble-body">{event.text}</div>
+      <div className="manager-bubble-body markdown"><MarkdownMessage>{event.text}</MarkdownMessage></div>
     </div>
   );
 }

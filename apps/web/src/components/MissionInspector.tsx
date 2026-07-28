@@ -61,7 +61,7 @@ export function MissionInspector({
     void loadMissionInspector(missionId)
       .then((result) => {
         setData(result);
-        setForm(formFrom(result, providerOptions));
+        void formFrom(result, providerOptions).then(setForm);
       })
       .catch((reason: Error) => setError(reason.message));
   }, [missionId, providerOptions]);
@@ -154,7 +154,7 @@ export function MissionInspector({
       setStep("inspect");
       const reloaded = await loadMissionInspector(missionId);
       setData(reloaded);
-      setForm(formFrom(reloaded, providerOptions));
+      setForm(await formFrom(reloaded, providerOptions));
     } catch (reason) {
       setError((reason as Error).message);
     } finally {
@@ -186,7 +186,7 @@ export function MissionInspector({
         loadMissionResult(missionId)
       ]);
       setData(reloaded);
-      setForm(formFrom(reloaded, providerOptions));
+      setForm(await formFrom(reloaded, providerOptions));
       setResult(reloadedResult);
       setNotice(`${action.label} · action appliquée`);
     } catch (reason) {
@@ -499,11 +499,12 @@ async function createWorkspaceFromForm(form: InspectorForm, fallbackName: string
   });
 }
 
-function formFrom(data: MissionInspectorData, catalog: ProviderOptionsCatalog | null): InspectorForm | null {
+async function formFrom(data: MissionInspectorData, catalog: ProviderOptionsCatalog | null): Promise<InspectorForm | null> {
   const config = data.config;
   if (!config) return null;
   const providerId = config.providerId ?? catalog?.defaults.providerId ?? "opencode";
   const titleSlug = data.mission.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const workspace = config.workspaceId ? await showWorkspace(config.workspaceId).catch(() => null) : null;
   return {
     providerId,
     modelId: config.modelId ?? (catalog ? selectDefaultModel(catalog, providerId) : "default"),
@@ -513,10 +514,10 @@ function formFrom(data: MissionInspectorData, catalog: ProviderOptionsCatalog | 
     workspaceId: config.workspaceId ?? "",
     autoCommitAuthorized: config.autoCommitAuthorized,
     integrationTargetRef: config.integrationTargetRef ?? "",
-    workspaceKind: "scratch",
-    workspacePath: "",
+    workspaceKind: workspace?.kind ?? "scratch",
+    workspacePath: workspace?.kind === "repo" ? workspace.path : "",
     workspaceName: titleSlug,
-    sourceWorkspaceId: config.workspaceId ?? "",
+    sourceWorkspaceId: "",
     sourceRepositoryPath: "",
     baseRef: "HEAD",
     branchName: branchNameFromTitle(titleSlug || data.mission.id),
