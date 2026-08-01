@@ -1,6 +1,7 @@
 import { api } from "../api";
 import type { AgentConfigView, MissionInspectorData, MissionIntakeDraft, MissionView, ProviderOptionsCatalog } from "../types";
 import { createWorkspaceForMission } from "./workspace-service";
+import { loadMissionProviderSession } from "./mission-provider-session-service";
 
 export async function listMissions() {
   return api<MissionView[]>("/api/missions");
@@ -23,6 +24,9 @@ export async function createHumanMission(input: { title: string; projectId?: str
 }
 
 export async function showMission(missionId: string) {
+  if (missionId.includes("/")) {
+    return api<MissionView>(`/api/missions/lookup?missionId=${encodeURIComponent(missionId)}`);
+  }
   return api<MissionView>(`/api/missions/${missionId}`);
 }
 
@@ -32,10 +36,13 @@ export async function getAgentConfig(missionId: string) {
 
 export async function loadMissionInspector(missionId: string): Promise<MissionInspectorData> {
   const mission = await showMission(missionId);
-  const config = mission.executionKind === "agent"
-    ? await getAgentConfig(missionId).catch(() => null)
-    : null;
-  return { mission, config };
+  const [config, providerSession] = mission.executionKind === "agent"
+    ? await Promise.all([
+      getAgentConfig(missionId).catch(() => null),
+      loadMissionProviderSession(missionId).catch(() => null)
+    ])
+    : [null, null];
+  return { mission, config, providerSession };
 }
 
 export async function updateAgentConfig(input: {

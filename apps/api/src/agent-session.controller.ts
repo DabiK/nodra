@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Inject, Param, Post } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
-import type { NodraSqliteDatabase } from "@nodra/adapters";
+import { SqliteProviderSessionRepository, type NodraSqliteDatabase } from "@nodra/adapters";
 import { conversationItems, conversations, providerEvents, runConfigSnapshots, runs } from "@nodra/adapters";
 import type { ChangeMissionState, DispatchWorkflowOutbox, ShowMission, StartMission, SteerRun } from "@nodra/application";
 import { DomainError, toId } from "@nodra/application";
@@ -22,6 +22,12 @@ export class AgentSessionController {
 
   @Post("missions/:id/start")
   async start(@Param("id") id: string, @Body() body: StartSessionDto) {
+    if ((await new SqliteProviderSessionRepository(this.database).listActiveLinksForMission(toId(id))).length) {
+      throw new DomainError(
+        "This mission is linked to a provider session; use the provider-session conversation endpoints",
+        "PROVIDER_SESSION_START_REQUIRED"
+      );
+    }
     const mission = await this.showMission.execute(toId(id));
     if (!mission) throw new DomainError(`Mission ${id} was not found`, "MISSION_NOT_FOUND");
     const context = commandContext(body.commandId);

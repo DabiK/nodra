@@ -200,6 +200,7 @@ export interface AgentSessionView {
 export interface MissionInspectorData {
   mission: MissionView;
   config: AgentConfigView | null;
+  providerSession: ProviderSessionDetailView | null;
 }
 
 export type ManagerState = "draft" | "ready" | "active" | "blocked" | "archived";
@@ -251,4 +252,76 @@ export interface ManagerThreadView {
   items: Array<{ id: string; kind: string; body: string | null; createdAt: string }>;
   events: AgentSessionView["events"];
   threadId: string;
+}
+
+export type ProviderSessionCapabilityState = "certified" | "compatible_unverified" | "unavailable";
+
+export interface ProviderSessionCapability {
+  state: ProviderSessionCapabilityState;
+  reason: string | null;
+  action: string | null;
+}
+
+export interface ProviderSessionCapabilities {
+  schemaVersion: 1;
+  providerId: string;
+  listSessions: ProviderSessionCapability;
+  readSession: ProviderSessionCapability;
+  readHistory: ProviderSessionCapability;
+  subscribe: ProviderSessionCapability;
+  cursorResume: ProviderSessionCapability;
+  attachedControl: ProviderSessionCapability;
+}
+
+export interface ProviderSessionSummaryView {
+  ref: { providerId: string; externalSessionId: string };
+  title: string | null;
+  cwd: string | null;
+  state: "active" | "idle" | "archived" | "unknown";
+  sourceCreatedAt: string | null;
+  sourceUpdatedAt: string | null;
+  receivedAt: string;
+}
+
+export interface ProviderSessionListItem {
+  id: string;
+  summary: ProviderSessionSummaryView;
+  link: { id: string; providerSessionId?: string; missionId: string; mode: "read_only" | "control"; attachedAt: string; detachedAt: string | null } | null;
+}
+
+export interface ProviderSessionListView {
+  sessions: ProviderSessionListItem[];
+  nextCursor: string | null;
+}
+
+export interface ProviderSessionDetailView {
+  identity: { id: string; providerId: string; externalSessionRef: string; ownership: "external_observed"; firstObservedAt: string; lastObservedAt: string };
+  snapshot: {
+    session: ProviderSessionSummaryView;
+    turns: Array<{ externalTurnId: string; order: number; state: string; sourceStartedAt: string | null; sourceCompletedAt: string | null; receivedAt: string }>;
+    items: Array<{ externalItemId: string; externalTurnId: string | null; role: string; kind: string; order: number; text: string | null; name: string | null; sourceAt: string | null; receivedAt: string }>;
+    cursor: string | null;
+  };
+  link: ProviderSessionListItem["link"];
+  capabilities: ProviderSessionCapabilities;
+}
+
+export interface ProviderSessionControlCapabilities {
+  schemaVersion: 1;
+  providerId: string;
+  read: ProviderSessionCapability;
+  startTurn: ProviderSessionCapability;
+  steer: ProviderSessionCapability;
+  queue: ProviderSessionCapability;
+}
+
+export interface MissionProviderSessionCapabilitiesView {
+  identity: ProviderSessionDetailView["identity"];
+  link: NonNullable<ProviderSessionDetailView["link"]>;
+  capabilities: ProviderSessionControlCapabilities;
+}
+
+export interface ProviderSessionTurnCommandResult {
+  ref: { providerId: string; externalSessionId: string };
+  externalTurnId: string;
 }

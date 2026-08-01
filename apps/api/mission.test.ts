@@ -68,6 +68,33 @@ describe("mission and Relay API", () => {
     expect(relay.body).toEqual({ ready: [], active: [], blocked: [], decision_required: [] });
   });
 
+  it("looks up missions whose identifiers contain path separators", async () => {
+    const missionId = "mission/provider-session/uuid";
+    const database = NodraSqliteDatabase.open(databaseFile);
+    try {
+      database.orm.insert(missions).values({
+        id: missionId,
+        projectId: null,
+        title: "Provider session mission",
+        executionKind: "agent",
+        state: "ACTIVE",
+        version: 1,
+        createdAt: "2026-08-01T12:00:00.000Z",
+        updatedAt: "2026-08-01T12:00:00.000Z"
+      }).run();
+    } finally {
+      database.close();
+    }
+
+    const shown = await request(app.getHttpServer())
+      .get("/api/missions/lookup")
+      .query({ missionId })
+      .expect(200);
+    expect(shown.body).toMatchObject({ id: missionId, state: "ACTIVE", version: 1 });
+
+    await request(app.getHttpServer()).get("/api/missions/lookup").expect(400);
+  });
+
   it("returns normative problem details for forbidden and stale transitions", async () => {
     const created = await request(app.getHttpServer()).post("/api/missions").send({ title: "Errors" }).expect(201);
     const id = created.body.id as string;

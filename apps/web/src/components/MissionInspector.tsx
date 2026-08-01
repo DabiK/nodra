@@ -103,7 +103,8 @@ export function MissionInspector({
     latestRunId: result?.latestRunId ?? null,
     latestRunState: result?.latestRunState ?? null,
     hasDelivery: Boolean(result?.hasStructuredDelivery),
-    hasResultText: Boolean(result?.assistantMessage?.trim())
+    hasResultText: Boolean(result?.assistantMessage?.trim()),
+    hasProviderSession: Boolean(data.providerSession)
   }) : null;
 
   const patch = (patchValue: Partial<InspectorForm>) => setForm((current) => current ? { ...current, ...patchValue } : current);

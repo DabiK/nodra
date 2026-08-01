@@ -1,10 +1,13 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
+import { randomUUID } from "node:crypto";
 import { Module, type DynamicModule } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 import {
   ContentAddressedBlobStore,
   CodexProviderAdapter,
+  CodexProviderSessionControlAdapter,
+  CodexProviderSessionSyncAdapter,
   OpenCodeProviderAdapter,
   LazyTemporalConnection,
   LazyTemporalWorkflowAdapter,
@@ -27,6 +30,7 @@ import {
   SqliteManagerExecutionRepository,
   SqlitePipelineRepository,
   SqliteProviderCatalogRepository,
+  SqliteProviderSessionRepository,
   SqliteRunControlRepository,
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
@@ -35,8 +39,10 @@ import {
   SqliteWorkflowReconciliationStore
 } from "@nodra/adapters";
 import {
+  ActivateProviderSessionMission,
   ChangeMissionState,
   AdvancePipeline,
+  AttachProviderSession,
   ApprovePipelineNodeTransition,
   ArchiveManager,
   CancelRun,
@@ -44,6 +50,7 @@ import {
   CommitWorkspace,
   CollectEvidence,
   CreateManager,
+  CreateActiveMissionForProviderSession,
   CreateMission,
   CreatePipeline,
   CreateWorkspace,
@@ -54,8 +61,11 @@ import {
   GetHealth,
   GetProviderStatus,
   GetRelay,
+  GetProviderSessionSyncCapabilities,
+  GetMissionProviderSessionControlCapabilities,
   ListMissions,
   ListManagerConversations,
+  ListProviderSessions,
   ListManagers,
   ManageApprovals,
   ManageConfirmations,
@@ -70,24 +80,32 @@ import {
   ListPipelines,
   SetPipelineNodeTransitionMode,
   ShowMission,
+  ShowProviderSession,
   ShowManager,
   SnapshotWorkspace,
   StartManagerRun,
   StartMission,
+  StartProviderSessionTurn,
   StartPipeline,
   SteerRun,
+  SteerProviderSessionTurn,
   ProbeProvider,
   PublishPipelineNodeHandover,
   ProviderRegistry,
+  ProviderSessionControlRegistry,
+  ProviderSessionSyncRegistry,
   PreviewAgentConfig,
+  ReadMissionProviderSession,
   ResolveAgentConfig,
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
   RestoreWorkspace,
   ResolveWorktree,
   UpdateAgentConfig,
-  UpdateManager
+  UpdateManager,
+  toId
 } from "@nodra/application";
+import type { ProviderSessionControlPort, ProviderSessionSyncPort } from "@nodra/application";
 import { ApprovalController } from "./approval.controller.js";
 import { AgentSessionController } from "./agent-session.controller.js";
 import { BusinessErrorFilter } from "./business-error.filter.js";
@@ -106,6 +124,7 @@ import { RuntimeController } from "./runtime.controller.js";
 import { RuntimeLifecycle } from "./runtime-lifecycle.js";
 import { WorkspaceController } from "./workspace.controller.js";
 import { ProviderController } from "./provider.controller.js";
+import { ProviderSessionController } from "./provider-session.controller.js";
 import { PipelineController } from "./pipeline.controller.js";
 import { RunController } from "./run.controller.js";
 import {
@@ -140,6 +159,18 @@ import {
   PUBLISH_PIPELINE_NODE_HANDOVER,
   PROVIDER_CATALOG,
   PROVIDER_REGISTRY,
+  PROVIDER_SESSION_SYNC_REGISTRY,
+  LIST_PROVIDER_SESSIONS,
+  SHOW_PROVIDER_SESSION,
+  ATTACH_PROVIDER_SESSION,
+  CREATE_ACTIVE_MISSION_FOR_PROVIDER_SESSION,
+  GET_PROVIDER_SESSION_SYNC_CAPABILITIES,
+  PROVIDER_SESSION_CONTROL_REGISTRY,
+  READ_MISSION_PROVIDER_SESSION,
+  GET_MISSION_PROVIDER_SESSION_CONTROL_CAPABILITIES,
+  ACTIVATE_PROVIDER_SESSION_MISSION,
+  START_PROVIDER_SESSION_TURN,
+  STEER_PROVIDER_SESSION_TURN,
   READ_EVIDENCE,
   READ_WORKSPACE,
   RECONCILE_WORKFLOWS,
@@ -176,6 +207,8 @@ export interface NodraModuleOptions {
   temporalNamespace?: string;
   dataRoot?: string;
   opencodeBaseUrl?: string;
+  providerSessionSyncPorts?: readonly ProviderSessionSyncPort[];
+  providerSessionControlPorts?: readonly ProviderSessionControlPort[];
 }
 
 @Module({})
@@ -183,7 +216,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, RunController, PipelineController],
+      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, ProviderSessionController, RunController, PipelineController],
       providers: [
         { provide: REPOSITORY_ROOT, useValue: options.repositoryRoot ?? process.cwd() },
         { provide: DATA_ROOT, useValue: options.dataRoot ?? dirname(options.databaseFile) },
@@ -311,6 +344,79 @@ export class NodraModule {
           ])
         },
         {
+          provide: PROVIDER_SESSION_SYNC_REGISTRY,
+          useFactory: () => new ProviderSessionSyncRegistry(
+            options.providerSessionSyncPorts ?? [new CodexProviderSessionSyncAdapter()]
+          )
+        },
+        {
+          provide: PROVIDER_SESSION_CONTROL_REGISTRY,
+          useFactory: () => new ProviderSessionControlRegistry(
+            options.providerSessionControlPorts ?? [new CodexProviderSessionControlAdapter()]
+          )
+        },
+        {
+          provide: LIST_PROVIDER_SESSIONS,
+          inject: [PROVIDER_SESSION_SYNC_REGISTRY, DATABASE],
+          useFactory: (providers: ProviderSessionSyncRegistry, database: NodraSqliteDatabase) =>
+            new ListProviderSessions(providers, new SqliteProviderSessionRepository(database), {
+              next: () => toId(randomUUID())
+            })
+        },
+        {
+          provide: SHOW_PROVIDER_SESSION,
+          inject: [PROVIDER_SESSION_SYNC_REGISTRY, DATABASE],
+          useFactory: (providers: ProviderSessionSyncRegistry, database: NodraSqliteDatabase) =>
+            new ShowProviderSession(providers, new SqliteProviderSessionRepository(database))
+        },
+        {
+          provide: GET_PROVIDER_SESSION_SYNC_CAPABILITIES,
+          inject: [PROVIDER_SESSION_SYNC_REGISTRY],
+          useFactory: (providers: ProviderSessionSyncRegistry) => new GetProviderSessionSyncCapabilities(providers)
+        },
+        {
+          provide: ATTACH_PROVIDER_SESSION,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) =>
+            new AttachProviderSession(new SqliteProviderSessionRepository(database))
+        },
+        {
+          provide: CREATE_ACTIVE_MISSION_FOR_PROVIDER_SESSION,
+          inject: [PROVIDER_SESSION_SYNC_REGISTRY, DATABASE],
+          useFactory: (providers: ProviderSessionSyncRegistry, database: NodraSqliteDatabase) =>
+            new CreateActiveMissionForProviderSession(providers, new SqliteProviderSessionRepository(database))
+        },
+        {
+          provide: READ_MISSION_PROVIDER_SESSION,
+          inject: [PROVIDER_SESSION_SYNC_REGISTRY, DATABASE],
+          useFactory: (providers: ProviderSessionSyncRegistry, database: NodraSqliteDatabase) =>
+            new ReadMissionProviderSession(providers, new SqliteProviderSessionRepository(database))
+        },
+        {
+          provide: GET_MISSION_PROVIDER_SESSION_CONTROL_CAPABILITIES,
+          inject: [PROVIDER_SESSION_CONTROL_REGISTRY, DATABASE],
+          useFactory: (controls: ProviderSessionControlRegistry, database: NodraSqliteDatabase) =>
+            new GetMissionProviderSessionControlCapabilities(controls, new SqliteProviderSessionRepository(database))
+        },
+        {
+          provide: ACTIVATE_PROVIDER_SESSION_MISSION,
+          inject: [PROVIDER_SESSION_CONTROL_REGISTRY, DATABASE],
+          useFactory: (controls: ProviderSessionControlRegistry, database: NodraSqliteDatabase) =>
+            new ActivateProviderSessionMission(controls, new SqliteProviderSessionRepository(database))
+        },
+        {
+          provide: START_PROVIDER_SESSION_TURN,
+          inject: [PROVIDER_SESSION_CONTROL_REGISTRY, DATABASE],
+          useFactory: (controls: ProviderSessionControlRegistry, database: NodraSqliteDatabase) =>
+            new StartProviderSessionTurn(controls, new SqliteProviderSessionRepository(database))
+        },
+        {
+          provide: STEER_PROVIDER_SESSION_TURN,
+          inject: [PROVIDER_SESSION_CONTROL_REGISTRY, DATABASE],
+          useFactory: (controls: ProviderSessionControlRegistry, database: NodraSqliteDatabase) =>
+            new SteerProviderSessionTurn(controls, new SqliteProviderSessionRepository(database))
+        },
+        {
           provide: PROVIDER_CATALOG,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new SqliteProviderCatalogRepository(database)
@@ -398,7 +504,8 @@ export class NodraModule {
               new SqliteMissionExecutionRepository(database),
               temporal,
               catalog,
-              resolver
+              resolver,
+              new SqliteProviderSessionRepository(database)
             );
           }
         },

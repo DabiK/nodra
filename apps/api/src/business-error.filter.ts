@@ -25,6 +25,11 @@ const statusFor = (code: string): number => {
     code === "BLOB_DIGEST_MISMATCH"
   ) return 409;
   if (code === "MISSION_TITLE_REQUIRED" || code === "BLOCK_REASON_REQUIRED") return 422;
+  if (code === "PROVIDER_SESSION_SYNC_UNAVAILABLE" || code === "PROVIDER_SESSION_SYNC_TRANSIENT") return 503;
+  if (code === "PROVIDER_SESSION_ACCESS_DENIED" || code === "PROVIDER_SESSION_CONTROL_FORBIDDEN") return 403;
+  if (code === "PROVIDER_SESSION_PROTOCOL_INCOMPATIBLE") return 422;
+  if (code === "PROVIDER_SESSION_LINK_CONFLICT") return 409;
+  if (code === "PROVIDER_SESSION_START_REQUIRED") return 409;
   if (code === "PERSISTENCE_FAILURE") return 500;
   if (code === "RUNTIME_UNHEALTHY" || code === "WORKFLOW_UNAVAILABLE") return 503;
   if (code === "AGENT_CONFIG_REQUIRED") return 422;

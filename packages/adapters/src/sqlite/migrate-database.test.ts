@@ -32,7 +32,7 @@ describe("migrateDatabase", () => {
 
     const result = await migrateDatabase(database, migrationsDirectory);
 
-    expect(result).toMatchObject({ version: 10, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] });
+    expect(result).toMatchObject({ version: 12, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] });
     expect(registeredMigrations(database)).toEqual([
       expect.objectContaining({ version: 1 }),
       expect.objectContaining({ version: 2 }),
@@ -43,7 +43,9 @@ describe("migrateDatabase", () => {
       expect.objectContaining({ version: 7 }),
       expect.objectContaining({ version: 8 }),
       expect.objectContaining({ version: 9 }),
-      expect.objectContaining({ version: 10, checksum: result.checksum })
+      expect.objectContaining({ version: 10 }),
+      expect.objectContaining({ version: 11 }),
+      expect.objectContaining({ version: 12, checksum: result.checksum })
     ]);
   });
 
@@ -69,11 +71,39 @@ describe("migrateDatabase", () => {
 
     const upgraded = await migrateDatabase(database, resolve("packages/adapters/drizzle"));
 
-    expect(upgraded).toMatchObject({ version: 10, registeredVersions: [3, 4, 5, 6, 7, 8, 9, 10] });
+    expect(upgraded).toMatchObject({ version: 12, registeredVersions: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12] });
     expect(database.connection.prepare("select name from sqlite_master where type = 'index' and name = 'gate_override_approval_id_unique'").get()).toBeTruthy();
     expect(database.connection.prepare("select name from sqlite_master where type = 'index' and name = 'idx_confirmation_state_expires'").get()).toBeTruthy();
     expect(database.connection.prepare("select name from sqlite_master where type = 'trigger' and name = 'confirmation_exact_fields_immutable'").get()).toBeTruthy();
     expect(database.connection.prepare("select name from sqlite_master where type = 'trigger' and name = 'workspace_state_transition'").get()).toBeTruthy();
+  });
+
+  it("preserves existing read-only provider links while adding the control mode", async () => {
+    const { database, migrationsDirectory } = await createFixture();
+    const journalFile = join(migrationsDirectory, "meta", "_journal.json");
+    const journal = JSON.parse(await readFile(journalFile, "utf8")) as { entries: unknown[] };
+    journal.entries = journal.entries.slice(0, 11);
+    await writeFile(journalFile, `${JSON.stringify(journal, null, 2)}\n`);
+    await unlink(join(migrationsDirectory, "0011_deep_power_pack.sql"));
+    await migrateDatabase(database, migrationsDirectory);
+    database.connection.prepare(`
+      insert into mission(id, project_id, title, execution_kind, state, version, temporal_parent_workflow_id, created_at, updated_at, deleted_at)
+      values('mission-existing-provider', null, 'Existing provider mission', 'agent', 'READY', 1, null, '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z', null)
+    `).run();
+    database.connection.prepare(`
+      insert into provider_session(id, provider_id, external_session_ref, ownership, first_observed_at, last_observed_at)
+      values('session-existing', 'codex', 'thread-existing', 'external_observed', '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')
+    `).run();
+    database.connection.prepare(`
+      insert into provider_session_link(id, provider_session_id, mission_id, mode, attached_at, detached_at)
+      values('link-existing', 'session-existing', 'mission-existing-provider', 'read_only', '2026-08-01T00:00:00.000Z', null)
+    `).run();
+
+    await migrateDatabase(database, resolve("packages/adapters/drizzle"));
+
+    expect(database.connection.prepare("select mode from provider_session_link where id = 'link-existing'").get())
+      .toEqual({ mode: "read_only" });
+    expect(database.connection.prepare("pragma foreign_key_check").all()).toEqual([]);
   });
 
   it("rejects an altered registered migration before changing the registry", async () => {
@@ -118,19 +148,19 @@ describe("migrateDatabase", () => {
       idx: nextIndex,
       version: first.version,
       when: last.when + 1,
-      tag: "0010_multi_migration_probe",
+      tag: "0012_multi_migration_probe",
       breakpoints: true
     });
     await writeFile(journalFile, `${JSON.stringify(journal, null, 2)}\n`);
     await writeFile(
-      join(migrationsDirectory, "0010_multi_migration_probe.sql"),
+      join(migrationsDirectory, "0012_multi_migration_probe.sql"),
       "CREATE TABLE `migration_probe` (`id` integer PRIMARY KEY NOT NULL);\n"
     );
 
     const result = await migrateDatabase(database, migrationsDirectory);
 
-    expect(result).toMatchObject({ version: 11, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] });
-    expect(registeredMigrations(database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(result).toMatchObject({ version: 13, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] });
+    expect(registeredMigrations(database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
     expect(database.connection.prepare("select name from sqlite_master where name = 'migration_probe'").get()).toBeTruthy();
   });
 });

@@ -2,9 +2,7 @@ import type { MissionState, MissionView } from "../types";
 
 export type MissionActionId =
   | "configure"
-  | "start"
-  | "open-run"
-  | "view-result"
+  | "open-provider-session"
   | "validate"
   | "accept-result"
   | "request-changes"
@@ -22,6 +20,7 @@ export interface MissionUiContext {
   latestRunState: string | null;
   hasDelivery: boolean;
   hasResultText: boolean;
+  hasProviderSession?: boolean;
 }
 
 export interface MissionUiAction {
@@ -74,7 +73,7 @@ export function getMissionUiPolicy(context: MissionUiContext): MissionUiPolicy {
   const showConversationLink = Boolean(context.latestRunId);
   const showResultPanel = Boolean(context.latestRunId) || ["VALIDATION", "DONE", "BLOCKED"].includes(mission.state);
   const showValidationActions = isAgent && mission.state === "VALIDATION";
-  const actions = isAgent ? agentActions(context, canEditConfig, canStart) : humanActions(context);
+  const actions = isAgent ? agentActions(context, canEditConfig) : humanActions(context);
 
   return {
     phaseLabel: labels[mission.state],
@@ -91,51 +90,48 @@ export function getMissionUiPolicy(context: MissionUiContext): MissionUiPolicy {
   };
 }
 
-function agentActions(context: MissionUiContext, canEditConfig: boolean, canStart: boolean): MissionUiAction[] {
-  const hasRun = Boolean(context.latestRunId);
-  const hasResult = context.hasResultText || hasRun;
+function agentActions(context: MissionUiContext, canEditConfig: boolean): MissionUiAction[] {
   const deliveryReason = context.hasDelivery ? undefined : "Résultat structuré indisponible";
+  const providerConversation = (primary = false) => action({
+    id: "open-provider-session",
+    label: "Ouvrir la conversation",
+    enabled: Boolean(context.hasProviderSession),
+    primary,
+    disabledReason: context.hasProviderSession ? undefined : "Session provider non attachée"
+  });
 
   switch (context.mission.state) {
     case "DRAFT":
       return [
-        action({ id: canStart ? "start" : "configure", label: canStart ? "Lancer →" : "Configurer", enabled: canStart || canEditConfig, primary: true }),
-        action({ id: "configure", label: "Configurer", enabled: canEditConfig }),
-        action({ id: "open-run", label: "Voir dernier run", enabled: hasRun, disabledReason: "Aucun run disponible" }),
+        action({ id: "configure", label: "Configurer", enabled: canEditConfig, primary: true }),
+        providerConversation(),
         action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
       ];
     case "READY":
       return [
-        action({ id: "start", label: "Lancer →", enabled: canStart, primary: true, disabledReason: "Configuration agent manquante" }),
-        action({ id: "open-run", label: "Voir dernier run", enabled: hasRun, disabledReason: "Aucun run disponible" }),
+        providerConversation(true),
         action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
       ];
     case "ACTIVE":
-      return [
-        action({ id: "open-run", label: "Ouvrir le run", enabled: hasRun, primary: true, disabledReason: "Run introuvable" })
-      ];
+      return [providerConversation(true)];
     case "VALIDATION":
       return [
         action({ id: "validate", label: "Valider ✓", enabled: true, primary: true }),
-        action({ id: "view-result", label: "Voir résultat", enabled: hasResult, disabledReason: "Aucun résultat disponible" }),
-        action({ id: "open-run", label: "Ouvrir conversation", enabled: hasRun, disabledReason: "Run introuvable" }),
+        providerConversation(),
         action({ id: "accept-result", label: "Accepter (delivery)", enabled: context.hasDelivery, disabledReason: deliveryReason }),
         action({ id: "request-changes", label: "Demander corrections", enabled: context.hasDelivery, disabledReason: deliveryReason }),
         action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
       ];
     case "DONE":
-      return [
-        action({ id: "view-result", label: "Voir résultat", enabled: hasResult, primary: true, disabledReason: "Aucun résultat disponible" }),
-        action({ id: "open-run", label: "Ouvrir conversation", enabled: hasRun, disabledReason: "Run introuvable" })
-      ];
+      return [providerConversation(true)];
     case "BLOCKED":
       return [
-        action({ id: "open-run", label: "Voir erreur / run", enabled: hasRun, primary: hasRun, disabledReason: "Run introuvable" }),
-        action({ id: "resume", label: "Remettre READY", enabled: true, primary: !hasRun }),
+        providerConversation(true),
+        action({ id: "resume", label: "Remettre READY", enabled: true, primary: !context.hasProviderSession }),
         action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
       ];
     case "ABANDONED":
-      return [action({ id: "open-run", label: "Ouvrir conversation", enabled: hasRun, disabledReason: "Aucun run disponible" })];
+      return [providerConversation()];
     default:
       return [];
   }

@@ -1,7 +1,7 @@
 import { api } from "../api";
 import type { MissionView } from "../types";
 import type { MissionActionId } from "./mission-ui-policy";
-import { startMissionSession } from "./agent-session-service";
+import { activateMissionProviderSession } from "./mission-provider-session-service";
 
 export interface MissionActionInput {
   actionId: MissionActionId;
@@ -12,14 +12,11 @@ export interface MissionActionInput {
 
 export async function performMissionAction(input: MissionActionInput) {
   const { actionId, mission, latestRunId } = input;
-  if (actionId === "start") {
-    const result = await startMissionSession(mission.id, mission.version);
-    location.assign(`/agent.html?threadId=${encodeURIComponent(result.threadId)}`);
-    return;
-  }
-  if (actionId === "open-run" || actionId === "view-result") {
-    if (!latestRunId) throw new Error("Aucun run disponible pour cette mission.");
-    location.assign(`/agent.html?threadId=${encodeURIComponent(latestRunId)}`);
+  if (actionId === "open-provider-session") {
+    if (mission.state === "READY") {
+      await activateMissionProviderSession(mission.id, mission.version, crypto.randomUUID());
+    }
+    location.assign(`/agent.html?missionId=${encodeURIComponent(mission.id)}`);
     return;
   }
   if (actionId === "accept-result") return decideDelivery(latestRunId, "accept", mission.version, input.comment ?? "Résultat accepté");

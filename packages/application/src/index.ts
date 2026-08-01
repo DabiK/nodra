@@ -108,6 +108,81 @@ export type {
   ProviderSmokeResult
 } from "./provider-model.js";
 export type { ProviderPort } from "./provider-port.js";
+export type { ProviderSessionSyncPort } from "./provider-session-sync-port.js";
+export type { ProviderSessionControlPort } from "./provider-session-control-port.js";
+export type { ProviderSessionControlRepository } from "./provider-session-control-repository.js";
+export { ProviderSessionControlRegistry } from "./provider-session-control-registry.js";
+export type {
+  ProviderSessionControlCapabilities,
+  ProviderSessionStartTurnInput,
+  ProviderSessionSteerInput,
+  ProviderSessionTurnCommandResult
+} from "./provider-session-control-model.js";
+export { ProviderSessionSyncError } from "./provider-session-sync-error.js";
+export { ProviderSessionSyncRegistry } from "./provider-session-sync-registry.js";
+export { ListProviderSessions } from "./list-provider-sessions.js";
+export { ShowProviderSession } from "./show-provider-session.js";
+export { ReadMissionProviderSession } from "./read-mission-provider-session.js";
+export { ActivateProviderSessionMission } from "./activate-provider-session-mission.js";
+export { GetMissionProviderSessionControlCapabilities } from "./get-mission-provider-session-control-capabilities.js";
+export { StartProviderSessionTurn, type StartProviderSessionTurnInput } from "./start-provider-session-turn.js";
+export { SteerProviderSessionTurn, type SteerProviderSessionTurnInput } from "./steer-provider-session-turn.js";
+export { AttachProviderSession } from "./attach-provider-session.js";
+export { AttachExternalProviderSession } from "./attach-external-provider-session.js";
+export type { AttachExternalProviderSessionInput } from "./attach-external-provider-session.js";
+export {
+  CreateActiveMissionForProviderSession,
+  type CreateActiveMissionForProviderSessionInput
+} from "./create-active-mission-for-provider-session.js";
+export { GetProviderSessionSyncCapabilities } from "./get-provider-session-sync-capabilities.js";
+export type { ProviderSessionIdGenerator } from "./provider-session-id-generator.js";
+export type {
+  ListedProviderSession,
+  ProviderSessionDetailProjection,
+  ProviderSessionListProjection
+} from "./provider-session-projection.js";
+export type {
+  AttachProviderSessionInput,
+  ActivateProviderSessionMissionInput,
+  ActivatedProviderSessionMissionResult,
+  CreateReadyAgentMissionAndAttachInput,
+  CreatedProviderSessionMissionResult,
+  ObserveProviderSessionInput,
+  ProviderSessionAttachmentResult,
+  ProviderSessionIdentity,
+  ProviderSessionLink,
+  ProviderSessionLinkMode,
+  ProviderSessionOwnership
+} from "./provider-session-model.js";
+export type { ProviderSessionRepository } from "./provider-session-repository.js";
+export type {
+  ProviderHistoryPage,
+  ProviderHistoryQuery,
+  ProviderSessionCursor,
+  ProviderSessionCursorInvalidatedEvent,
+  ProviderSessionEvent,
+  ProviderSessionItem,
+  ProviderSessionItemKind,
+  ProviderSessionItemRole,
+  ProviderSessionItemUpsertedEvent,
+  ProviderSessionListQuery,
+  ProviderSessionPage,
+  ProviderSessionRef,
+  ProviderSessionRemovedEvent,
+  ProviderSessionSnapshot,
+  ProviderSessionState,
+  ProviderSessionSummary,
+  ProviderSessionSyncCapabilities,
+  ProviderSessionSyncCapability,
+  ProviderSessionSyncCapabilityState,
+  ProviderSessionSyncErrorCode,
+  ProviderSessionSyncErrorDetails,
+  ProviderSessionTurn,
+  ProviderSessionTurnState,
+  ProviderSessionTurnUpsertedEvent,
+  ProviderSessionUpsertedEvent,
+  ProviderSubscription
+} from "./provider-session-sync-model.js";
 export { ProviderRegistry } from "./provider-registry.js";
 export { deriveProviderHealth } from "./provider-health.js";
 export { ProviderProtocolIncompatibleError } from "./provider-protocol-incompatible-error.js";

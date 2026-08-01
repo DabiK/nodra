@@ -96,6 +96,16 @@ Mission agent configuration:
     [--options-json <json-object>]
       Configure the agent used by a mission.
 
+Provider sessions:
+  provider-session:attach
+    --provider <provider-id>
+    --session <external-session-id>
+    --mission <mission-id>
+    [--command-id <stable-id>]
+      Read an external provider session and attach it read-only to a mission.
+      The session identifier is provider-native. Reuse --command-id to retry
+      idempotently; without it, the CLI generates a new UUID per invocation.
+
 Relay:
   relay
   relay --scratch

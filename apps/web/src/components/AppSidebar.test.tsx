@@ -45,4 +45,10 @@ describe("AppSidebar", () => {
     fireEvent.click(screen.getByRole("link", { name: /Pipelines/ }));
     expect(onNavigate).toHaveBeenCalledWith("pipelines");
   });
+
+  it("navigates to the Codex sessions observatory", () => {
+    const { onNavigate } = renderSidebar(false);
+    fireEvent.click(screen.getByRole("link", { name: /Sessions Codex/ }));
+    expect(onNavigate).toHaveBeenCalledWith("provider-sessions");
+  });
 });

@@ -9,5 +9,6 @@ export * from "./operations.js";
 export * from "./pipelines.js";
 export * from "./provider-events.js";
 export * from "./provider-catalog.js";
+export * from "./provider-sessions.js";
 export * from "./runs.js";
 export * from "./scheduling.js";

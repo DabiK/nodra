@@ -5,6 +5,7 @@ import type { MissionRepository } from "./mission-repository.js";
 import type { RuntimeHealthProbe } from "./runtime-health-probe.js";
 import type { ProviderCatalogRepository } from "./provider-catalog-repository.js";
 import type { ResolveAgentConfig } from "./resolve-agent-config.js";
+import type { ProviderSessionRepository } from "./provider-session-repository.js";
 
 export interface StartMissionCommand {
   missionId: Id;
@@ -33,12 +34,19 @@ export class StartMission {
     private readonly executions: MissionExecutionRepository,
     private readonly runtime: RuntimeHealthProbe,
     private readonly providers?: ProviderCatalogRepository,
-    private readonly resolver?: ResolveAgentConfig
+    private readonly resolver?: ResolveAgentConfig,
+    private readonly providerSessions?: ProviderSessionRepository
   ) {}
 
   async execute(command: StartMissionCommand): Promise<StartMissionResult> {
     const mission = await this.missions.load(command.missionId);
     if (!mission) throw new DomainError(`Mission ${command.missionId} was not found`, "MISSION_NOT_FOUND");
+    if ((await this.providerSessions?.listActiveLinksForMission(command.missionId))?.length) {
+      throw new DomainError(
+        "This mission is linked to a provider session; use the provider-session conversation endpoints",
+        "PROVIDER_SESSION_START_REQUIRED"
+      );
+    }
     if (mission.snapshot().version !== command.expectedVersion) {
       throw new DomainError("Mission version conflict", "MISSION_VERSION_CONFLICT");
     }

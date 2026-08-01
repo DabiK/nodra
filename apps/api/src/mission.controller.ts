@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post, Put, Query } from "@nestjs/common";
 import type {
+  ActivateProviderSessionMission,
   ChangeMissionState,
   CreateMission,
   HumanMissionAction,
@@ -9,20 +10,29 @@ import type {
   ShowMission,
   EnableAgentConfig,
   GetAgentConfig,
+  GetMissionProviderSessionControlCapabilities,
   PreviewAgentConfig,
+  ReadMissionProviderSession,
+  StartProviderSessionTurn,
+  SteerProviderSessionTurn,
   UpdateAgentConfig
 } from "@nodra/application";
 import { DomainError, toId } from "@nodra/application";
 import { randomUUID } from "node:crypto";
 import {
+  ACTIVATE_PROVIDER_SESSION_MISSION,
   CHANGE_MISSION_STATE,
   CREATE_MISSION,
   ENABLE_AGENT_CONFIG,
   GET_AGENT_CONFIG,
+  GET_MISSION_PROVIDER_SESSION_CONTROL_CAPABILITIES,
   LIST_MISSIONS,
   PREVIEW_AGENT_CONFIG,
+  READ_MISSION_PROVIDER_SESSION,
   SHOW_MISSION,
   START_MISSION,
+  START_PROVIDER_SESSION_TURN,
+  STEER_PROVIDER_SESSION_TURN,
   UPDATE_AGENT_CONFIG
 } from "./tokens.js";
 /* eslint-disable @typescript-eslint/consistent-type-imports */
@@ -31,6 +41,10 @@ import { BlockMissionDto } from "./dto/block-mission.dto.js";
 import { MissionTransitionDto } from "./dto/mission-transition.dto.js";
 import { EnableAgentConfigDto } from "./dto/enable-agent-config.dto.js";
 import { UpdateAgentConfigDto } from "./dto/update-agent-config.dto.js";
+import { MissionLookupQueryDto } from "./dto/mission-lookup-query.dto.js";
+import { ActivateProviderSessionMissionDto } from "./dto/activate-provider-session-mission.dto.js";
+import { StartProviderSessionTurnDto } from "./dto/start-provider-session-turn.dto.js";
+import { SteerProviderSessionTurnDto } from "./dto/steer-provider-session-turn.dto.js";
 
 @Controller("api/missions")
 export class MissionController {
@@ -43,7 +57,12 @@ export class MissionController {
     @Inject(ENABLE_AGENT_CONFIG) private readonly enableAgentConfig: EnableAgentConfig,
     @Inject(GET_AGENT_CONFIG) private readonly getAgentConfig: GetAgentConfig,
     @Inject(UPDATE_AGENT_CONFIG) private readonly updateAgentConfig: UpdateAgentConfig,
-    @Inject(PREVIEW_AGENT_CONFIG) private readonly previewAgentConfig: PreviewAgentConfig
+    @Inject(PREVIEW_AGENT_CONFIG) private readonly previewAgentConfig: PreviewAgentConfig,
+    @Inject(READ_MISSION_PROVIDER_SESSION) private readonly readProviderSession: ReadMissionProviderSession,
+    @Inject(GET_MISSION_PROVIDER_SESSION_CONTROL_CAPABILITIES) private readonly providerSessionControlCapabilities: GetMissionProviderSessionControlCapabilities,
+    @Inject(ACTIVATE_PROVIDER_SESSION_MISSION) private readonly activateProviderSession: ActivateProviderSessionMission,
+    @Inject(START_PROVIDER_SESSION_TURN) private readonly startProviderTurn: StartProviderSessionTurn,
+    @Inject(STEER_PROVIDER_SESSION_TURN) private readonly steerProviderTurn: SteerProviderSessionTurn
   ) {}
 
   @Post()
@@ -62,6 +81,11 @@ export class MissionController {
     return this.listMissions.execute(this.filter(projectId));
   }
 
+  @Get("lookup")
+  lookup(@Query() query: MissionLookupQueryDto) {
+    return this.showMission.execute(toId(query.missionId));
+  }
+
   @Get(":id")
   show(@Param("id") id: string) {
     return this.showMission.execute(toId(id));
@@ -70,6 +94,38 @@ export class MissionController {
   @Post(":id/ready")
   ready(@Param("id") id: string, @Body() body: MissionTransitionDto) {
     return this.transition(id, body, { type: "prepare" });
+  }
+
+  @Get(":id/provider-session")
+  providerSession(@Param("id") id: string) {
+    return this.readProviderSession.execute(toId(id));
+  }
+
+  @Get(":id/provider-session/capabilities")
+  providerSessionCapabilities(@Param("id") id: string) {
+    return this.providerSessionControlCapabilities.execute(toId(id));
+  }
+
+  @Post(":id/provider-session/activate")
+  activateProviderSessionMission(@Param("id") id: string, @Body() body: ActivateProviderSessionMissionDto) {
+    return this.activateProviderSession.execute({
+      missionId: toId(id), expectedVersion: body.expectedVersion, commandId: toId(body.commandId),
+      actor: "user", occurredAt: new Date().toISOString()
+    });
+  }
+
+  @Post(":id/provider-session/turns")
+  @HttpCode(202)
+  startProviderSessionTurn(@Param("id") id: string, @Body() body: StartProviderSessionTurnDto) {
+    return this.startProviderTurn.execute({ missionId: toId(id), commandId: toId(body.commandId), text: body.text });
+  }
+
+  @Post(":id/provider-session/steer")
+  @HttpCode(202)
+  steerProviderSessionTurn(@Param("id") id: string, @Body() body: SteerProviderSessionTurnDto) {
+    return this.steerProviderTurn.execute({
+      missionId: toId(id), commandId: toId(body.commandId), externalTurnId: body.externalTurnId, text: body.text
+    });
   }
 
   @Post(":id/start")

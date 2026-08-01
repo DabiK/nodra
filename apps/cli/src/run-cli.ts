@@ -1,8 +1,10 @@
 import { mkdir } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 import {
   ContentAddressedBlobStore,
   CodexProviderAdapter,
+  CodexProviderSessionSyncAdapter,
   OpenCodeProviderAdapter,
   LazyTemporalConnection,
   LazyTemporalWorkflowAdapter,
@@ -25,6 +27,7 @@ import {
   SqliteManagerExecutionRepository,
   SqlitePipelineRepository,
   SqliteProviderCatalogRepository,
+  SqliteProviderSessionRepository,
   SqliteRunControlRepository,
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
@@ -36,6 +39,7 @@ import {
   AdvancePipeline,
   ApprovePipelineNodeTransition,
   ArchiveManager,
+  AttachExternalProviderSession,
   ChangeMissionState,
   CancelRun,
   CommitWorkspace,
@@ -75,6 +79,7 @@ import {
   SteerRun,
   ProbeProvider,
   ProviderRegistry,
+  ProviderSessionSyncRegistry,
   PreviewAgentConfig,
   PublishPipelineNodeHandover,
   ResolveAgentConfig,
@@ -83,7 +88,8 @@ import {
   IntegrateWorkspace,
   RestoreWorkspace,
   UpdateAgentConfig,
-  UpdateManager
+  UpdateManager,
+  toId
 } from "@nodra/application";
 import { ConsoleOutput } from "./console-output.js";
 import {
@@ -104,6 +110,7 @@ import { AgentConfigCli } from "./agent-config-cli.js";
 import { PipelineCli } from "./pipeline-cli.js";
 import { ConversationCli } from "./conversation-cli.js";
 import { ManagerCli } from "./manager-cli.js";
+import { ProviderSessionCli } from "./provider-session-cli.js";
 
 export const runCli = async (
   arguments_: readonly string[],
@@ -143,6 +150,8 @@ export const runCli = async (
       })
     ]);
     const providerCatalog = new SqliteProviderCatalogRepository(database);
+    const providerSessionSync = new ProviderSessionSyncRegistry([new CodexProviderSessionSyncAdapter()]);
+    const providerSessions = new SqliteProviderSessionRepository(database);
     const agentConfigs = new SqliteAgentConfigRepository(database);
     const agentResolver = new ResolveAgentConfig(agentConfigs, providerCatalog);
     const pipelineRepository = new SqlitePipelineRepository(database);
@@ -213,6 +222,11 @@ export const runCli = async (
           )
         ),
         new ConversationCli(database),
+        new ProviderSessionCli(new AttachExternalProviderSession(
+          providerSessionSync,
+          providerSessions,
+          { next: () => toId(randomUUID()) }
+        )),
         new ManagerCli(
           new CreateManager(new SqliteManagerRepository(database)),
           new UpdateManager(new SqliteManagerRepository(database)),

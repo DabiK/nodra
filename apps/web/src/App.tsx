@@ -12,6 +12,8 @@ import { createInitialDraft, loadMissionIntake, submitMissionIntake } from "./se
 import { loadServerConfig } from "./services/config-service";
 import { appShellClassName, loadSidebarCollapsed, saveSidebarCollapsed } from "./services/sidebar-preference-service";
 import { AppSidebar } from "./components/AppSidebar";
+import type { AppPage } from "./components/AppSidebar";
+import { ProviderSessionsPage } from "./components/ProviderSessionsPage";
 import { listManagers } from "./services/manager-service";
 import { listMissions } from "./services/mission-service";
 import { loadSchedule, rescheduleToday, scheduledDay, todayKey, type MissionSchedule } from "./services/mission-schedule-service";
@@ -50,9 +52,9 @@ export function App() {
   const [folderLoading, setFolderLoading] = useState(false);
   const [probingProviderId, setProbingProviderId] = useState<string | null>(null);
   const [inspectedMissionId, setInspectedMissionId] = useState<string | null>(null);
-  const [page, setPage] = useState<"tasks" | "pipelines" | "managers">(() => {
+  const [page, setPage] = useState<AppPage>(() => {
     const value = new URLSearchParams(location.search).get("page");
-    return value === "pipelines" || value === "managers" ? value : "tasks";
+    return value === "pipelines" || value === "managers" || value === "provider-sessions" ? value : "tasks";
   });
   const [focusPipelineId, setFocusPipelineId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<MissionSchedule>(() => loadSchedule());
@@ -92,16 +94,17 @@ export function App() {
   useEffect(() => {
     const onPopState = () => {
       const value = new URLSearchParams(location.search).get("page");
-      setPage(value === "pipelines" || value === "managers" ? value : "tasks");
+      setPage(value === "pipelines" || value === "managers" || value === "provider-sessions" ? value : "tasks");
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const navigate = (next: "tasks" | "pipelines" | "managers") => {
+  const navigate = (next: AppPage) => {
     const url = new URL(location.href);
     if (next === "tasks") url.searchParams.delete("page");
     else url.searchParams.set("page", next);
+    if (next !== "provider-sessions") url.searchParams.delete("session");
     history.pushState({}, "", `${url.pathname}${url.search}`);
     setPage(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -248,7 +251,20 @@ export function App() {
       />
 
       <section className="workspace">
-        {page === "pipelines" ? (
+        {page === "provider-sessions" ? (
+          <ProviderSessionsPage
+            missions={missions}
+            initialSessionId={new URLSearchParams(location.search).get("session")}
+            onSessionChange={(sessionId) => {
+              const url = new URL(location.href);
+              url.searchParams.set("session", sessionId);
+              history.replaceState({}, "", `${url.pathname}${url.search}`);
+            }}
+            onOpenMission={(missionId) => {
+              location.assign(`/agent.html?missionId=${encodeURIComponent(missionId)}`);
+            }}
+          />
+        ) : page === "pipelines" ? (
           <>
             <header className="hero-row">
               <div>

@@ -1,4 +1,4 @@
-type Page = "tasks" | "pipelines" | "managers";
+export type AppPage = "tasks" | "pipelines" | "managers" | "provider-sessions";
 
 /**
  * Presentational left navigation. Collapsible: when `collapsed` is true only
@@ -13,14 +13,14 @@ export function AppSidebar({
   onToggle,
   onNavigate
 }: {
-  page: Page;
+  page: AppPage;
   collapsed: boolean;
   activePipelineCount: number;
   hasActiveManager: boolean;
   onToggle(): void;
-  onNavigate(page: Page): void;
+  onNavigate(page: AppPage): void;
 }) {
-  const go = (target: Page) => (event: { preventDefault(): void }) => {
+  const go = (target: AppPage) => (event: { preventDefault(): void }) => {
     event.preventDefault();
     onNavigate(target);
   };
@@ -58,6 +58,10 @@ export function AppSidebar({
           <span className="nav-icon" aria-hidden="true">✦</span>
           <span className="nav-label">Managers</span>
           {hasActiveManager ? <span className="count">•</span> : null}
+        </a>
+        <a className={page === "provider-sessions" ? "active" : ""} href="/?page=provider-sessions" title="Sessions Codex" onClick={go("provider-sessions")}>
+          <span className="nav-icon" aria-hidden="true">◫</span>
+          <span className="nav-label">Sessions Codex</span>
         </a>
       </nav>
     </aside>
