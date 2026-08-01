@@ -13,6 +13,27 @@ const detail = { identity: control.identity, link: control.link, capabilities: {
 function json(value: unknown) { return Promise.resolve(new Response(JSON.stringify(value), { status: 200, headers: { "content-type": "application/json" } })); }
 
 describe("provider mission conversation", () => {
+  it("activates an attached READY mission when its chat URL is opened directly", async () => {
+    const readyMission = { ...mission, state: "READY", version: 1 };
+    let activated = false;
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (path.endsWith("/activate") && init?.method === "POST") {
+        activated = true;
+        return json({ mission: { ...readyMission, state: "ACTIVE", version: 2 }, link: { ...control.link, mode: "control" } });
+      }
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json({ ...detail, link: { ...detail.link, mode: activated ? "control" : "read_only" } });
+      return json(activated ? { ...readyMission, state: "ACTIVE", version: 2 } : readyMission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={readyMission.id} />);
+
+    await screen.findByText("Provider mission");
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/activate") && init?.method === "POST")).toBe(true));
+    expect(screen.getByText("CONTRÔLE ATTACHÉ")).toBeTruthy();
+  });
+
   it("renders provider items by external identity and sends turns without a local queue", async () => {
     const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
       const path = String(url);

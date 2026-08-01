@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { MissionProviderSessionCapabilitiesView, MissionView, ProviderSessionDetailView } from "../types";
 import {
+  activateMissionProviderSession,
   loadMissionProviderSession,
   loadMissionProviderSessionCapabilities,
   startMissionProviderTurn,
@@ -72,12 +73,18 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
+  const activationRef = useRef(false);
   const commandRef = useRef<{ kind: "send" | "steer"; text: string; id: string } | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [nextMission, nextDetail, nextControl] = await Promise.all([
-        showMission(missionId),
+      let nextMission = await showMission(missionId);
+      if (nextMission.state === "READY" && !activationRef.current) {
+        activationRef.current = true;
+        await activateMissionProviderSession(missionId, nextMission.version, commandId());
+        nextMission = await showMission(missionId);
+      }
+      const [nextDetail, nextControl] = await Promise.all([
         loadMissionProviderSession(missionId),
         loadMissionProviderSessionCapabilities(missionId)
       ]);
@@ -87,6 +94,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
       setConnected(true);
       setError("");
     } catch (reason) {
+      activationRef.current = false;
       setConnected(false);
       setError((reason as Error).message);
     }
