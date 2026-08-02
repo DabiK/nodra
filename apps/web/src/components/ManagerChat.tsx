@@ -5,7 +5,9 @@ import type { AgentSessionView, ManagerConversationView, ManagerThreadView, Mana
 import { latestManagerThread, listManagerConversations, loadManagerThread, sendManagerMessage, stopManager, deleteManagerThread } from "../services/manager-service";
 import { normalizeAgentConversation, extractRunFailure, type AgentConversationEvent } from "../services/agent-conversation-normalizer";
 import { formatCostMicros, formatTokenCount, runTokenTotal } from "../services/budget-service";
+import { assessConversationContext } from "../services/conversation-context-service";
 import { PixelAvatar } from "./PixelAvatar";
+import { ConversationContextBanner } from "./ConversationContextBanner";
 import { ConversationSearchBar } from "./ConversationSearchBar";
 import { HighlightedText } from "./HighlightedText";
 import { useConversationSearch } from "../hooks/useConversationSearch";
@@ -147,6 +149,25 @@ export function ManagerChat({
     if (!thread || thread.run?.state !== "FAILED") return null;
     return extractRunFailure(toSession(thread));
   }, [thread]);
+
+  // Risque de perte de contexte (issue #10) : tours de la conversation en
+  // cours (liste chargée, sinon comptage des messages user), volume de tokens
+  // du run courant, et marqueurs de troncature dans les événements provider.
+  const contextRisk = useMemo(() => {
+    if (!thread) return null;
+    const conversationTurns = conversations.find((conversation) => conversation.id === threadId)?.turns.length;
+    const turnCount = conversationTurns ?? events.filter((event) => event.kind === "user").length;
+    const charCount = events.reduce(
+      (sum, event) => sum + (event.text?.length ?? 0) + (event.title?.length ?? 0) + (event.command?.length ?? 0) + (event.output?.length ?? 0),
+      0
+    );
+    return assessConversationContext({
+      turnCount,
+      charCount,
+      totalTokens: thread.run ? runTokenTotal(thread.run) : null,
+      events: thread.events
+    });
+  }, [thread, events, conversations, threadId]);
 
   // Recherche dans le fil : texte des messages, événements (système,
   // réflexion, erreurs) et contenus des tool calls (titre, commande, sortie).
@@ -307,6 +328,13 @@ export function ManagerChat({
             )}
           </div>
         </header>
+
+        <ConversationContextBanner
+          risk={contextRisk}
+          actionLabel="＋ Nouveau fil"
+          onAction={() => { setThreadId(null); setThread(null); }}
+          busy={busy}
+        />
 
         {searchOpen ? (
           <ConversationSearchBar

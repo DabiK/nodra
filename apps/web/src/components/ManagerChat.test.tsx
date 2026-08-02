@@ -148,4 +148,62 @@ describe("ManagerChat", () => {
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "introuvable" } });
     expect((await screen.findByRole("status", { name: "Occurrences" })).textContent).toBe("Aucun résultat");
   });
+
+  it("keeps the context-loss banner hidden for a short conversation", async () => {
+    renderChat();
+    await screen.findByText("La release est prête");
+    expect(screen.queryByText(/risque de perte de contexte/)).toBeNull();
+  });
+
+  it("warns about context loss for a long conversation with its metrics", async () => {
+    const longConversation: ManagerConversationView = {
+      ...conversation,
+      turns: Array.from({ length: 30 }, (_, index) => ({
+        runId: `r${index}`,
+        state: "COMPLETED",
+        createdAt: "2026-01-01",
+        endedAt: "2026-01-01",
+        summary: `Brief ${index}`
+      }))
+    };
+    const fetchMock = vi.fn((url: RequestInfo | URL) => {
+      const path = String(url);
+      if (path.endsWith("/conversations")) return json([longConversation]);
+      if (path.endsWith("/threads/t1")) return json(thread);
+      return json(null);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ManagerChat manager={manager} onBack={vi.fn()} onChanged={vi.fn()} />);
+
+    expect(await screen.findByText("⚠ Conversation longue — risque de perte de contexte")).toBeTruthy();
+    expect(screen.getByText("30 tours · ≈ 150 tokens rapportés")).toBeTruthy();
+    expect(screen.getByText("Nombre de tours élevé")).toBeTruthy();
+  });
+
+  it("starts a new conversation from the banner action", async () => {
+    const longConversation: ManagerConversationView = {
+      ...conversation,
+      turns: Array.from({ length: 30 }, (_, index) => ({
+        runId: `r${index}`,
+        state: "COMPLETED",
+        createdAt: "2026-01-01",
+        endedAt: "2026-01-01",
+        summary: `Brief ${index}`
+      }))
+    };
+    const fetchMock = vi.fn((url: RequestInfo | URL) => {
+      const path = String(url);
+      if (path.endsWith("/conversations")) return json([longConversation]);
+      if (path.endsWith("/threads/t1")) return json(thread);
+      return json(null);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ManagerChat manager={manager} onBack={vi.fn()} onChanged={vi.fn()} />);
+
+    await screen.findByText("⚠ Conversation longue — risque de perte de contexte");
+    fireEvent.click(screen.getByRole("button", { name: "＋ Nouveau fil" }));
+
+    expect(await screen.findByRole("heading", { name: "Nouvelle conversation" })).toBeTruthy();
+    expect(screen.queryByText(/risque de perte de contexte/)).toBeNull();
+  });
 });

@@ -15,11 +15,13 @@ import { showMission } from "../services/mission-service";
 import { latestRunForMission } from "../services/mission-result-service";
 import { loadAgentSession } from "../services/agent-session-service";
 import { extractRunFailure, type RunFailure } from "../services/agent-conversation-normalizer";
+import { assessConversationContext } from "../services/conversation-context-service";
 import { providerSessionSections } from "../services/provider-session-sections";
 import { subagentStatusLabel, subagentToolLabel } from "../services/subagent-labels";
 import { SubagentExecution } from "./SubagentExecution";
 import { ModelPicker } from "./ModelPicker";
 import { PromptEnhanceDialog } from "./PromptEnhanceDialog";
+import { ConversationContextBanner } from "./ConversationContextBanner";
 import { ConversationSearchBar } from "./ConversationSearchBar";
 import { HighlightedText } from "./HighlightedText";
 import { useConversationSearch } from "../hooks/useConversationSearch";
@@ -28,6 +30,19 @@ import { suppressServerEventsFor } from "../services/events-service";
 
 /** Fenêtre de silence SSE après une mutation locale (évite l'écho en boucle). */
 const SSE_SUPPRESSION_MS = 2500;
+
+/**
+ * Instruction de compaction envoyée au provider quand la conversation devient
+ * longue (issue #10) : un résumé structuré sert de point de reprise avant
+ * saturation du contexte. "Compact/truncate" côté provider = steer avec
+ * instruction de résumé, comme suggéré par l'issue.
+ */
+const COMPACT_INSTRUCTION = `Compaction du contexte nécessaire : la conversation est devenue longue et risque de perdre du contexte.
+Réponds uniquement avec un résumé structuré et concis, sans exécuter d'autre action :
+1. Objectif de la mission et état actuel.
+2. Décisions, résultats et fichiers touchés jusqu'ici.
+3. Prochaines étapes restantes.
+Ce résumé servira de point de reprise dans la suite de la conversation.`;
 
 function capabilityAvailable(state: string | undefined) {
   return Boolean(state && state !== "unavailable");
@@ -351,6 +366,43 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   const canStartTurn = Boolean(detail?.link && capabilityAvailable(control?.capabilities.startTurn.state));
   const canSteer = Boolean(detail?.link && detail?.snapshot.session.state === "active" && activeTurn && capabilityAvailable(control?.capabilities.steer.state));
 
+  // Risque de perte de contexte (issue #10) : le snapshot provider ne porte
+  // pas d'usage — tokens estimés depuis le texte des items, tours du snapshot.
+  const contextRisk = useMemo(() => {
+    if (!detail) return null;
+    const items = detail.snapshot.items;
+    const charCount = items.reduce((sum, item) => sum + (item.text?.length ?? 0) + (item.name?.length ?? 0), 0);
+    return assessConversationContext({ turnCount: detail.snapshot.turns.length, charCount, totalTokens: null });
+  }, [detail]);
+
+  // Action de remédiation : steer du tour actif (ou nouveau tour) avec
+  // l'instruction de résumé — même mécanique que l'envoi, sans toucher au
+  // contenu du composer.
+  const compactContext = async () => {
+    if (busy) return;
+    const steers = Boolean(canSteer && activeTurn);
+    const sends = !steers && canStartTurn;
+    if (!steers && !sends) return;
+    const id = commandId();
+    const run = {
+      ...(runModelId ? { modelId: runModelId } : {}),
+      ...(runReasoningEffort !== "provider_default" ? { reasoningEffort: runReasoningEffort } : {})
+    };
+    setBusy(steers ? "steer" : "send");
+    setError("");
+    setSentText(COMPACT_INSTRUCTION);
+    try {
+      if (steers) await steerMissionProviderTurn(missionId, activeTurn.externalTurnId, COMPACT_INSTRUCTION, id, run);
+      else await startMissionProviderTurn(missionId, COMPACT_INSTRUCTION, id, run);
+      await refresh();
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setBusy(null);
+      setSentText(null);
+    }
+  };
+
   const execute = async (kind: "send" | "steer") => {
     const value = text.trim();
     if (!value || busy || (kind === "send" ? !canStartTurn : !canSteer || !activeTurn)) return;
@@ -400,6 +452,12 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
               <p>{failure.detail}</p>
             </div>
           )}
+          <ConversationContextBanner
+            risk={contextRisk}
+            actionLabel={canStartTurn || canSteer ? "⟳ Compacter le contexte" : undefined}
+            onAction={canStartTurn || canSteer ? () => void compactContext() : undefined}
+            busy={busy !== null}
+          />
           <div className="provider-thread-source"><span>Source de vérité provider</span><code>{detail?.identity.externalSessionRef ?? missionId}</code></div>
           {searchOpen ? (
             <ConversationSearchBar

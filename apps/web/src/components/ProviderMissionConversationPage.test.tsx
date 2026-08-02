@@ -421,4 +421,72 @@ describe("provider mission conversation", () => {
     expect((await screen.findByRole("status", { name: "Occurrences" })).textContent).toBe("Aucun résultat");
     expect(document.querySelectorAll("mark.conversation-search-hit")).toHaveLength(0);
   });
+
+  // --- Issue #10 : avertissement de perte de contexte -----------------------
+
+  function longDetail() {
+    const turns = Array.from({ length: 30 }, (_, index) => ({
+      externalTurnId: index === 29 ? "turn-active" : `turn-${index}`,
+      order: index + 1,
+      state: index === 29 ? "in_progress" : "completed",
+      sourceStartedAt: null,
+      sourceCompletedAt: null,
+      receivedAt: "2026-01-01"
+    }));
+    const items = Array.from({ length: 40 }, (_, index) => ({
+      externalItemId: `item-${index}`,
+      externalTurnId: "turn-active",
+      role: index % 2 === 0 ? "user" : "assistant",
+      kind: "message" as const,
+      order: index + 1,
+      text: "x".repeat(8000),
+      name: null,
+      sourceAt: null,
+      receivedAt: "2026-01-01"
+    }));
+    return { ...detail, snapshot: { ...detail.snapshot, turns, items } };
+  }
+
+  it("warns about context loss for a long thread with estimated tokens", async () => {
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (init?.method === "POST") return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-new" });
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(longDetail());
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+
+    expect(await screen.findByText("⚠ Conversation longue — risque de perte de contexte")).toBeTruthy();
+    expect(screen.getByText("30 tours · ≈ 80 k tokens estimés")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Compacter le contexte/ })).toBeTruthy();
+  });
+
+  it("compacts the context by steering the active turn with a summary instruction", async () => {
+    let steeredText: string | null = null;
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (path.endsWith("/steer") && init?.method === "POST") {
+        steeredText = JSON.parse(String(init.body)).text;
+        return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-active" });
+      }
+      if (init?.method === "POST") return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-new" });
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(longDetail());
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+
+    await screen.findByText("⚠ Conversation longue — risque de perte de contexte");
+    fireEvent.click(screen.getByRole("button", { name: /Compacter le contexte/ }));
+
+    await waitFor(() => {
+      expect(steeredText).not.toBeNull();
+      expect(steeredText).toContain("résumé structuré et concis");
+    });
+    const steerCall = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/steer") && init?.method === "POST");
+    expect(JSON.parse(String(steerCall?.[1]?.body)).externalTurnId).toBe("turn-active");
+  });
 });
