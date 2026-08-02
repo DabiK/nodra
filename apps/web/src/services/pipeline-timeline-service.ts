@@ -33,7 +33,7 @@ export function nodeDurationMs(node: PipelineListNode): number | null {
   return Math.max(0, end - start);
 }
 
-/** Durée totale du pipeline : run de pipeline si borné, sinon somme des durées de nœuds. */
+/** Durée totale du pipeline : run de pipeline si borné, sinon somme des durées de nœuds connues. */
 export function pipelineTotalDurationMs(pipeline: PipelineListItem): number | null {
   if (pipeline.startedAt && pipeline.endedAt) {
     const start = Date.parse(pipeline.startedAt);
@@ -41,12 +41,15 @@ export function pipelineTotalDurationMs(pipeline: PipelineListItem): number | nu
     if (!Number.isNaN(start) && !Number.isNaN(end)) return Math.max(0, end - start);
   }
   let total = 0;
+  let known = 0;
   for (const node of pipeline.nodes) {
     const duration = nodeDurationMs(node);
-    if (duration === null) return null;
-    total += duration;
+    if (duration !== null) {
+      total += duration;
+      known += 1;
+    }
   }
-  return total;
+  return known > 0 ? total : null;
 }
 
 /** Format humanisé d'une durée en millisecondes : "45 s", "1 min 05 s", "2 h 12 min". */

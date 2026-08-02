@@ -73,13 +73,14 @@ describe("pipelineTotalDurationMs", () => {
       .toBe(7_500_000);
   });
 
-  it("falls back to the sum of node durations when the run is not bounded", () => {
+  it("falls back to the sum of known node durations", () => {
     const p = pipeline({
       startedAt: null,
       endedAt: null,
       nodes: [
         node({ nodeKey: "a", runStartedAt: "2026-07-26T08:00:00.000Z", runEndedAt: "2026-07-26T08:01:00.000Z" }),
-        node({ nodeKey: "b", runStartedAt: "2026-07-26T08:05:00.000Z", runEndedAt: "2026-07-26T08:06:30.000Z" })
+        node({ nodeKey: "b", runStartedAt: "2026-07-26T08:05:00.000Z", runEndedAt: "2026-07-26T08:06:30.000Z" }),
+        node({ nodeKey: "c", runStartedAt: null, runEndedAt: null })
       ]
     });
     expect(pipelineTotalDurationMs(p)).toBe(150_000);
