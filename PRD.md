@@ -3,18 +3,6 @@
 Backlog généré depuis les issues GitHub ouvertes. Chaque item est une tâche.
 Coche la case quand la tâche est terminée. Une seule tâche par itération Ralph.
 
-- [x] #3 — Recherche et filtres globaux (labels: —)
-  > ## Contexte
-
-- [x] #4 — Vue pipeline en timeline chronologique (labels: —)
-  > ## Contexte
-
-- [x] #5 — Palette de commandes Cmd+K et raccourcis clavier (labels: —)
-  > ## Contexte
-
-- [x] #6 — Budget / coût visible par run et mission (labels: —)
-  > ## Contexte
-
 - [ ] #7 — Mini-cartes de run actif sur le board (labels: —)
   > ## Contexte
 
@@ -55,4 +43,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > ## Contexte
 
 - [ ] #20 — Séquences favorites (templates de pipeline) (labels: —)
+  > ## Contexte
+
+- [ ] #21 — Compatibilité Windows des nouvelles features (labels: —)
   > ## Contexte
