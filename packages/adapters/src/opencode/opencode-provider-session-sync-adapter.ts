@@ -18,6 +18,8 @@ import {
   type ProviderSessionSyncPort,
   type ProviderSessionTurn,
   type ProviderSessionTurnState,
+  type ProviderSubagentExecution,
+  type ProviderSubagentTranscriptItem,
   type ProviderSubscription
 } from "@nodra/application";
 
@@ -111,10 +113,11 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
         })).data;
         const receivedAt = this.now();
         const mapped = this.mapMessages(messages, receivedAt);
+        const items = await this.attachSubagentExecutions(messages, mapped.items, client, directory);
         return {
           session: this.summary(session, receivedAt),
           turns: mapped.turns,
-          items: mapped.items,
+          items,
           cursor: null
         };
       });
@@ -236,6 +239,96 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
       return item;
     });
     return { turns, items };
+  }
+
+  private async attachSubagentExecutions(
+    entries: MessageEntry[],
+    items: ProviderSessionItem[],
+    client: OpenCodeClient,
+    directory: string | null
+  ): Promise<ProviderSessionItem[]> {
+    const entriesById = new Map(entries.map((entry) => [entry.info.id, entry]));
+    const targets = items.filter(
+      (item) => item.kind === "subagent" && entriesById.has(item.externalItemId)
+    );
+    if (targets.length === 0) return items;
+    const executions = await Promise.all(targets.map(async (item) => {
+      const task = this.taskPart(entriesById.get(item.externalItemId)!.parts);
+      if (task === null) return null;
+      const execution = await this.subagentExecution(task, client, directory);
+      return execution ? { ...item, subagent: execution } : null;
+    }));
+    const byExternalItemId = new Map(
+      executions
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+        .map((item) => [item.externalItemId, item])
+    );
+    return items.map((item) => byExternalItemId.get(item.externalItemId) ?? item);
+  }
+
+  private async subagentExecution(
+    task: Extract<Part, { type: "tool" }>,
+    client: OpenCodeClient,
+    directory: string | null
+  ): Promise<ProviderSubagentExecution | null> {
+    const rawState = task.state as unknown as {
+      status?: unknown;
+      output?: unknown;
+      time?: { start?: unknown; end?: unknown };
+      metadata?: { sessionId?: unknown; model?: { modelID?: unknown } };
+    };
+    const metadata = rawState.metadata;
+    const subSessionId =
+      typeof metadata?.sessionId === "string" && metadata.sessionId.length > 0
+        ? metadata.sessionId
+        : null;
+    if (subSessionId === null) return null;
+    const transcript = await this.subagentTranscript(subSessionId, client, directory);
+    return {
+      subSessionId,
+      status: typeof rawState.status === "string" ? rawState.status : "unknown",
+      model: typeof metadata.model?.modelID === "string" ? metadata.model.modelID : null,
+      startedAt: typeof rawState.time?.start === "number" ? new Date(rawState.time.start).toISOString() : null,
+      finishedAt: typeof rawState.time?.end === "number" ? new Date(rawState.time.end).toISOString() : null,
+      report: typeof rawState.output === "string" && rawState.output.length > 0
+        ? this.cleanSubagentReport(rawState.output)
+        : null,
+      transcript
+    };
+  }
+
+  private async subagentTranscript(
+    subSessionId: string,
+    client: OpenCodeClient,
+    directory: string | null
+  ): Promise<ProviderSubagentTranscriptItem[]> {
+    try {
+      const messages = (await client.session.messages({
+        path: { id: subSessionId },
+        ...(directory ? { query: { directory } } : {}),
+        throwOnError: true
+      })).data;
+      const mapped = this.mapMessages(messages, this.now());
+      return mapped.items.map((item) => ({
+        externalItemId: item.externalItemId,
+        role: item.role,
+        kind: item.kind,
+        order: item.order,
+        text: item.text,
+        name: item.name,
+        sourceAt: item.sourceAt
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  private cleanSubagentReport(output: string): string {
+    return output
+      .replace(/^\s*<task\b[^>]*>\s*/i, "")
+      .replace(/\s*<\/task>\s*$/i, "")
+      .replace(/<\/?task_result>/g, "")
+      .trim();
   }
 
   private summary(session: Session, receivedAt: string): ProviderSessionSummary {

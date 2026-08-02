@@ -185,6 +185,8 @@ export type {
   ProviderSessionSyncCapability,
   ProviderSessionSyncCapabilityState,
   ProviderSessionSyncErrorCode,
+  ProviderSubagentExecution,
+  ProviderSubagentTranscriptItem,
   ProviderSessionSyncErrorDetails,
   ProviderSessionTurn,
   ProviderSessionTurnState,

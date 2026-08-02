@@ -86,7 +86,7 @@ const subtaskPart = (agent: string, prompt: string, description: string, message
   description
 });
 
-const taskToolPart = (messageID = "m"): Record<string, unknown> => ({
+const taskToolPart = (messageID = "m", overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: `task-tool-${messageID}`,
   sessionID: "session-1",
   messageID,
@@ -99,7 +99,8 @@ const taskToolPart = (messageID = "m"): Record<string, unknown> => ({
       description: "Créer toto.txt avec histoire",
       prompt: "Create a file named toto.txt with a story inside"
     },
-    output: "<task id=\"ses_sub\">\n<task_result>\nCreated: toto.txt\n</task_result>\n</task>"
+    output: "<task id=\"ses_sub\">\n<task_result>\nCreated: toto.txt\n</task_result>\n</task>",
+    ...overrides
   }
 });
 
@@ -275,6 +276,121 @@ describe("OpenCodeProviderSessionSyncAdapter", () => {
       { externalItemId: "m8", externalTurnId: "m1", role: "assistant", kind: "subagent", order: 8, text: "Créer toto.txt avec histoire", name: "task", sourceAt: "1970-01-01T00:00:00.009Z", receivedAt }
     ]);
     expect(snapshot.cursor).toBeNull();
+  });
+
+  it("enriches subagent items with the sub-session transcript and report", async () => {
+    const fake = fakeClient();
+    fake.session.get.mockResolvedValue({ data: session() });
+    fake.session.messages
+      .mockResolvedValueOnce({
+        data: [
+          entry({ id: "user-1", role: "user", time: { created: 1 } }, [textPart("delegate", "user-1")]),
+          entry({ id: "assistant-1", role: "assistant", parentID: "user-1", time: { created: 2, completed: 30 } },
+            [taskToolPart("assistant-1", {
+              metadata: {
+                sessionId: "ses_sub",
+                parentSessionId: "session-1",
+                model: { modelID: "deepseek-v4-flash", providerID: "opencode-go" }
+              },
+              time: { start: 3, end: 20 }
+            })])
+        ]
+      })
+      .mockResolvedValueOnce({
+        data: [
+          entry({ id: "sub-1", role: "assistant", time: { created: 4, completed: 15 } },
+            [reasoningPart("planning the file", "sub-1")]),
+          entry({ id: "sub-2", role: "assistant", parentID: "sub-1", time: { created: 5, completed: 16 } },
+            [toolPart("write", "sub-2")]),
+          entry({ id: "sub-3", role: "assistant", parentID: "sub-1", time: { created: 6, completed: 20 } },
+            [textPart("Created toto.txt", "sub-3")])
+        ]
+      });
+
+    const snapshot = await adapter(fake).readSession({
+      providerId: "opencode",
+      externalSessionId: "session-1"
+    });
+
+    expect(fake.session.messages).toHaveBeenCalledTimes(2);
+    expect(fake.session.messages).toHaveBeenLastCalledWith({
+      path: { id: "ses_sub" },
+      query: { directory: "/workspace" },
+      throwOnError: true
+    });
+    expect(snapshot.items).toEqual([
+      { externalItemId: "user-1", externalTurnId: "user-1", role: "user", kind: "message", order: 0, text: "delegate", name: null, sourceAt: "1970-01-01T00:00:00.001Z", receivedAt },
+      {
+        externalItemId: "assistant-1",
+        externalTurnId: "user-1",
+        role: "assistant",
+        kind: "subagent",
+        order: 1,
+        text: "Créer toto.txt avec histoire",
+        name: "task",
+        sourceAt: "1970-01-01T00:00:00.002Z",
+        receivedAt,
+        subagent: {
+          subSessionId: "ses_sub",
+          status: "completed",
+          model: "deepseek-v4-flash",
+          startedAt: "1970-01-01T00:00:00.003Z",
+          finishedAt: "1970-01-01T00:00:00.020Z",
+          report: "Created: toto.txt",
+          transcript: [
+            { externalItemId: "sub-1", role: "assistant", kind: "reasoning", order: 0, text: "planning the file", name: null, sourceAt: "1970-01-01T00:00:00.004Z" },
+            { externalItemId: "sub-2", role: "assistant", kind: "tool_call", order: 1, text: null, name: "write", sourceAt: "1970-01-01T00:00:00.005Z" },
+            { externalItemId: "sub-3", role: "assistant", kind: "message", order: 2, text: "Created toto.txt", name: null, sourceAt: "1970-01-01T00:00:00.006Z" }
+          ]
+        }
+      }
+    ]);
+  });
+
+  it("keeps subagent items unchanged when the sub-session is unreachable", async () => {
+    const fake = fakeClient();
+    fake.session.get.mockResolvedValue({ data: session() });
+    fake.session.messages
+      .mockResolvedValueOnce({
+        data: [
+          entry({ id: "user-1", role: "user", time: { created: 1 } }, [textPart("delegate", "user-1")]),
+          entry({ id: "assistant-1", role: "assistant", parentID: "user-1", time: { created: 2, completed: 30 } },
+            [taskToolPart("assistant-1", {
+              metadata: { sessionId: "ses_gone" },
+              time: { start: 3, end: 20 }
+            })])
+        ]
+      })
+      .mockRejectedValueOnce(new Error("sub-session not found"));
+
+    const snapshot = await adapter(fake).readSession({
+      providerId: "opencode",
+      externalSessionId: "session-1"
+    });
+
+    expect(snapshot.items).toEqual([
+      { externalItemId: "user-1", externalTurnId: "user-1", role: "user", kind: "message", order: 0, text: "delegate", name: null, sourceAt: "1970-01-01T00:00:00.001Z", receivedAt },
+      {
+        externalItemId: "assistant-1",
+        externalTurnId: "user-1",
+        role: "assistant",
+        kind: "subagent",
+        order: 1,
+        text: "Créer toto.txt avec histoire",
+        name: "task",
+        sourceAt: "1970-01-01T00:00:00.002Z",
+        receivedAt,
+        subagent: {
+          subSessionId: "ses_gone",
+          status: "completed",
+          model: null,
+          startedAt: "1970-01-01T00:00:00.003Z",
+          finishedAt: "1970-01-01T00:00:00.020Z",
+          report: "Created: toto.txt",
+          transcript: []
+        }
+      }
+    ]);
   });
 
   it("marks the last unanswered user message as in_progress and completed ones as completed", async () => {

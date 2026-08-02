@@ -79,6 +79,26 @@ export type ProviderSessionItemKind =
   | "subagent"
   | "unknown";
 
+export interface ProviderSubagentTranscriptItem {
+  externalItemId: string;
+  role: ProviderSessionItemRole;
+  kind: ProviderSessionItemKind;
+  order: number;
+  text: string | null;
+  name: string | null;
+  sourceAt: string | null;
+}
+
+export interface ProviderSubagentExecution {
+  subSessionId: string;
+  status: string;
+  model: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  report: string | null;
+  transcript: ProviderSubagentTranscriptItem[];
+}
+
 export interface ProviderSessionItem {
   externalItemId: string;
   externalTurnId: string | null;
@@ -89,6 +109,7 @@ export interface ProviderSessionItem {
   name: string | null;
   sourceAt: string | null;
   receivedAt: string;
+  subagent?: ProviderSubagentExecution | null;
 }
 
 export interface ProviderSessionSnapshot {
