@@ -150,19 +150,24 @@ export function ManagerChat({
     return extractRunFailure(toSession(thread));
   }, [thread]);
 
-  // Risque de perte de contexte (issue #10) : tours de la conversation en
-  // cours (liste chargée, sinon comptage des messages user), volume de tokens
-  // du run courant, et marqueurs de troncature dans les événements provider.
+  // Risque de perte de contexte (issue #10) : tours de la conversation,
+  // volume de tokens du run courant, et marqueurs de troncature dans les
+  // événements provider. Le compte de tours prend le max entre les tours
+  // persistés de la liste de conversations (chargée au montage, rafraîchie à
+  // l'envoi) et les messages user du fil en live (rechargé par SSE) — la
+  // liste seule resterait figée pendant un long streaming.
   const contextRisk = useMemo(() => {
     if (!thread) return null;
-    const conversationTurns = conversations.find((conversation) => conversation.id === threadId)?.turns.length;
-    const turnCount = conversationTurns ?? events.filter((event) => event.kind === "user").length;
-    const charCount = events.reduce(
-      (sum, event) => sum + (event.text?.length ?? 0) + (event.title?.length ?? 0) + (event.command?.length ?? 0) + (event.output?.length ?? 0),
-      0
-    );
+    const conversationTurns = conversations.find((conversation) => conversation.id === threadId)?.turns.length ?? 0;
+    const liveTurns = events.filter((event) => event.kind === "user").length;
+    const charCount = events.reduce((sum, event) => {
+      if (event.kind === "tool") {
+        return sum + (event.title?.length ?? 0) + (event.command?.length ?? 0) + (event.output?.length ?? 0);
+      }
+      return sum + (event.text?.length ?? 0);
+    }, 0);
     return assessConversationContext({
-      turnCount,
+      turnCount: Math.max(conversationTurns, liveTurns),
       charCount,
       totalTokens: thread.run ? runTokenTotal(thread.run) : null,
       events: thread.events

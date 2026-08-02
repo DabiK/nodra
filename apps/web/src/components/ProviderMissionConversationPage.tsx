@@ -392,7 +392,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
     setError("");
     setSentText(COMPACT_INSTRUCTION);
     try {
-      if (steers) await steerMissionProviderTurn(missionId, activeTurn.externalTurnId, COMPACT_INSTRUCTION, id, run);
+      if (steers && activeTurn) await steerMissionProviderTurn(missionId, activeTurn.externalTurnId, COMPACT_INSTRUCTION, id, run);
       else await startMissionProviderTurn(missionId, COMPACT_INSTRUCTION, id, run);
       await refresh();
     } catch (reason) {
