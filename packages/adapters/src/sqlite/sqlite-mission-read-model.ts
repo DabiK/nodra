@@ -9,11 +9,12 @@ import type {
   RelayProjection
 } from "@nodra/application";
 import { asId, type Id } from "@nodra/domain";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { missions } from "./schema/missions.js";
 import { runs } from "./schema/runs.js";
 import { conversationItems } from "./schema/conversations.js";
+import { gateBindings, gateEvaluations } from "./schema/gates.js";
 import { businessAuditEvents, relayItems } from "./schema/operations.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
 
@@ -193,17 +194,61 @@ export class SqliteMissionReadModel implements MissionReadModel {
 
   /**
    * Timeline d'audit de la mission : tous les événements persistés atomiquement
-   * avec les sauvegardes d'agrégat (transitions d'état, décisions, commandes),
-   * du plus ancien au plus récent.
+   * avec les sauvegardes d'agrégat, du plus ancien au plus récent.
+   *
+   * Couvre trois périmètres liés à la mission :
+   * - les événements d'agrégat mission (`aggregateKind="mission"` : transitions
+   *   d'état, activation de config, démarrage de run…) ;
+   * - les événements des runs de la mission (`aggregateKind="run"` : delivery
+   *   déclarée, décisions humaines accept/request-changes/reject, fin de run,
+   *   preuves collectées) ;
+   * - les évaluations de gates liées à la mission (`aggregateKind="gate_evaluation"` :
+   *   gates attachées à la mission ou évaluées pendant un de ses runs).
    */
   async audit(id: Id): Promise<MissionAuditView[]> {
     try {
-      const rows = this.database.orm.select()
-        .from(businessAuditEvents)
-        .where(and(
+      const runIds = this.database.orm.select({ id: runs.id })
+        .from(runs)
+        .where(eq(runs.missionId, id))
+        .all()
+        .map((row) => row.id);
+      const gateBindingIds = this.database.orm.select({ id: gateBindings.id })
+        .from(gateBindings)
+        .where(eq(gateBindings.missionId, id))
+        .all()
+        .map((row) => row.id);
+      const gateEvaluationIds = (gateBindingIds.length > 0 || runIds.length > 0)
+        ? this.database.orm.select({ id: gateEvaluations.id })
+          .from(gateEvaluations)
+          .where(or(
+            ...(gateBindingIds.length > 0 ? [inArray(gateEvaluations.gateBindingId, gateBindingIds)] : []),
+            ...(runIds.length > 0 ? [inArray(gateEvaluations.runId, runIds)] : [])
+          ))
+          .all()
+          .map((row) => row.id)
+        : [];
+
+      const conditions = [
+        and(
           eq(businessAuditEvents.aggregateKind, "mission"),
           eq(businessAuditEvents.aggregateId, id)
-        ))
+        ),
+        ...(runIds.length > 0
+          ? [and(
+            eq(businessAuditEvents.aggregateKind, "run"),
+            inArray(businessAuditEvents.aggregateId, runIds)
+          )]
+          : []),
+        ...(gateEvaluationIds.length > 0
+          ? [and(
+            eq(businessAuditEvents.aggregateKind, "gate_evaluation"),
+            inArray(businessAuditEvents.aggregateId, gateEvaluationIds)
+          )]
+          : [])
+      ];
+      const rows = this.database.orm.select()
+        .from(businessAuditEvents)
+        .where(or(...conditions))
         .orderBy(asc(businessAuditEvents.occurredAt), asc(businessAuditEvents.id))
         .all();
       return rows.map((row) => ({

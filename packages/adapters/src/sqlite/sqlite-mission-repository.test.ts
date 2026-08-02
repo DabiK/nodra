@@ -9,6 +9,7 @@ import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { projects } from "./schema/core.js";
 import { conversations, conversationItems } from "./schema/conversations.js";
 import { runs } from "./schema/runs.js";
+import { gateBindings, gateDefinitions, gateEvaluations } from "./schema/gates.js";
 import { businessAuditEvents } from "./schema/operations.js";
 import { SqliteMissionReadModel } from "./sqlite-mission-read-model.js";
 import { SqliteMissionRepository } from "./sqlite-mission-repository.js";
@@ -424,6 +425,88 @@ describe("SQLite human mission vertical slice", () => {
       occurredAt: at(1)
     }).run();
     expect(await listMissionAudit.execute(asId("mission-no-audit"))).toEqual([]);
+  });
+
+  it("includes run events (delivery decisions) and gate evaluations in the audit timeline, oldest first", async () => {
+    await createMission.execute({ id: asId("mission-audit-deep"), title: "Deep audit", context: context("create-deep", 0) });
+    database.orm.insert(conversations).values({
+      id: "conversation-deep",
+      missionId: "mission-audit-deep",
+      managerId: null,
+      providerId: "opencode",
+      providerSessionRef: null,
+      state: "open",
+      createdAt: at(1),
+      deletedAt: null
+    }).run();
+    database.orm.insert(runs).values({
+      id: "run-deep-1", missionId: "mission-audit-deep", managerId: null, conversationId: "conversation-deep",
+      userAttempt: 1, state: "SUCCEEDED", temporalWorkflowId: "run/run-deep-1", temporalRunId: null,
+      providerId: "opencode", modelId: "model-a", reasoningEffort: "provider_default",
+      startedAt: at(1), endedAt: at(2), durationMs: 60_000,
+      inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null,
+      costMicros: null, usageKind: null, createdAt: at(1)
+    }).run();
+    // Décision humaine de delivery (aggregateKind "run") et fin de run (manager).
+    database.orm.insert(businessAuditEvents).values([
+      {
+        id: "audit/declare-deep", aggregateKind: "run", aggregateId: "run-deep-1",
+        commandId: "declare-deep", eventType: "DELIVERY_DECLARED", actor: "manager",
+        payloadJson: JSON.stringify({ schemaVersion: 1, missionId: "mission-audit-deep" }), occurredAt: at(3)
+      },
+      {
+        id: "audit/decide-deep", aggregateKind: "run", aggregateId: "run-deep-1",
+        commandId: "decide-deep", eventType: "DELIVERY_DECIDED", actor: "user",
+        payloadJson: JSON.stringify({ schemaVersion: 1, decision: "accept", missionId: "mission-audit-deep" }), occurredAt: at(4)
+      },
+      {
+        id: "audit/terminal-deep", aggregateKind: "run", aggregateId: "run-deep-1",
+        commandId: "terminal-deep", eventType: "RUN_TERMINAL_RECORDED", actor: "manager",
+        payloadJson: JSON.stringify({ schemaVersion: 1, missionId: "mission-audit-deep", state: "SUCCEEDED" }), occurredAt: at(2)
+      }
+    ]).run();
+    // Évaluation de gate liée à la mission (aggregateKind "gate_evaluation").
+    database.orm.insert(gateDefinitions).values({
+      id: "gate-deep", name: "Tests verts", evaluatorId: "nodra.tests", evaluatorVersion: "1",
+      criteriaSchemaVersion: 1, criteriaJson: "{}", expectedEvidenceJson: "{}", createdAt: at(1)
+    }).run();
+    database.orm.insert(gateBindings).values({
+      id: "binding-deep", gateId: "gate-deep", pipelineEdgeId: null, pipelineNodeId: null, missionId: "mission-audit-deep"
+    }).run();
+    database.orm.insert(gateEvaluations).values({
+      id: "evaluation-deep", gateBindingId: "binding-deep", runId: "run-deep-1",
+      evaluatorId: "nodra.tests", evaluatorVersion: "1", state: "passed", evaluatedAt: at(5), staleAt: null, rationale: "Tout passe."
+    }).run();
+    database.orm.insert(businessAuditEvents).values({
+      id: "audit/eval-deep", aggregateKind: "gate_evaluation", aggregateId: "evaluation-deep",
+      commandId: "eval-deep", eventType: "GATE_EVALUATED", actor: "manager",
+      payloadJson: JSON.stringify({ schemaVersion: 1, state: "passed", rationale: "Tout passe." }), occurredAt: at(5)
+    }).run();
+    // Un run et une évaluation d'une autre mission ne doivent pas fuiter.
+    database.orm.insert(businessAuditEvents).values({
+      id: "audit/leak-run", aggregateKind: "run", aggregateId: "run-other-mission",
+      commandId: "leak-run", eventType: "DELIVERY_DECIDED", actor: "user",
+      payloadJson: JSON.stringify({ schemaVersion: 1, missionId: "mission-other" }), occurredAt: at(6)
+    }).run();
+
+    const timeline = await listMissionAudit.execute(asId("mission-audit-deep"));
+    expect(timeline.map((event) => event.eventType)).toEqual([
+      "MISSION_CREATED",
+      "RUN_TERMINAL_RECORDED",
+      "DELIVERY_DECLARED",
+      "DELIVERY_DECIDED",
+      "GATE_EVALUATED"
+    ]);
+    expect(timeline[3]).toMatchObject({
+      eventType: "DELIVERY_DECIDED",
+      actor: "user",
+      payload: { decision: "accept" }
+    });
+    expect(timeline[4]).toMatchObject({
+      eventType: "GATE_EVALUATED",
+      actor: "manager",
+      payload: { state: "passed", rationale: "Tout passe." }
+    });
   });
 
   it("rejects an audit timeline lookup for an unknown mission", async () => {
