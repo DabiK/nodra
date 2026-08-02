@@ -1,0 +1,28 @@
+# Journal d'avancement — DabiK/nodra
+
+## Itération 1 — 2026-08-02 — Task #1 : Dark mode (thème sombre)
+
+### Fait
+- Nouveau service `apps/web/src/services/theme-service.ts` (+ tests) : résolution light/dark
+  (préférence utilisateur persistée dans `localStorage` sinon `prefers-color-scheme`),
+  application via `data-theme` sur `<html>`, et helpers `initTheme`/`applyTheme`/`saveTheme`/`systemTheme`.
+- Script inline anti-flash dans `apps/web/index.html` : pose `data-theme` avant le premier paint.
+- CSS : tokens sombres dans `:root[data-theme="dark"]` (`--ink/--muted/--paper/--panel/--line/--green/--green-soft/--lime/--red`) +
+  nouveau token `--contrast` (surfaces "ink-as-background" qui doivent rester sombres en dark : badges, chips actives, bulles user, dock, primary-button…).
+- Bloc d'overrides sombres en fin de `styles.css` (~350 règles) couvrant : sidebar, intake, chips/filtres, board relay + lanes, pipelines, workflow legacy, drawer dossiers, inspector/configurator, conversations agent, managers + dock + chat, bannières overdue/warnings, worktree, observatoire sessions provider, thread provider + subagents, model picker, prompt enhance, run controls.
+- Toggle thème (☾/☀) en bas de la sidebar, câblé dans `App.tsx` et `AgentPage.tsx` (les deux pages partagent `AppSidebar`).
+- Tests mis à jour : `AppSidebar.test.tsx` (nouveau toggle + props), nouveau `theme-service.test.ts` (7 tests).
+
+### Vérifications
+- `npm run typecheck` (racine + web) : OK
+- `npm run build -w @nodra/web` : OK
+- `npx vitest run apps/web` : 20 fichiers / 102 tests OK
+- Lint : aucun nouveau problème (9 erreurs pré-existantes hors périmètre dans packages/adapters, packages/application, `AgentPage.test.tsx`, `sidebar-missions.ts`).
+
+### Décisions / notes
+- Le thème suit le système par défaut ; dès que l'utilisateur bascule explicitement, ce choix est persisté et prime.
+- Pas de suivi runtime des changements OS (re-résolu seulement au chargement) — possible itération future.
+- La page agent (`agent.html`) était déjà partiellement sombre ; elle respecte désormais aussi le thème global via `data-theme`.
+
+### Statut
+- [x] #1 — Dark mode (thème sombre)
