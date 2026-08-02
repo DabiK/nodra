@@ -8,6 +8,7 @@ import { PixelAvatar } from "./components/PixelAvatar";
 import { TaskIntakeCard } from "./components/TaskIntakeCard";
 import type { FolderBrowseResult, ManagerView, MissionIntakeDraft, MissionState, MissionView, PipelineListItem, ProviderOptionsCatalog } from "./types";
 import { filterMissions } from "./services/mission-filters";
+import { selectActiveSidebarMissions } from "./services/sidebar-missions";
 import { createInitialDraft, loadMissionIntake, submitMissionIntake } from "./services/mission-intake-service";
 import { loadServerConfig } from "./services/config-service";
 import { appShellClassName, loadSidebarCollapsed, saveSidebarCollapsed } from "./services/sidebar-preference-service";
@@ -255,14 +256,7 @@ export function App() {
     }
   };
 
-  const activeSidebarMissions = useMemo(
-    () => missions
-      .filter((mission) => ["DRAFT", "READY", "ACTIVE", "BLOCKED", "VALIDATION"].includes(mission.state))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, 10)
-      .map((mission) => ({ id: mission.id, title: mission.title, state: mission.state })),
-    [missions]
-  );
+  const activeSidebarMissions = useMemo(() => selectActiveSidebarMissions(missions), [missions]);
 
   const selectMission = (missionId: string) => {
     setInspectedMissionId(missionId);

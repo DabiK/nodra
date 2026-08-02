@@ -31,10 +31,36 @@ describe("AgentPage", () => {
 
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/missions")).toBe(true));
     expect(await screen.findByLabelText("Missions actives")).toBeTruthy();
-    expect(screen.getByText("Other mission")).toBeTruthy();
+    expect(screen.queryByText("Other mission")).toBeNull();
 
     await waitFor(() => expect(screen.getAllByText("Provider mission").length).toBeGreaterThanOrEqual(2));
     expect(screen.getByText("exec")).toBeTruthy();
     expect(screen.getByText("ls -la")).toBeTruthy();
+  });
+
+  it("shows only running missions in the sidebar despite recent non-terminal missions", async () => {
+    window.history.replaceState({}, "", "/agent.html?missionId=mission%2Fprovider%2F1");
+    const oldActive = { ...mission, state: "ACTIVE", updatedAt: "2026-01-01" };
+    const recent = Array.from({ length: 10 }, (_, index) => ({
+      ...otherMission,
+      id: `mission/provider/recent-${index}`,
+      title: `Recent mission ${index}`,
+      state: "DRAFT",
+      updatedAt: `2026-02-${String(index + 1).padStart(2, "0")}`
+    }));
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (path === "/api/missions") return json([oldActive, ...recent]);
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(detail);
+      return json(oldActive);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AgentPage />);
+
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/missions")).toBe(true));
+    expect(await screen.findByLabelText("Missions actives")).toBeTruthy();
+    expect(screen.getAllByText("Provider mission").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Recent mission 9")).toBeNull();
   });
 });

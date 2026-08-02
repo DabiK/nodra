@@ -5,16 +5,7 @@ import { loadAgentSession } from "../services/agent-session-service";
 import { listMissions } from "../services/mission-service";
 import { appShellClassName, loadSidebarCollapsed, saveSidebarCollapsed } from "../services/sidebar-preference-service";
 import { ProviderMissionConversationPage } from "./ProviderMissionConversationPage";
-
-const ACTIVE_SIDEBAR_STATES = ["DRAFT", "READY", "ACTIVE", "BLOCKED", "VALIDATION"];
-
-function agentSidebarMissions(missions: MissionView[]) {
-  return missions
-    .filter((mission) => ACTIVE_SIDEBAR_STATES.includes(mission.state))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 10)
-    .map((mission) => ({ id: mission.id, title: mission.title, state: mission.state }));
-}
+import { selectActiveSidebarMissions } from "../services/sidebar-missions";
 
 function navigateToApp(page: AppPage) {
   location.assign(page === "tasks" ? "/" : `/?page=${page}`);
@@ -53,7 +44,7 @@ function AgentMissionShell({ missionId }: { missionId: string }) {
         collapsed={sidebarCollapsed}
         activePipelineCount={0}
         hasActiveManager={false}
-        missions={agentSidebarMissions(missions)}
+        missions={selectActiveSidebarMissions(missions)}
         onToggle={toggleSidebar}
         onNavigate={navigateToApp}
         onSelectMission={(id) => { location.assign(`/agent.html?missionId=${encodeURIComponent(id)}`); }}
