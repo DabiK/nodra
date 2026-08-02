@@ -56,6 +56,8 @@ export interface PipelineRunView {
     state: PipelineNodeRunState;
     transitionMode: "auto" | "human";
     userAttempt: number;
+    runStartedAt: string | null;
+    runEndedAt: string | null;
     handovers: Array<{
       fromNodeKey: string;
       payload: unknown;
@@ -71,6 +73,12 @@ export interface PipelineListNodeView {
   missionState: string;
   nodeRunState: PipelineNodeRunState | null;
   transitionMode: "auto" | "human";
+  /** Début du dernier run de la mission (dérivé des run records), null si jamais exécutée. */
+  runStartedAt: string | null;
+  /** Fin du dernier run de la mission, null si pas encore terminé. */
+  runEndedAt: string | null;
+  /** Numéro de tentative (userAttempt) du dernier run de la mission, null si jamais exécutée. */
+  runAttempt: number | null;
 }
 
 export interface PipelineListItemView {

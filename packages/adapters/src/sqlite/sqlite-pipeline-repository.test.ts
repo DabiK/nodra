@@ -83,6 +83,92 @@ describe("SqlitePipelineRepository", () => {
     expect(completed.pipelineRun.nodes.map((node) => node.state)).toEqual(["completed", "completed"]);
   });
 
+  it("exposes the latest mission run timestamps per node in list and showRun", async () => {
+    database.orm.insert(conversations).values({
+      id: "conversation-a",
+      missionId: "mission-a",
+      managerId: null,
+      providerId: "opencode",
+      providerSessionRef: null,
+      state: "open",
+      createdAt: now,
+      deletedAt: null
+    }).run();
+    database.orm.insert(runs).values([
+      {
+        id: "run-a-1",
+        missionId: "mission-a",
+        managerId: null,
+        conversationId: "conversation-a",
+        userAttempt: 1,
+        state: "SUCCEEDED",
+        temporalWorkflowId: "run/run-a-1",
+        temporalRunId: "temporal-run-a-1",
+        providerId: "opencode",
+        modelId: "model",
+        reasoningEffort: "provider_default",
+        startedAt: "2026-07-26T08:00:00.000Z",
+        endedAt: "2026-07-26T08:30:00.000Z",
+        createdAt: now
+      },
+      {
+        id: "run-a-2",
+        missionId: "mission-a",
+        managerId: null,
+        conversationId: "conversation-a",
+        userAttempt: 2,
+        state: "RUNNING",
+        temporalWorkflowId: "run/run-a-2",
+        temporalRunId: "temporal-run-a-2",
+        providerId: "opencode",
+        modelId: "model",
+        reasoningEffort: "provider_default",
+        startedAt: "2026-07-26T09:00:00.000Z",
+        endedAt: null,
+        createdAt: now
+      }
+    ]).run();
+    await repository.create({
+      pipelineId: asId("pipeline-timeline"),
+      definitionId: asId("pipeline-timeline/definition/1"),
+      nodeIdPrefix: "pipeline-timeline/node",
+      edgeIdPrefix: "pipeline-timeline/edge",
+      name: "Pipeline timeline",
+      nodes: [
+        { nodeKey: "01-first", missionId: asId("mission-a") },
+        { nodeKey: "02-second", missionId: asId("mission-b") }
+      ],
+      context: context("create-timeline")
+    });
+    await repository.start({
+      pipelineId: asId("pipeline-timeline"),
+      pipelineRunId: asId("pipeline-run-timeline"),
+      nodeRunIdPrefix: "pipeline-run-timeline/node-run",
+      context: context("start-timeline")
+    });
+
+    const [item] = await repository.list();
+    expect(item).toBeDefined();
+    expect(item!.id).toBe(asId("pipeline-timeline"));
+    expect(item!.nodes.find((node) => node.nodeKey === "01-first")).toMatchObject({
+      runStartedAt: "2026-07-26T09:00:00.000Z",
+      runEndedAt: null,
+      runAttempt: 2
+    });
+    expect(item!.nodes.find((node) => node.nodeKey === "02-second")).toMatchObject({
+      runStartedAt: null,
+      runEndedAt: null,
+      runAttempt: null
+    });
+
+    const runView = await repository.showRun(asId("pipeline-run-timeline"));
+    expect(runView?.nodes.find((node) => node.nodeKey === "01-first")).toMatchObject({
+      runStartedAt: "2026-07-26T09:00:00.000Z",
+      runEndedAt: null
+    });
+    expect(runView?.nodes.find((node) => node.nodeKey === "02-second")?.runStartedAt).toBeNull();
+  });
+
   it("completes ready human nodes when their mission is closed", async () => {
     database.orm.update(missions).set({ executionKind: "human" }).run();
     await repository.create({

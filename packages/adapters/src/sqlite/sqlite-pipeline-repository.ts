@@ -409,6 +409,7 @@ export class SqlitePipelineRepository implements PipelineRepository {
           .orderBy(asc(pipelineNodes.nodeKey), asc(pipelineNodes.id))
           .all()
       : [];
+    const latestRunByMission = this.latestRunByMission(nodeRows.map((row) => row.mission.id));
     const nodeKeyById = new Map(nodeRows.map((row) => [row.node.id, row.node.nodeKey]));
     const edges = definition
       ? this.database.orm.select().from(pipelineEdges)
@@ -430,15 +431,21 @@ export class SqlitePipelineRepository implements PipelineRepository {
       runState: latestRun ? latestRun.state : null,
       startedAt: latestRun?.startedAt ?? null,
       endedAt: latestRun?.endedAt ?? null,
-      nodes: nodeRows.map((row) => ({
-        nodeKey: row.node.nodeKey,
-        missionId: asId(row.mission.id),
-        missionTitle: row.mission.title,
-        missionKind: row.mission.executionKind,
-        missionState: row.mission.state,
-        nodeRunState: nodeRunStateByNodeId.get(row.node.id) ?? null,
-        transitionMode: row.node.startMode
-      })),
+      nodes: nodeRows.map((row) => {
+        const latest = latestRunByMission.get(row.mission.id);
+        return {
+          nodeKey: row.node.nodeKey,
+          missionId: asId(row.mission.id),
+          missionTitle: row.mission.title,
+          missionKind: row.mission.executionKind,
+          missionState: row.mission.state,
+          nodeRunState: nodeRunStateByNodeId.get(row.node.id) ?? null,
+          transitionMode: row.node.startMode,
+          runStartedAt: latest?.startedAt ?? null,
+          runEndedAt: latest?.endedAt ?? null,
+          runAttempt: latest?.userAttempt ?? null
+        };
+      }),
       edges
     };
   }
@@ -447,6 +454,7 @@ export class SqlitePipelineRepository implements PipelineRepository {
     const run = this.database.orm.select().from(pipelineRuns).where(eq(pipelineRuns.id, id)).get();
     if (!run) return null;
     const nodes = this.nodeRows(id);
+    const latestRunByMission = this.latestRunByMission(nodes.map((row) => row.mission.id));
     return {
       id: asId(run.id),
       pipelineId: asId(run.pipelineId),
@@ -455,19 +463,41 @@ export class SqlitePipelineRepository implements PipelineRepository {
       startedAt: run.startedAt,
       endedAt: run.endedAt,
       createdAt: run.createdAt,
-      nodes: nodes.map((row) => ({
-        id: asId(row.nodeRun.id),
-        nodeId: asId(row.node.id),
-        nodeKey: row.node.nodeKey,
-        missionId: asId(row.mission.id),
-        missionKind: row.mission.executionKind,
-        missionState: row.mission.state,
-        state: row.nodeRun.state,
-        transitionMode: row.node.startMode,
-        userAttempt: row.nodeRun.userAttempt,
-        handovers: this.incomingHandovers(row.nodeRun.id)
-      }))
+      nodes: nodes.map((row) => {
+        const latest = latestRunByMission.get(row.mission.id);
+        return {
+          id: asId(row.nodeRun.id),
+          nodeId: asId(row.node.id),
+          nodeKey: row.node.nodeKey,
+          missionId: asId(row.mission.id),
+          missionKind: row.mission.executionKind,
+          missionState: row.mission.state,
+          state: row.nodeRun.state,
+          transitionMode: row.node.startMode,
+          userAttempt: row.nodeRun.userAttempt,
+          runStartedAt: latest?.startedAt ?? null,
+          runEndedAt: latest?.endedAt ?? null,
+          handovers: this.incomingHandovers(row.nodeRun.id)
+        };
+      })
     };
+  }
+
+  /** Dernier run de mission (tentative la plus récente) pour chaque mission, en une seule requête batch. */
+  private latestRunByMission(missionIds: string[]): Map<string, { startedAt: string | null; endedAt: string | null; userAttempt: number }> {
+    const uniqueIds = [...new Set(missionIds)];
+    if (uniqueIds.length === 0) return new Map();
+    const rows = this.database.orm.select()
+      .from(runs)
+      .where(inArray(runs.missionId, uniqueIds))
+      .orderBy(desc(runs.userAttempt), desc(runs.createdAt))
+      .all();
+    const latest = new Map<string, { startedAt: string | null; endedAt: string | null; userAttempt: number }>();
+    for (const row of rows) {
+      if (!row.missionId || latest.has(row.missionId)) continue;
+      latest.set(row.missionId, { startedAt: row.startedAt, endedAt: row.endedAt, userAttempt: row.userAttempt });
+    }
+    return latest;
   }
 
   private nodeRows(pipelineRunId: Id) {
