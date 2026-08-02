@@ -6,6 +6,7 @@ import type {
   EnsureMissionObservationSession,
   HumanMissionAction,
   ListMissions,
+  ListMissionAudit,
   ListMissionRuns,
   MissionListFilter,
   StartMission,
@@ -30,6 +31,7 @@ import {
   GET_AGENT_CONFIG,
   GET_MISSION_PROVIDER_SESSION_CONTROL_CAPABILITIES,
   LIST_MISSIONS,
+  LIST_MISSION_AUDIT,
   LIST_MISSION_RUNS,
   PREVIEW_AGENT_CONFIG,
   READ_MISSION_PROVIDER_SESSION,
@@ -59,6 +61,7 @@ export class MissionController {
     @Inject(CHANGE_MISSION_STATE) private readonly changeMissionState: ChangeMissionState,
     @Inject(LIST_MISSIONS) private readonly listMissions: ListMissions,
     @Inject(LIST_MISSION_RUNS) private readonly listMissionRuns: ListMissionRuns,
+    @Inject(LIST_MISSION_AUDIT) private readonly listMissionAudit: ListMissionAudit,
     @Inject(SHOW_MISSION) private readonly showMission: ShowMission,
     @Inject(START_MISSION) private readonly startMission: StartMission,
     @Inject(ENABLE_AGENT_CONFIG) private readonly enableAgentConfig: EnableAgentConfig,
@@ -107,6 +110,15 @@ export class MissionController {
   @Get(":id/runs")
   runs(@Param("id") id: string) {
     return this.listMissionRuns.execute(toId(id));
+  }
+
+  /**
+   * Timeline d'audit de la mission (transitions d'état, décisions humaines,
+   * commandes), du plus ancien au plus récent.
+   */
+  @Get(":id/audit")
+  audit(@Param("id") id: string) {
+    return this.listMissionAudit.execute(toId(id));
   }
 
   @Post(":id/ready")

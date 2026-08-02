@@ -72,6 +72,7 @@ import {
   GetMissionProviderSessionControlCapabilities,
   ListMissions,
   ListMissionRuns,
+  ListMissionAudit,
   ListManagerConversations,
   ListProviderSessions,
   ListManagers,
@@ -168,6 +169,7 @@ import {
   LIST_MANAGERS,
   LIST_MISSIONS,
   LIST_MISSION_RUNS,
+  LIST_MISSION_AUDIT,
   MANAGE_APPROVALS,
   MANAGE_CONFIRMATIONS,
   MANAGE_DELIVERY,
@@ -641,6 +643,11 @@ export class NodraModule {
           provide: LIST_MISSION_RUNS,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new ListMissionRuns(new SqliteMissionReadModel(database))
+        },
+        {
+          provide: LIST_MISSION_AUDIT,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ListMissionAudit(new SqliteMissionReadModel(database))
         },
         {
           provide: CREATE_PIPELINE,

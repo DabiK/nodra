@@ -26,6 +26,16 @@ export interface MissionRelayRecord {
   createdAt: string;
 }
 
+/** Événement d'audit d'une mission (timeline, cf. issue #11). */
+export interface MissionAuditView {
+  id: Id;
+  commandId: Id;
+  eventType: string;
+  actor: "user" | "manager";
+  payload: Readonly<Record<string, unknown>>;
+  occurredAt: string;
+}
+
 export interface SaveMissionInput {
   mission: Mission;
   expectedVersion: number;
@@ -100,4 +110,6 @@ export interface MissionReadModel {
   show(id: Id): Promise<MissionView | null>;
   relay(filter?: MissionListFilter): Promise<RelayProjection>;
   runs(id: Id): Promise<MissionRunsView>;
+  /** Timeline d'audit de la mission, du plus ancien au plus récent. */
+  audit(id: Id): Promise<MissionAuditView[]>;
 }

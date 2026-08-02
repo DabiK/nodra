@@ -1,7 +1,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { ChangeMissionState, CreateMission, GetRelay, ListMissionRuns, ListMissions, ShowMission } from "@nodra/application";
+import { ChangeMissionState, CreateMission, GetRelay, ListMissionAudit, ListMissionRuns, ListMissions, ShowMission } from "@nodra/application";
 import { asId } from "@nodra/domain";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrateDatabase } from "./migrate-database.js";
@@ -9,6 +9,7 @@ import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { projects } from "./schema/core.js";
 import { conversations, conversationItems } from "./schema/conversations.js";
 import { runs } from "./schema/runs.js";
+import { businessAuditEvents } from "./schema/operations.js";
 import { SqliteMissionReadModel } from "./sqlite-mission-read-model.js";
 import { SqliteMissionRepository } from "./sqlite-mission-repository.js";
 import { missions } from "./schema/missions.js";
@@ -29,6 +30,7 @@ describe("SQLite human mission vertical slice", () => {
   let showMission: ShowMission;
   let getRelay: GetRelay;
   let listMissionRuns: ListMissionRuns;
+  let listMissionAudit: ListMissionAudit;
 
   beforeEach(async () => {
     const directory = await mkdtemp(join(tmpdir(), "nodra-sqlite-"));
@@ -42,6 +44,7 @@ describe("SQLite human mission vertical slice", () => {
     showMission = new ShowMission(readModel);
     getRelay = new GetRelay(readModel);
     listMissionRuns = new ListMissionRuns(readModel);
+    listMissionAudit = new ListMissionAudit(readModel);
   });
 
   afterEach(() => database.close());
@@ -361,6 +364,70 @@ describe("SQLite human mission vertical slice", () => {
 
   it("rejects a run history lookup for an unknown mission", async () => {
     await expect(listMissionRuns.execute(asId("mission-unknown")))
+      .rejects.toMatchObject({ code: "MISSION_NOT_FOUND" });
+  });
+
+  it("lists the mission audit timeline oldest first with actor and transition payload", async () => {
+    await createMission.execute({ id: asId("mission-audit"), title: "Audit", context: context("create-audit", 0) });
+    await changeMissionState.execute({
+      missionId: asId("mission-audit"),
+      expectedVersion: 0,
+      action: { type: "prepare" },
+      context: { commandId: asId("prepare-audit"), actor: "user", occurredAt: at(5) }
+    });
+    await changeMissionState.execute({
+      missionId: asId("mission-audit"),
+      expectedVersion: 1,
+      action: { type: "pickup" },
+      context: { commandId: asId("pickup-audit"), actor: "user", occurredAt: at(9) }
+    });
+
+    const timeline = await listMissionAudit.execute(asId("mission-audit"));
+    const [created, prepared, pickedUp] = timeline;
+    expect(timeline.map((event) => event.eventType)).toEqual([
+      "MISSION_CREATED",
+      "MISSION_PREPARED",
+      "MISSION_PICKED_UP"
+    ]);
+    expect(created).toMatchObject({
+      id: "audit/create-audit",
+      commandId: "create-audit",
+      actor: "user",
+      payload: { fromState: null, toState: "DRAFT" },
+      occurredAt: at(0)
+    });
+    expect(prepared?.payload).toMatchObject({ fromState: "DRAFT", toState: "READY" });
+    expect(pickedUp?.payload).toMatchObject({ fromState: "READY", toState: "ACTIVE" });
+  });
+
+  it("returns an empty timeline for a known mission without audit events", async () => {
+    // Insertion directe (sans commande d'agrégat) : aucune ligne d'audit n'existe pour cette mission.
+    database.orm.insert(missions).values({
+      id: "mission-no-audit",
+      projectId: null,
+      title: "No audit",
+      executionKind: "human",
+      state: "DRAFT",
+      version: 0,
+      createdAt: at(0),
+      updatedAt: at(0)
+    }).run();
+    // Un événement d'une autre mission ne doit pas fuiter.
+    database.orm.insert(businessAuditEvents).values({
+      id: "audit/other",
+      aggregateKind: "mission",
+      aggregateId: "mission-other",
+      commandId: "other",
+      eventType: "MISSION_PREPARED",
+      actor: "manager",
+      payloadJson: JSON.stringify({ schemaVersion: 1 }),
+      occurredAt: at(1)
+    }).run();
+    expect(await listMissionAudit.execute(asId("mission-no-audit"))).toEqual([]);
+  });
+
+  it("rejects an audit timeline lookup for an unknown mission", async () => {
+    await expect(listMissionAudit.execute(asId("mission-unknown")))
       .rejects.toMatchObject({ code: "MISSION_NOT_FOUND" });
   });
 });

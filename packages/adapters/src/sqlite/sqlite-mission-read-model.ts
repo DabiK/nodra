@@ -1,4 +1,5 @@
 import type {
+  MissionAuditView,
   MissionListFilter,
   MissionReadModel,
   MissionRunView,
@@ -13,7 +14,7 @@ import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { missions } from "./schema/missions.js";
 import { runs } from "./schema/runs.js";
 import { conversationItems } from "./schema/conversations.js";
-import { relayItems } from "./schema/operations.js";
+import { businessAuditEvents, relayItems } from "./schema/operations.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
 
 type MissionRow = typeof missions.$inferSelect;
@@ -185,6 +186,34 @@ export class SqliteMissionReadModel implements MissionReadModel {
         projection[row.queue].push(item);
       }
       return projection;
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
+  /**
+   * Timeline d'audit de la mission : tous les événements persistés atomiquement
+   * avec les sauvegardes d'agrégat (transitions d'état, décisions, commandes),
+   * du plus ancien au plus récent.
+   */
+  async audit(id: Id): Promise<MissionAuditView[]> {
+    try {
+      const rows = this.database.orm.select()
+        .from(businessAuditEvents)
+        .where(and(
+          eq(businessAuditEvents.aggregateKind, "mission"),
+          eq(businessAuditEvents.aggregateId, id)
+        ))
+        .orderBy(asc(businessAuditEvents.occurredAt), asc(businessAuditEvents.id))
+        .all();
+      return rows.map((row) => ({
+        id: asId(row.id),
+        commandId: asId(row.commandId ?? row.id),
+        eventType: row.eventType,
+        actor: row.actor as "user" | "manager",
+        payload: JSON.parse(row.payloadJson) as Record<string, unknown>,
+        occurredAt: row.occurredAt
+      }));
     } catch (error) {
       throw translateSqliteError(error);
     }
