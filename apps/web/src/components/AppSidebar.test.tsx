@@ -5,20 +5,22 @@ import { AppSidebar } from "./AppSidebar";
 
 afterEach(cleanup);
 
-function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.fn(), onSelectMission = vi.fn()) {
+function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.fn(), onSelectMission = vi.fn(), onThemeToggle = vi.fn()) {
   render(
     <AppSidebar
       page="tasks"
       collapsed={collapsed}
+      theme="light"
       activePipelineCount={0}
       hasActiveManager={false}
       missions={[]}
       onToggle={onToggle}
       onNavigate={onNavigate}
       onSelectMission={onSelectMission}
+      onThemeToggle={onThemeToggle}
     />
   );
-  return { onToggle, onNavigate, onSelectMission };
+  return { onToggle, onNavigate, onSelectMission, onThemeToggle };
 }
 
 describe("AppSidebar", () => {
@@ -52,5 +54,17 @@ describe("AppSidebar", () => {
     const { onNavigate } = renderSidebar(false);
     fireEvent.click(screen.getByRole("link", { name: /Sessions provider/ }));
     expect(onNavigate).toHaveBeenCalledWith("provider-sessions");
+  });
+
+  it("exposes the theme toggle with the opposite action label", () => {
+    renderSidebar(false);
+    // In light mode the toggle offers the dark mode.
+    expect(screen.getByRole("button", { name: "Passer en mode sombre" })).toBeTruthy();
+  });
+
+  it("calls onThemeToggle when activated", () => {
+    const { onThemeToggle } = renderSidebar(false);
+    fireEvent.click(screen.getByRole("button", { name: "Passer en mode sombre" }));
+    expect(onThemeToggle).toHaveBeenCalledTimes(1);
   });
 });

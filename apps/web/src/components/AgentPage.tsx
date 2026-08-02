@@ -6,6 +6,7 @@ import { listMissions } from "../services/mission-service";
 import { appShellClassName, loadSidebarCollapsed, saveSidebarCollapsed } from "../services/sidebar-preference-service";
 import { ProviderMissionConversationPage } from "./ProviderMissionConversationPage";
 import { selectActiveSidebarMissions } from "../services/sidebar-missions";
+import { applyTheme, initTheme, saveTheme, type Theme } from "../services/theme-service";
 
 function navigateToApp(page: AppPage) {
   location.assign(page === "tasks" ? "/" : `/?page=${page}`);
@@ -14,6 +15,7 @@ function navigateToApp(page: AppPage) {
 function AgentMissionShell({ missionId }: { missionId: string }) {
   const [missions, setMissions] = useState<MissionView[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => loadSidebarCollapsed());
+  const [theme, setTheme] = useState<Theme>(() => initTheme());
 
   useEffect(() => {
     let cancelled = false;
@@ -37,17 +39,28 @@ function AgentMissionShell({ missionId }: { missionId: string }) {
     });
   };
 
+  const toggleTheme = () => {
+    setTheme((current) => {
+      const next: Theme = current === "dark" ? "light" : "dark";
+      saveTheme(next);
+      applyTheme(next);
+      return next;
+    });
+  };
+
   return (
     <main className={appShellClassName(sidebarCollapsed)}>
       <AppSidebar
         page="tasks"
         collapsed={sidebarCollapsed}
+        theme={theme}
         activePipelineCount={0}
         hasActiveManager={false}
         missions={selectActiveSidebarMissions(missions)}
         onToggle={toggleSidebar}
         onNavigate={navigateToApp}
         onSelectMission={(id) => { location.assign(`/agent.html?missionId=${encodeURIComponent(id)}`); }}
+        onThemeToggle={toggleTheme}
       />
       <section className="agent-shell-workspace">
         <ProviderMissionConversationPage missionId={missionId} />

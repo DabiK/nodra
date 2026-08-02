@@ -1,5 +1,7 @@
 export type AppPage = "tasks" | "pipelines" | "managers" | "provider-sessions";
 
+export type Theme = "light" | "dark";
+
 export interface SidebarMission {
   id: string;
   title: string;
@@ -14,21 +16,25 @@ export interface SidebarMission {
 export function AppSidebar({
   page,
   collapsed,
+  theme,
   activePipelineCount,
   hasActiveManager,
   missions,
   onToggle,
   onNavigate,
-  onSelectMission
+  onSelectMission,
+  onThemeToggle
 }: {
   page: AppPage;
   collapsed: boolean;
+  theme: Theme;
   activePipelineCount: number;
   hasActiveManager: boolean;
   missions: SidebarMission[];
   onToggle(): void;
   onNavigate(page: AppPage): void;
   onSelectMission(missionId: string): void;
+  onThemeToggle(): void;
 }) {
   const go = (target: AppPage) => (event: { preventDefault(): void }) => {
     event.preventDefault();
@@ -94,6 +100,19 @@ export function AppSidebar({
           </ul>
         </div>
       ) : null}
+
+      <div className="sidebar-theme">
+        <button
+          type="button"
+          className="theme-toggle"
+          aria-label={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+          title={theme === "dark" ? "Mode clair" : "Mode sombre"}
+          onClick={onThemeToggle}
+        >
+          <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+          <span className="theme-toggle-label">{theme === "dark" ? "Mode clair" : "Mode sombre"}</span>
+        </button>
+      </div>
     </aside>
   );
 }

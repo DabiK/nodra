@@ -24,6 +24,7 @@ import { browseFolders } from "./services/workspace-service";
 import { loadViewMode, saveViewMode, type MissionViewMode } from "./services/view-mode-service";
 import { dragActionId, findDragTransition } from "./services/mission-drag-transitions";
 import { performMissionAction } from "./services/mission-action-service";
+import { applyTheme, initTheme, saveTheme, type Theme } from "./services/theme-service";
 
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -64,6 +65,7 @@ export function App() {
   const [focusPipelineId, setFocusPipelineId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<MissionSchedule>(() => loadSchedule());
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => loadSidebarCollapsed());
+  const [theme, setTheme] = useState<Theme>(() => initTheme());
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -146,6 +148,15 @@ export function App() {
     setSidebarCollapsed((current) => {
       const next = !current;
       saveSidebarCollapsed(next);
+      return next;
+    });
+  };
+
+  const toggleTheme = () => {
+    setTheme((current) => {
+      const next: Theme = current === "dark" ? "light" : "dark";
+      saveTheme(next);
+      applyTheme(next);
       return next;
     });
   };
@@ -268,12 +279,14 @@ export function App() {
       <AppSidebar
         page={page}
         collapsed={sidebarCollapsed}
+        theme={theme}
         activePipelineCount={activePipelineCount}
         hasActiveManager={managers.some((manager) => manager.state === "active")}
         missions={activeSidebarMissions}
         onToggle={toggleSidebar}
         onNavigate={navigate}
         onSelectMission={selectMission}
+        onThemeToggle={toggleTheme}
       />
 
       <section className="workspace">
