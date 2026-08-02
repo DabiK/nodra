@@ -109,6 +109,10 @@ describe("SqlitePipelineRepository", () => {
         reasoningEffort: "provider_default",
         startedAt: "2026-07-26T08:00:00.000Z",
         endedAt: "2026-07-26T08:30:00.000Z",
+        inputTokens: 1000,
+        outputTokens: 500,
+        costMicros: 12_345,
+        usageKind: "reported",
         createdAt: now
       },
       {
@@ -125,6 +129,8 @@ describe("SqlitePipelineRepository", () => {
         reasoningEffort: "provider_default",
         startedAt: "2026-07-26T09:00:00.000Z",
         endedAt: null,
+        costMicros: 6_543,
+        usageKind: "reported",
         createdAt: now
       }
     ]).run();
@@ -153,20 +159,26 @@ describe("SqlitePipelineRepository", () => {
     expect(item!.nodes.find((node) => node.nodeKey === "01-first")).toMatchObject({
       runStartedAt: "2026-07-26T09:00:00.000Z",
       runEndedAt: null,
-      runAttempt: 2
+      runAttempt: 2,
+      runCostMicros: 6_543
     });
     expect(item!.nodes.find((node) => node.nodeKey === "02-second")).toMatchObject({
       runStartedAt: null,
       runEndedAt: null,
-      runAttempt: null
+      runAttempt: null,
+      runCostMicros: null
     });
+    // Le total du pipeline somme les coûts connus des nœuds (seul mission-a a un run).
+    expect(item!.totalCostMicros).toBe(6_543);
 
     const runView = await repository.showRun(asId("pipeline-run-timeline"));
     expect(runView?.nodes.find((node) => node.nodeKey === "01-first")).toMatchObject({
       runStartedAt: "2026-07-26T09:00:00.000Z",
-      runEndedAt: null
+      runEndedAt: null,
+      runCostMicros: 6_543
     });
     expect(runView?.nodes.find((node) => node.nodeKey === "02-second")?.runStartedAt).toBeNull();
+    expect(runView?.totalCostMicros).toBe(6_543);
   });
 
   it("completes ready human nodes when their mission is closed", async () => {

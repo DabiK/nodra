@@ -422,6 +422,22 @@ export class SqlitePipelineRepository implements PipelineRepository {
             return fromNodeKey && toNodeKey ? [{ fromNodeKey, toNodeKey }] : [];
           })
       : [];
+    const nodes = nodeRows.map((row) => {
+      const latest = latestRunByMission.get(row.mission.id);
+      return {
+        nodeKey: row.node.nodeKey,
+        missionId: asId(row.mission.id),
+        missionTitle: row.mission.title,
+        missionKind: row.mission.executionKind,
+        missionState: row.mission.state,
+        nodeRunState: nodeRunStateByNodeId.get(row.node.id) ?? null,
+        transitionMode: row.node.startMode,
+        runStartedAt: latest?.startedAt ?? null,
+        runEndedAt: latest?.endedAt ?? null,
+        runAttempt: latest?.userAttempt ?? null,
+        runCostMicros: latest?.costMicros ?? null
+      };
+    });
     return {
       id: asId(pipeline.id),
       name: pipeline.name,
@@ -431,21 +447,8 @@ export class SqlitePipelineRepository implements PipelineRepository {
       runState: latestRun ? latestRun.state : null,
       startedAt: latestRun?.startedAt ?? null,
       endedAt: latestRun?.endedAt ?? null,
-      nodes: nodeRows.map((row) => {
-        const latest = latestRunByMission.get(row.mission.id);
-        return {
-          nodeKey: row.node.nodeKey,
-          missionId: asId(row.mission.id),
-          missionTitle: row.mission.title,
-          missionKind: row.mission.executionKind,
-          missionState: row.mission.state,
-          nodeRunState: nodeRunStateByNodeId.get(row.node.id) ?? null,
-          transitionMode: row.node.startMode,
-          runStartedAt: latest?.startedAt ?? null,
-          runEndedAt: latest?.endedAt ?? null,
-          runAttempt: latest?.userAttempt ?? null
-        };
-      }),
+      totalCostMicros: totalCost(nodes),
+      nodes,
       edges
     };
   }
@@ -455,6 +458,24 @@ export class SqlitePipelineRepository implements PipelineRepository {
     if (!run) return null;
     const nodes = this.nodeRows(id);
     const latestRunByMission = this.latestRunByMission(nodes.map((row) => row.mission.id));
+    const nodeViews = nodes.map((row) => {
+      const latest = latestRunByMission.get(row.mission.id);
+      return {
+        id: asId(row.nodeRun.id),
+        nodeId: asId(row.node.id),
+        nodeKey: row.node.nodeKey,
+        missionId: asId(row.mission.id),
+        missionKind: row.mission.executionKind,
+        missionState: row.mission.state,
+        state: row.nodeRun.state,
+        transitionMode: row.node.startMode,
+        userAttempt: row.nodeRun.userAttempt,
+        runStartedAt: latest?.startedAt ?? null,
+        runEndedAt: latest?.endedAt ?? null,
+        runCostMicros: latest?.costMicros ?? null,
+        handovers: this.incomingHandovers(row.nodeRun.id)
+      };
+    });
     return {
       id: asId(run.id),
       pipelineId: asId(run.pipelineId),
@@ -463,28 +484,13 @@ export class SqlitePipelineRepository implements PipelineRepository {
       startedAt: run.startedAt,
       endedAt: run.endedAt,
       createdAt: run.createdAt,
-      nodes: nodes.map((row) => {
-        const latest = latestRunByMission.get(row.mission.id);
-        return {
-          id: asId(row.nodeRun.id),
-          nodeId: asId(row.node.id),
-          nodeKey: row.node.nodeKey,
-          missionId: asId(row.mission.id),
-          missionKind: row.mission.executionKind,
-          missionState: row.mission.state,
-          state: row.nodeRun.state,
-          transitionMode: row.node.startMode,
-          userAttempt: row.nodeRun.userAttempt,
-          runStartedAt: latest?.startedAt ?? null,
-          runEndedAt: latest?.endedAt ?? null,
-          handovers: this.incomingHandovers(row.nodeRun.id)
-        };
-      })
+      totalCostMicros: totalCost(nodeViews),
+      nodes: nodeViews
     };
   }
 
   /** Dernier run de mission (tentative la plus récente) pour chaque mission, en une seule requête batch. */
-  private latestRunByMission(missionIds: string[]): Map<string, { startedAt: string | null; endedAt: string | null; userAttempt: number }> {
+  private latestRunByMission(missionIds: string[]): Map<string, { startedAt: string | null; endedAt: string | null; userAttempt: number; costMicros: number | null }> {
     const uniqueIds = [...new Set(missionIds)];
     if (uniqueIds.length === 0) return new Map();
     const rows = this.database.orm.select()
@@ -492,10 +498,15 @@ export class SqlitePipelineRepository implements PipelineRepository {
       .where(inArray(runs.missionId, uniqueIds))
       .orderBy(desc(runs.userAttempt), desc(runs.createdAt))
       .all();
-    const latest = new Map<string, { startedAt: string | null; endedAt: string | null; userAttempt: number }>();
+    const latest = new Map<string, { startedAt: string | null; endedAt: string | null; userAttempt: number; costMicros: number | null }>();
     for (const row of rows) {
       if (!row.missionId || latest.has(row.missionId)) continue;
-      latest.set(row.missionId, { startedAt: row.startedAt, endedAt: row.endedAt, userAttempt: row.userAttempt });
+      latest.set(row.missionId, {
+        startedAt: row.startedAt,
+        endedAt: row.endedAt,
+        userAttempt: row.userAttempt,
+        costMicros: row.costMicros ?? null
+      });
     }
     return latest;
   }
@@ -600,4 +611,17 @@ export class SqlitePipelineRepository implements PipelineRepository {
       return `<resultat_etape_precedente id="${handover.fromNodeKey}">\n${content}\n</resultat_etape_precedente>`;
     }).join("\n\n");
   }
+}
+
+/** Somme des coûts connus (micro-dollars) d'une liste de nœuds ; null si aucun coût renseigné. */
+function totalCost(nodes: Array<{ runCostMicros: number | null }>): number | null {
+  let total = 0;
+  let known = 0;
+  for (const node of nodes) {
+    if (node.runCostMicros !== null) {
+      total += node.runCostMicros;
+      known += 1;
+    }
+  }
+  return known > 0 ? total : null;
 }

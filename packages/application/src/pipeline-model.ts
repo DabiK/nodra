@@ -58,11 +58,15 @@ export interface PipelineRunView {
     userAttempt: number;
     runStartedAt: string | null;
     runEndedAt: string | null;
+    /** Coût du dernier run de la mission (micro-dollars), null si inconnu. */
+    runCostMicros: number | null;
     handovers: Array<{
       fromNodeKey: string;
       payload: unknown;
     }>;
   }>;
+  /** Somme des coûts connus des nœuds (micro-dollars), null si aucun. */
+  totalCostMicros: number | null;
 }
 
 export interface PipelineListNodeView {
@@ -79,6 +83,8 @@ export interface PipelineListNodeView {
   runEndedAt: string | null;
   /** Numéro de tentative (userAttempt) du dernier run de la mission, null si jamais exécutée. */
   runAttempt: number | null;
+  /** Coût du dernier run de la mission (micro-dollars), null si inconnu. */
+  runCostMicros: number | null;
 }
 
 export interface PipelineListItemView {
@@ -90,6 +96,8 @@ export interface PipelineListItemView {
   runState: PipelineRunState | null;
   startedAt: string | null;
   endedAt: string | null;
+  /** Somme des coûts connus des nœuds (micro-dollars), null si aucun. */
+  totalCostMicros: number | null;
   nodes: PipelineListNodeView[];
   edges: Array<{ fromNodeKey: string; toNodeKey: string }>;
 }
