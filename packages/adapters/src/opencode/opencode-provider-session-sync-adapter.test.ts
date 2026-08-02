@@ -347,6 +347,80 @@ describe("OpenCodeProviderSessionSyncAdapter", () => {
     ]);
   });
 
+  it("expands a message with multiple task parts into one subagent item per delegation", async () => {
+    const fake = fakeClient();
+    fake.session.get.mockResolvedValue({ data: session() });
+    const story1 = taskToolPart("task-1", {
+      metadata: { sessionId: "ses_story_1" },
+      input: { description: "Mettre à jour Histoire 1", prompt: "Update story 1" }
+    });
+    const story2 = taskToolPart("task-2", {
+      metadata: { sessionId: "ses_story_2" },
+      input: { description: "Mettre à jour Histoire 2", prompt: "Update story 2" }
+    });
+    const story3 = taskToolPart("task-3", {
+      metadata: { sessionId: "ses_story_3" },
+      input: { description: "Mettre à jour Histoire 3", prompt: "Update story 3" }
+    });
+    fake.session.messages
+      .mockResolvedValueOnce({
+        data: [
+          entry({ id: "user-1", role: "user", time: { created: 1 } }, [textPart("spawn 3 agents", "user-1")]),
+          entry({ id: "multi-1", role: "assistant", parentID: "user-1", time: { created: 2, completed: 30 } },
+            [story1, story2, story3])
+        ]
+      })
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] });
+
+    const snapshot = await adapter(fake).readSession({
+      providerId: "opencode",
+      externalSessionId: "session-1"
+    });
+
+    expect(fake.session.messages).toHaveBeenCalledTimes(4);
+    const subagents = snapshot.items.filter((item) => item.kind === "subagent");
+    expect(subagents).toEqual([
+      {
+        externalItemId: "multi-1#0",
+        externalTurnId: "user-1",
+        role: "assistant",
+        kind: "subagent",
+        order: 1,
+        text: "Mettre à jour Histoire 1",
+        name: "task",
+        sourceAt: "1970-01-01T00:00:00.002Z",
+        receivedAt,
+        subagent: { subSessionId: "ses_story_1", status: "completed", model: null, startedAt: null, finishedAt: null, report: "Created: toto.txt", transcript: [] }
+      },
+      {
+        externalItemId: "multi-1#1",
+        externalTurnId: "user-1",
+        role: "assistant",
+        kind: "subagent",
+        order: 2,
+        text: "Mettre à jour Histoire 2",
+        name: "task",
+        sourceAt: "1970-01-01T00:00:00.002Z",
+        receivedAt,
+        subagent: { subSessionId: "ses_story_2", status: "completed", model: null, startedAt: null, finishedAt: null, report: "Created: toto.txt", transcript: [] }
+      },
+      {
+        externalItemId: "multi-1#2",
+        externalTurnId: "user-1",
+        role: "assistant",
+        kind: "subagent",
+        order: 3,
+        text: "Mettre à jour Histoire 3",
+        name: "task",
+        sourceAt: "1970-01-01T00:00:00.002Z",
+        receivedAt,
+        subagent: { subSessionId: "ses_story_3", status: "completed", model: null, startedAt: null, finishedAt: null, report: "Created: toto.txt", transcript: [] }
+      }
+    ]);
+  });
+
   it("keeps subagent items unchanged when the sub-session is unreachable", async () => {
     const fake = fakeClient();
     fake.session.get.mockResolvedValue({ data: session() });

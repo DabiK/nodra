@@ -40,6 +40,10 @@ interface MessageEntry {
   parts: Part[];
 }
 
+interface MappedItem extends ProviderSessionItem {
+  taskPart: Extract<Part, { type: "tool" }> | null;
+}
+
 export interface OpenCodeProviderSessionSyncAdapterOptions {
   baseUrl?: string;
   fetch?: typeof fetch;
@@ -113,7 +117,8 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
         })).data;
         const receivedAt = this.now();
         const mapped = this.mapMessages(messages, receivedAt);
-        const items = await this.attachSubagentExecutions(messages, mapped.items, client, directory);
+        const enriched = await this.attachSubagentExecutions(mapped.items, client, directory);
+        const items = enriched.map(({ taskPart: _taskPart, ...item }) => item);
         return {
           session: this.summary(session, receivedAt),
           turns: mapped.turns,
@@ -190,7 +195,7 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
   private mapMessages(
     entries: MessageEntry[],
     receivedAt: string
-  ): { turns: ProviderSessionTurn[]; items: ProviderSessionItem[] } {
+  ): { turns: ProviderSessionTurn[]; items: MappedItem[] } {
     const sorted = [...entries].sort((a, b) => a.info.time.created - b.info.time.created);
     const userEntries = sorted.filter((entry) => this.mapRole(entry.info.role) === "user");
     const turns = userEntries.map((entry, order) => {
@@ -214,17 +219,16 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
       };
     });
     let currentTurnId: string | null = null;
-    const items = sorted.map((entry, order) => {
+    const flattened = sorted.flatMap((entry) => {
       const role = this.mapRole(entry.info.role);
       const text = this.messageText(entry.parts);
       if (role === "user") currentTurnId = entry.info.id;
       const kind = this.mapKind(entry.parts, role, text);
-      const item: ProviderSessionItem = {
-        externalItemId: entry.info.id,
+      const sourceAt = new Date(entry.info.time.created).toISOString();
+      const base = {
         externalTurnId: currentTurnId,
         role,
         kind,
-        order,
         text: kind === "subagent"
           ? (text ?? this.subagentText(entry.parts))
           : kind === "reasoning"
@@ -233,29 +237,37 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
         name: kind === "subagent"
           ? this.subagentName(entry.parts)
           : role === "assistant" ? this.toolName(entry.parts) : null,
-        sourceAt: new Date(entry.info.time.created).toISOString(),
+        sourceAt,
         receivedAt
       };
-      return item;
+      if (kind === "subagent") {
+        const tasks = this.taskParts(entry.parts);
+        if (tasks.length > 1) {
+          return tasks.map((task, index) => ({
+            ...base,
+            externalItemId: `${entry.info.id}#${index}`,
+            text: this.taskText(task),
+            name: "task",
+            taskPart: task
+          }));
+        }
+        return [{ ...base, externalItemId: entry.info.id, taskPart: tasks[0] ?? null }];
+      }
+      return [{ ...base, externalItemId: entry.info.id, taskPart: null }];
     });
+    const items = flattened.map((item, order) => ({ ...item, order }));
     return { turns, items };
   }
 
   private async attachSubagentExecutions(
-    entries: MessageEntry[],
-    items: ProviderSessionItem[],
+    items: MappedItem[],
     client: OpenCodeClient,
     directory: string | null
-  ): Promise<ProviderSessionItem[]> {
-    const entriesById = new Map(entries.map((entry) => [entry.info.id, entry]));
-    const targets = items.filter(
-      (item) => item.kind === "subagent" && entriesById.has(item.externalItemId)
-    );
+  ): Promise<MappedItem[]> {
+    const targets = items.filter((item) => item.taskPart !== null);
     if (targets.length === 0) return items;
     const executions = await Promise.all(targets.map(async (item) => {
-      const task = this.taskPart(entriesById.get(item.externalItemId)!.parts);
-      if (task === null) return null;
-      const execution = await this.subagentExecution(task, client, directory);
+      const execution = await this.subagentExecution(item.taskPart!, client, directory);
       return execution ? { ...item, subagent: execution } : null;
     }));
     const byExternalItemId = new Map(
@@ -362,10 +374,24 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
   }
 
   private taskPart(parts: Part[]): Extract<Part, { type: "tool" }> | null {
-    const tool = parts.find(
+    const tasks = this.taskParts(parts);
+    return tasks[0] ?? null;
+  }
+
+  private taskParts(parts: Part[]): Extract<Part, { type: "tool" }>[] {
+    return parts.filter(
       (part): part is Extract<Part, { type: "tool" }> => part.type === "tool" && part.tool === "task"
     );
-    return tool ?? null;
+  }
+
+  private taskText(task: Extract<Part, { type: "tool" }>): string | null {
+    const input = task.state.input as { description?: unknown; prompt?: unknown } | undefined;
+    const description =
+      typeof input?.description === "string" && input.description.length > 0
+        ? input.description
+        : null;
+    const prompt = typeof input?.prompt === "string" && input.prompt.length > 0 ? input.prompt : null;
+    return description ?? prompt;
   }
 
   private subagentName(parts: Part[]): string | null {
@@ -378,14 +404,7 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
 
   private subagentText(parts: Part[]): string | null {
     const task = this.taskPart(parts);
-    if (task !== null) {
-      const input = task.state.input;
-      const description = typeof input.description === "string" && input.description.length > 0
-        ? input.description
-        : null;
-      const prompt = typeof input.prompt === "string" && input.prompt.length > 0 ? input.prompt : null;
-      return description ?? prompt;
-    }
+    if (task !== null) return this.taskText(task);
     const subtask = parts.find((part) => part.type === "subtask");
     if (!subtask) return null;
     return subtask.prompt.length > 0 ? subtask.prompt : (subtask.description.length > 0 ? subtask.description : null);
