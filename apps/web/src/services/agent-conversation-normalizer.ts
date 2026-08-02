@@ -22,6 +22,11 @@ export interface ConversationStats {
   providerSessionRef?: string;
 }
 
+export interface RunFailure {
+  title: string;
+  detail: string;
+}
+
 type RawEvent = AgentSessionView["events"][number];
 type ConversationItem = AgentSessionView["items"][number];
 
@@ -115,6 +120,54 @@ export function extractConversationStats(session: AgentSessionView | null): Conv
   return stats;
 }
 
+export function extractRunFailure(session: AgentSessionView | null): RunFailure | null {
+  if (!session || session.run.state !== "FAILED") return null;
+  let detail: string | null = null;
+  for (const event of session.events) {
+    const message = failureMessageFromEvent(event.type, event.payload);
+    if (message) detail = message;
+  }
+  if (!detail) return null;
+  return { title: "Le run a échoué", detail };
+}
+
+function failureMessageFromEvent(type: string, payload: unknown): string | null {
+  const record = payloadRecord(payload);
+  if (!record) return null;
+  if (type.includes("executionCompleted") || type.includes("run.finished")) {
+    if (String(record.state ?? "").toUpperCase() !== "FAILED") return null;
+    const source = payloadRecord(record.source);
+    if (source) {
+      const properties = payloadRecord(source.properties);
+      const nested = errorMessage(payloadRecord(properties?.error)) ?? errorMessage(payloadRecord(properties));
+      if (nested) return nested;
+    }
+    return errorMessage(payloadRecord(record.error)) ?? errorMessage(payloadRecord(record));
+  }
+  if (type.includes("failed") || type.includes("error")) {
+    const properties = payloadRecord(record.properties);
+    const nested = errorMessage(payloadRecord(properties?.error));
+    if (nested) return nested;
+    return errorMessage(payloadRecord(record.error)) ?? errorMessage(payloadRecord(record));
+  }
+  return null;
+}
+
+function errorMessage(value: Record<string, unknown> | null): string | null {
+  if (!value) return null;
+  const data = payloadRecord(value.data);
+  if (data) {
+    const dataMessage = errorMessage(data);
+    if (dataMessage) return dataMessage;
+  }
+  const message = typeof value.message === "string" && value.message.trim() ? value.message.trim() : null;
+  return message ? truncate(message, 500) : null;
+}
+
+function truncate(text: string, max: number) {
+  return text.length <= max ? text : `${text.slice(0, max)}…`;
+}
+
 function normalizeItems(items: ConversationItem[], session: AgentSessionView): AgentConversationEvent[] {
   const result: AgentConversationEvent[] = [];
   const hasUserItem = items.some((item) => (item.kind === "user" || item.kind === "steer") && item.body?.trim());
@@ -178,7 +231,8 @@ function normalizeProviderEvent(event: RawEvent, finalTextPartIds: Set<string>, 
     return text.trim() ? [{ kind: "user", id: event.id, text, at }] : [];
   }
   if (event.type === "turn.failed" || event.type === "error" || event.type.includes("failed") || event.type.includes("error")) {
-    return [{ kind: "error", id: event.id, text: String(payload?.message ?? payload?.error ?? "Échec du run"), at }];
+    const message = failureMessageFromEvent(event.type, payload) ?? "Échec du run";
+    return [{ kind: "error", id: event.id, text: message, at }];
   }
   const item = canonicalItem(event.payload);
   if (!item) return [];

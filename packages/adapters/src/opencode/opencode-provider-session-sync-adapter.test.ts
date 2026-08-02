@@ -224,7 +224,7 @@ describe("OpenCodeProviderSessionSyncAdapter", () => {
     ]);
     expect(snapshot.items).toEqual([
       { externalItemId: "m0", externalTurnId: null, role: "assistant", kind: "message", order: 0, text: "preamble", name: null, sourceAt: "1970-01-01T00:00:00.001Z", receivedAt },
-      { externalItemId: "m1", externalTurnId: null, role: "user", kind: "message", order: 1, text: "hello", name: null, sourceAt: "1970-01-01T00:00:00.002Z", receivedAt },
+      { externalItemId: "m1", externalTurnId: "m1", role: "user", kind: "message", order: 1, text: "hello", name: null, sourceAt: "1970-01-01T00:00:00.002Z", receivedAt },
       { externalItemId: "m2", externalTurnId: "m1", role: "assistant", kind: "message", order: 2, text: "hi there", name: null, sourceAt: "1970-01-01T00:00:00.003Z", receivedAt },
       { externalItemId: "m3", externalTurnId: "m1", role: "tool", kind: "tool_result", order: 3, text: null, name: null, sourceAt: "1970-01-01T00:00:00.004Z", receivedAt },
       { externalItemId: "m4", externalTurnId: "m1", role: "assistant", kind: "reasoning", order: 4, text: null, name: null, sourceAt: "1970-01-01T00:00:00.005Z", receivedAt },

@@ -214,18 +214,21 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
     const items = sorted.map((entry, order) => {
       const role = this.mapRole(entry.info.role);
       const text = this.messageText(entry.parts);
+      if (role === "user") currentTurnId = entry.info.id;
+      const kind = this.mapKind(entry.parts, role, text);
       const item: ProviderSessionItem = {
         externalItemId: entry.info.id,
         externalTurnId: currentTurnId,
         role,
-        kind: this.mapKind(entry.parts, role, text),
+        kind,
         order,
-        text,
-        name: role === "assistant" ? this.toolName(entry.parts) : null,
+        text: kind === "subagent" ? (text ?? this.subagentText(entry.parts)) : text,
+        name: kind === "subagent"
+          ? this.subagentName(entry.parts)
+          : role === "assistant" ? this.toolName(entry.parts) : null,
         sourceAt: new Date(entry.info.time.created).toISOString(),
         receivedAt
       };
-      if (role === "user") currentTurnId = entry.info.id;
       return item;
     });
     return { turns, items };
@@ -251,12 +254,26 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
   private mapKind(parts: Part[], role: ProviderSessionItemRole, text: string | null): ProviderSessionItemKind {
     if (role === "tool") return "tool_result";
     if (role === "assistant") {
+      if (parts.some((part) => part.type === "agent" || part.type === "subtask")) return "subagent";
       if (text !== null) return "message";
       if (parts.some((part) => part.type === "reasoning")) return "reasoning";
       if (parts.some((part) => part.type === "tool")) return "tool_call";
       return "message";
     }
     return "message";
+  }
+
+  private subagentName(parts: Part[]): string | null {
+    const subtask = parts.find((part) => part.type === "subtask");
+    if (subtask && subtask.agent.length > 0) return subtask.agent;
+    const agent = parts.find((part) => part.type === "agent");
+    return agent ? agent.name : null;
+  }
+
+  private subagentText(parts: Part[]): string | null {
+    const subtask = parts.find((part) => part.type === "subtask");
+    if (!subtask) return null;
+    return subtask.prompt.length > 0 ? subtask.prompt : (subtask.description.length > 0 ? subtask.description : null);
   }
 
   private messageText(parts: Part[]): string | null {

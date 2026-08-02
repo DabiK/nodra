@@ -76,6 +76,7 @@ export type ProviderSessionItemKind =
   | "tool_call"
   | "tool_result"
   | "status"
+  | "subagent"
   | "unknown";
 
 export interface ProviderSessionItem {

@@ -104,13 +104,11 @@ describe("OpenCodeProviderAdapter", () => {
         id: "local-engine/gemma3:4b",
         defaultReasoningEffort: "provider_default",
         supportedReasoningEfforts: ["provider_default", "high"]
-      }),
-      expect.objectContaining({
-        id: "opencode-go/deepseek-v4-flash",
-        displayName: "OpenCode Go / DeepSeek V4 Flash",
-        isDefault: true
       })
     ]);
+    expect(result.models).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "opencode-go/deepseek-v4-flash" })])
+    );
     expect(requests).toEqual([
       "GET /global/health",
       "GET /doc",
@@ -131,6 +129,42 @@ describe("OpenCodeProviderAdapter", () => {
       expect.arrayContaining([expect.objectContaining({ id: "opencode-go/deepseek-v4-flash" })])
     );
     expect(requests).toContain("GET /provider");
+  });
+
+  it("advertises models of a connected provider that is not in the config catalog", async () => {
+    const requests: string[] = [];
+    const baseUrl = await fixtureServer(requests, [], {
+      extraAllProvider: {
+        id: "github-copilot",
+        name: "GitHub Copilot",
+        models: {
+          "gpt-5-mini": {
+            id: "gpt-5-mini",
+            name: "GPT 5 Mini",
+            release_date: "2026-01-01",
+            attachment: false,
+            reasoning: false,
+            temperature: true,
+            tool_call: true,
+            cost: { input: 0, output: 0 },
+            limit: { context: 128000, output: 8192 },
+            status: "active",
+            options: {}
+          }
+        }
+      },
+      extraConnectedId: "github-copilot"
+    });
+    const result = await new OpenCodeProviderAdapter({ baseUrl }).probe();
+
+    expect(result.models).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "github-copilot/gpt-5-mini",
+          displayName: "GitHub Copilot / GPT 5 Mini"
+        })
+      ])
+    );
   });
 
   it("maps SSE, persists the assistant result and reaches a provider terminal", async () => {
@@ -246,7 +280,7 @@ describe("OpenCodeProviderAdapter", () => {
   const fixtureServer = async (
     requests: string[],
     promptBodies: Array<Record<string, unknown>> = [],
-    options: { terminalAfterPrompts?: number; providerListStatus?: number } = {}
+    options: { terminalAfterPrompts?: number; providerListStatus?: number; extraAllProvider?: { id: string; name: string; models: Record<string, unknown> }; extraConnectedId?: string } = {}
   ): Promise<string> => {
     let eventResponse: ServerResponse | undefined;
     const server = createServer(async (request, response) => {
@@ -275,29 +309,32 @@ describe("OpenCodeProviderAdapter", () => {
           return;
         }
         return json(response, {
-          all: [{
-            id: "opencode-go",
-            name: "OpenCode Go",
-            source: "custom",
-            env: [],
-            models: {
-              "deepseek-v4-flash": {
-                id: "deepseek-v4-flash",
-                name: "DeepSeek V4 Flash",
-                release_date: "2026-01-01",
-                attachment: false,
-                reasoning: true,
-                temperature: true,
-                tool_call: true,
-                cost: { input: 0, output: 0 },
-                limit: { context: 128000, output: 8192 },
-                status: "active",
-                options: {}
+          all: [
+            {
+              id: "opencode-go",
+              name: "OpenCode Go",
+              source: "custom",
+              env: [],
+              models: {
+                "deepseek-v4-flash": {
+                  id: "deepseek-v4-flash",
+                  name: "DeepSeek V4 Flash",
+                  release_date: "2026-01-01",
+                  attachment: false,
+                  reasoning: true,
+                  temperature: true,
+                  tool_call: true,
+                  cost: { input: 0, output: 0 },
+                  limit: { context: 128000, output: 8192 },
+                  status: "active",
+                  options: {}
+                }
               }
-            }
-          }],
+            },
+            ...(options.extraAllProvider ? [options.extraAllProvider] : [])
+          ],
           default: { "opencode-go": "deepseek-v4-flash" },
-          connected: ["local-engine"]
+          connected: ["local-engine", ...(options.extraConnectedId ? [options.extraConnectedId] : [])]
         });
       }
       if (url.pathname === "/event") {

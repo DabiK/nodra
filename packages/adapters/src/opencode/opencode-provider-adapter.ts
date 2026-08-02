@@ -336,11 +336,12 @@ export class OpenCodeProviderAdapter implements ProviderPort {
 
   private async probeModels(client: ReturnType<OpenCodeProviderAdapter["client"]>): Promise<ProviderModel[]> {
     const catalog = await client.config.providers({ throwOnError: true });
-    const models = this.models(catalog.data.providers, catalog.data.default);
     try {
       const listed = await client.provider.list({ throwOnError: true });
-      const known = new Set(catalog.data.providers.map((provider) => provider.id));
-      const connected = new Set([...listed.data.connected, "opencode-go"]);
+      const connected = new Set(listed.data.connected);
+      const providers = catalog.data.providers.filter((provider) => connected.has(provider.id));
+      const models = this.models(providers, catalog.data.default);
+      const known = new Set(providers.map((provider) => provider.id));
       for (const provider of listed.data.all) {
         if (known.has(provider.id) || !connected.has(provider.id)) continue;
         for (const model of Object.values(provider.models)) {
@@ -357,10 +358,11 @@ export class OpenCodeProviderAdapter implements ProviderPort {
           });
         }
       }
+      return models;
     } catch {
       // GET /provider is optional; /config/providers models remain authoritative.
+      return this.models(catalog.data.providers, catalog.data.default);
     }
-    return models;
   }
 
   private models(providers: Provider[], defaults: Record<string, string>): ProviderModel[] {

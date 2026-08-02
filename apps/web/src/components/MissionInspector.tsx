@@ -315,6 +315,12 @@ function InspectStep({
 }) {
   return (
     <div className="agent-modal-body">
+      {result?.latestRunState === "FAILED" && result.failure && (
+        <div className="run-failure-banner" role="alert">
+          <strong>⚠ {result.failure.title}</strong>
+          <p>{result.failure.detail}</p>
+        </div>
+      )}
       <section className="agent-modal-context" aria-label="Contexte de la mission">
         <div className={`inspector-status ${data?.mission.state.toLowerCase() ?? "loading"}`}>
           <i />

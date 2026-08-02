@@ -3,6 +3,7 @@ import type {
   AdvancePipeline,
   ApprovePipelineNodeTransition,
   CreatePipeline,
+  DispatchWorkflowOutbox,
   ListPipelines,
   PublishPipelineNodeHandover,
   ShowMission,
@@ -21,6 +22,7 @@ import {
   ADVANCE_PIPELINE,
   APPROVE_PIPELINE_NODE_TRANSITION,
   CREATE_PIPELINE,
+  DISPATCH_WORKFLOW_OUTBOX,
   LIST_PIPELINES,
   PUBLISH_PIPELINE_NODE_HANDOVER,
   SET_PIPELINE_NODE_TRANSITION_MODE,
@@ -44,7 +46,8 @@ export class PipelineController {
     @Inject(APPROVE_PIPELINE_NODE_TRANSITION) private readonly approveTransition: ApprovePipelineNodeTransition,
     @Inject(PUBLISH_PIPELINE_NODE_HANDOVER) private readonly publishHandover: PublishPipelineNodeHandover,
     @Inject(SHOW_MISSION) private readonly showMission: ShowMission,
-    @Inject(START_MISSION) private readonly startMission: StartMission
+    @Inject(START_MISSION) private readonly startMission: StartMission,
+    @Inject(DISPATCH_WORKFLOW_OUTBOX) private readonly dispatchOutbox: DispatchWorkflowOutbox
   ) {}
 
   @Post()
@@ -157,6 +160,7 @@ export class PipelineController {
             occurredAt: context.occurredAt
           }
         });
+        await this.dispatchOutbox.execute({ limit: 20, occurredAt: context.occurredAt });
       }
     });
   }

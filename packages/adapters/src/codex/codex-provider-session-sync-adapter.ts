@@ -320,6 +320,20 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
           text: this.redactedString(this.optionalString(item.text)),
           name: "plan"
         };
+      case "subAgentActivity":
+        return {
+          role: "assistant",
+          kind: "subagent",
+          text: this.optionalString(item.kind),
+          name: this.optionalString(item.agentPath) ?? this.optionalString(item.agentThreadId)
+        };
+      case "collabAgentToolCall":
+        return {
+          role: "assistant",
+          kind: "subagent",
+          text: this.redactedString(this.optionalString(item.prompt)),
+          name: this.optionalString(item.tool)
+        };
       default:
         return { role: "unknown", kind: "unknown", text: null, name: null };
     }

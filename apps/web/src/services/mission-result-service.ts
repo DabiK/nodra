@@ -1,6 +1,7 @@
 import { api } from "../api";
 import type { AgentSessionView } from "../types";
 import { loadAgentSession } from "./agent-session-service";
+import { extractRunFailure, type RunFailure } from "./agent-conversation-normalizer";
 
 export interface DeliveryView {
   id: string;
@@ -20,6 +21,7 @@ export interface MissionResultView {
   delivery: DeliveryView | null;
   assistantMessage: string | null;
   hasStructuredDelivery: boolean;
+  failure: RunFailure | null;
 }
 
 export async function loadMissionResult(missionId: string): Promise<MissionResultView> {
@@ -34,7 +36,8 @@ export async function loadMissionResult(missionId: string): Promise<MissionResul
     latestRunState: session?.run.state ?? null,
     delivery,
     assistantMessage: delivery?.agentDeclaration || lastAssistantMessage(session),
-    hasStructuredDelivery: Boolean(delivery)
+    hasStructuredDelivery: Boolean(delivery),
+    failure: extractRunFailure(session)
   };
 }
 
@@ -56,7 +59,8 @@ function emptyResult(): MissionResultView {
     latestRunState: null,
     delivery: null,
     assistantMessage: null,
-    hasStructuredDelivery: false
+    hasStructuredDelivery: false,
+    failure: null
   };
 }
 

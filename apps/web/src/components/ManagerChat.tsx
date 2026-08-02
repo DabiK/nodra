@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { AgentSessionView, ManagerConversationView, ManagerThreadView, ManagerView } from "../types";
 import { latestManagerThread, listManagerConversations, loadManagerThread, sendManagerMessage, stopManager, deleteManagerThread } from "../services/manager-service";
-import { normalizeAgentConversation, type AgentConversationEvent } from "../services/agent-conversation-normalizer";
+import { normalizeAgentConversation, extractRunFailure, type AgentConversationEvent } from "../services/agent-conversation-normalizer";
 import { PixelAvatar } from "./PixelAvatar";
 
 const ACTIVE_RUN = new Set(["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"]);
@@ -117,6 +117,11 @@ export function ManagerChat({
     // shown from the persisted conversation item, so drop the composed one.
     return normalizeAgentConversation(toSession(thread))
       .filter((event) => !(event.kind === "user" && event.text.includes("--- Environnement DevFlow ---")));
+  }, [thread]);
+
+  const failure = useMemo(() => {
+    if (!thread || thread.run?.state !== "FAILED") return null;
+    return extractRunFailure(toSession(thread));
   }, [thread]);
 
   useEffect(() => {
@@ -241,6 +246,12 @@ export function ManagerChat({
               <PixelAvatar id={manager.id} title={manager.name} />
               <p>{manager.instruction}</p>
               <small>Ce manager pilote DevFlow via son CLI. Demande-lui de créer des missions, de vérifier un état, ou d'orchestrer un pipeline.</small>
+            </div>
+          )}
+          {failure && (
+            <div className="manager-run-failure" role="alert">
+              <strong>⚠ {failure.title}</strong>
+              <p>{failure.detail}</p>
             </div>
           )}
           {events.map((event) => <ManagerEvent key={event.id} event={event} manager={manager} />)}

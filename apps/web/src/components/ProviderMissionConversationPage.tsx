@@ -9,6 +9,11 @@ import {
   steerMissionProviderTurn
 } from "../services/mission-provider-session-service";
 import { showMission } from "../services/mission-service";
+import { latestRunForMission } from "../services/mission-result-service";
+import { loadAgentSession } from "../services/agent-session-service";
+import { extractRunFailure, type RunFailure } from "../services/agent-conversation-normalizer";
+import { providerSessionSections } from "../services/provider-session-sections";
+import { subagentStatusLabel, subagentToolLabel } from "../services/subagent-labels";
 
 function capabilityAvailable(state: string | undefined) {
   return Boolean(state && state !== "unavailable");
@@ -30,6 +35,7 @@ function providerLabel(providerId: string) {
 
 function itemLabel(item: ProviderSessionDetailView["snapshot"]["items"][number], providerId: string) {
   if (item.role === "user") return "Vous";
+  if (item.kind === "subagent") return "Sous-agent";
   if (item.role === "assistant" && item.kind === "message") return providerLabel(providerId);
   if (item.role === "assistant") return `${providerLabel(providerId)} · activité`;
   if (item.role === "tool") return "Outil";
@@ -39,12 +45,14 @@ function itemLabel(item: ProviderSessionDetailView["snapshot"]["items"][number],
 function ProviderItem({ item, providerId }: { item: ProviderSessionDetailView["snapshot"]["items"][number]; providerId: string }) {
   const message = item.kind === "message";
   const user = item.role === "user";
-  const tool = !message && (item.kind === "tool_call" || item.kind === "tool_result");
+  const subagent = item.kind === "subagent";
+  const tool = !message && !subagent && (item.kind === "tool_call" || item.kind === "tool_result");
+  const statusLabel = subagent ? subagentStatusLabel(item.text) : null;
   return (
-    <article className={`provider-thread-item ${user ? "user" : message ? "assistant" : "tool"}`} data-external-item-id={item.externalItemId}>
+    <article className={`provider-thread-item ${user ? "user" : message ? "assistant" : subagent ? "subagent" : "tool"}`} data-external-item-id={item.externalItemId}>
       <header><strong>{itemLabel(item, providerId)}</strong><span>{item.kind} · {item.externalItemId}</span></header>
-      {item.name ? <code>{item.name}</code> : null}
-      <p className={tool ? "provider-thread-tool-text" : undefined}>{item.text ?? "—"}</p>
+      {item.name ? <code>{subagentToolLabel(item.name) ?? item.name}</code> : null}
+      {statusLabel ? <span className="subagent-chip">{statusLabel}</span> : <p className={tool ? "provider-thread-tool-text" : undefined}>{item.text ?? "—"}</p>}
     </article>
   );
 }
@@ -53,14 +61,18 @@ function ProviderFeed({ detail, busy }: { detail: ProviderSessionDetailView | nu
   if (!detail) return <div className="conversation-empty">Connexion au fil provider…</div>;
   const { turns, items } = detail.snapshot;
   const providerId = detail.identity.providerId;
+  const sections = providerSessionSections(turns, items);
   return <>
-    {turns.map((turn) => (
-      <section className="provider-thread-turn" data-external-turn-id={turn.externalTurnId} key={turn.externalTurnId}>
-        <header><strong>Tour {turn.order}</strong><span className={isActiveTurn(turn.state) ? "active" : ""}>{turn.state}</span><code>{turn.externalTurnId}</code></header>
-        <div>{items.filter((item) => item.externalTurnId === turn.externalTurnId).map((item) => <ProviderItem item={item} providerId={providerId} key={item.externalItemId} />)}</div>
+    {sections.map((section) => section.turn ? (
+      <section className="provider-thread-turn" data-external-turn-id={section.turn.externalTurnId} key={section.turn.externalTurnId}>
+        <header><strong>Tour {section.turn.order}</strong><span className={isActiveTurn(section.turn.state) ? "active" : ""}>{section.turn.state}</span><code>{section.turn.externalTurnId}</code></header>
+        <div>{section.items.map((item) => <ProviderItem item={item} providerId={providerId} key={item.externalItemId} />)}</div>
+      </section>
+    ) : (
+      <section className="provider-thread-turn" key={section.items[0]?.externalItemId}>
+        <div>{section.items.map((item) => <ProviderItem item={item} providerId={providerId} key={item.externalItemId} />)}</div>
       </section>
     ))}
-    {items.filter((item) => item.externalTurnId === null).map((item) => <ProviderItem item={item} providerId={providerId} key={item.externalItemId} />)}
     {!turns.length && !items.length ? <div className="conversation-empty">La conversation ne contient encore aucun élément.</div> : null}
     {busy ? <div className="provider-thread-sync" role="status">Synchronisation avec le provider…</div> : null}
   </>;
@@ -74,6 +86,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   const [busy, setBusy] = useState<"send" | "steer" | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
+  const [failure, setFailure] = useState<RunFailure | null>(null);
   const [connected, setConnected] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const activationRef = useRef(false);
@@ -100,6 +113,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
             setMission(nextMission);
             setDetail(null);
             setControl(null);
+            setFailure(null);
             setConnected(false);
             setError("");
             setPending(nextMission.state === "READY" || nextMission.state === "DRAFT"
@@ -114,9 +128,19 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
       const [nextControl] = await Promise.all([
         loadMissionProviderSessionCapabilities(missionId)
       ]);
+      let nextFailure: RunFailure | null = null;
+      if (nextMission.state === "BLOCKED") {
+        try {
+          const latest = await latestRunForMission(missionId);
+          if (latest) nextFailure = extractRunFailure(await loadAgentSession(latest.runId));
+        } catch {
+          nextFailure = null;
+        }
+      }
       setMission(nextMission);
       setDetail(nextDetail);
       setControl(nextControl);
+      setFailure(nextFailure);
       setConnected(true);
       setError("");
       setPending("");
@@ -180,6 +204,12 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
           </header>
           {error ? <p className="inspector-error" role="alert">{error}</p> : null}
           {pending ? <p className="inspector-note" role="status">{pending}</p> : null}
+          {failure && (
+            <div className="run-failure-banner" role="alert">
+              <strong>⚠ {failure.title}</strong>
+              <p>{failure.detail}</p>
+            </div>
+          )}
           <div className="provider-thread-source"><span>Source de vérité provider</span><code>{detail?.identity.externalSessionRef ?? missionId}</code></div>
           <div className="conversation-feed-wrap"><div className="agent-conversation provider-thread-feed" ref={feedRef} aria-live="polite"><ProviderFeed detail={detail} busy={busy !== null} /></div></div>
           <footer className="composer-wrap">
