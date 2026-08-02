@@ -64,6 +64,12 @@ nav .nav-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .app-shell.sidebar-collapsed nav .count { position: absolute; margin-left: 22px; margin-top: -16px; }
 
 .sidebar-missions { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-search { margin-top: 18px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 0 11px; background: var(--panel); }
+.sidebar-search:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.sidebar-search-icon { flex: none; color: var(--muted); font-size: 15px; }
+.sidebar-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--ink); padding: 9px 0; font: 600 13px Manrope; }
+.sidebar-search input::placeholder { color: var(--muted); }
+.app-shell.sidebar-collapsed .sidebar-search { display: none; }
 .sidebar-theme { margin-top: auto; padding-top: 16px; }
 .theme-toggle { width: 100%; min-height: 38px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 0 13px; background: var(--panel); color: var(--muted); font-size: 11px; font-weight: 800; text-align: left; }
 .theme-toggle:hover { border-color: var(--green); color: var(--green); background: var(--green-soft); }
@@ -1049,6 +1055,8 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
   input, select, textarea { background: #1b241d; color: var(--ink); border-color: var(--line); }
   input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
   input:focus, select:focus, textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(76, 167, 131, 0.18); }
+  .sidebar-search { background: #1b241d; border-color: var(--line); }
+  .sidebar-search input { background: transparent; box-shadow: none; }
   .quick-add select { background: #1a221c; color: var(--muted); }
   .human-notes-field textarea, .mission-notes-panel textarea { background: #1b241d; border-color: #2b362d; }
   .kind-switch { background: #1a221c; }

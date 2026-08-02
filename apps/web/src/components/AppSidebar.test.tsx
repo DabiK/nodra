@@ -5,7 +5,7 @@ import { AppSidebar } from "./AppSidebar";
 
 afterEach(cleanup);
 
-function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.fn(), onSelectMission = vi.fn(), onThemeToggle = vi.fn()) {
+function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.fn(), onSelectMission = vi.fn(), onThemeToggle = vi.fn(), onQueryChange = vi.fn()) {
   render(
     <AppSidebar
       page="tasks"
@@ -14,13 +14,15 @@ function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.f
       activePipelineCount={0}
       hasActiveManager={false}
       missions={[]}
+      query=""
+      onQueryChange={onQueryChange}
       onToggle={onToggle}
       onNavigate={onNavigate}
       onSelectMission={onSelectMission}
       onThemeToggle={onThemeToggle}
     />
   );
-  return { onToggle, onNavigate, onSelectMission, onThemeToggle };
+  return { onToggle, onNavigate, onSelectMission, onThemeToggle, onQueryChange };
 }
 
 describe("AppSidebar", () => {
@@ -66,5 +68,38 @@ describe("AppSidebar", () => {
     const { onThemeToggle } = renderSidebar(false);
     fireEvent.click(screen.getByRole("button", { name: "Passer en mode sombre" }));
     expect(onThemeToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the mission search input with the current query", () => {
+    render(
+      <AppSidebar
+        page="tasks"
+        collapsed={false}
+        theme="light"
+        activePipelineCount={0}
+        hasActiveManager={false}
+        missions={[]}
+        query="paiement"
+        onQueryChange={vi.fn()}
+        onToggle={vi.fn()}
+        onNavigate={vi.fn()}
+        onSelectMission={vi.fn()}
+        onThemeToggle={vi.fn()}
+      />
+    );
+    const input = screen.getByRole("searchbox", { name: "Rechercher dans les missions" });
+    expect((input as HTMLInputElement).value).toBe("paiement");
+  });
+
+  it("forwards typed queries through onQueryChange", () => {
+    const { onQueryChange } = renderSidebar(false);
+    const input = screen.getByRole("searchbox", { name: "Rechercher dans les missions" });
+    fireEvent.change(input, { target: { value: "stripe" } });
+    expect(onQueryChange).toHaveBeenCalledWith("stripe");
+  });
+
+  it("keeps the search input in the DOM when collapsed (hidden by CSS)", () => {
+    renderSidebar(true);
+    expect(screen.getByRole("searchbox", { name: "Rechercher dans les missions" })).toBeTruthy();
   });
 });

@@ -20,6 +20,8 @@ export function AppSidebar({
   activePipelineCount,
   hasActiveManager,
   missions,
+  query,
+  onQueryChange,
   onToggle,
   onNavigate,
   onSelectMission,
@@ -31,6 +33,8 @@ export function AppSidebar({
   activePipelineCount: number;
   hasActiveManager: boolean;
   missions: SidebarMission[];
+  query: string;
+  onQueryChange(query: string): void;
   onToggle(): void;
   onNavigate(page: AppPage): void;
   onSelectMission(missionId: string): void;
@@ -84,6 +88,16 @@ export function AppSidebar({
           <span className="nav-label">Sessions provider</span>
         </a>
       </nav>
+      <div className="sidebar-search">
+        <span className="sidebar-search-icon" aria-hidden="true">⌕</span>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="Rechercher des missions…"
+          aria-label="Rechercher dans les missions"
+        />
+      </div>
       {missions.length > 0 ? (
         <div className="sidebar-missions" aria-label="Missions actives">
           <span className="sidebar-section-label">Missions actives</span>

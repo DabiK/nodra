@@ -289,6 +289,8 @@ export function App() {
         activePipelineCount={activePipelineCount}
         hasActiveManager={managers.some((manager) => manager.state === "active")}
         missions={activeSidebarMissions}
+        query={query}
+        onQueryChange={setQuery}
         onToggle={toggleSidebar}
         onNavigate={navigate}
         onSelectMission={selectMission}
