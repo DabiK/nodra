@@ -75,6 +75,7 @@ export type { ConfirmationRecord, ConfirmationRepository, ConfirmationScope, Con
 export { CreateWorkspace } from "./create-workspace.js";
 export { ReadWorkspace } from "./read-workspace.js";
 export { SnapshotWorkspace } from "./snapshot-workspace.js";
+export { DiffWorkspace } from "./diff-workspace.js";
 export { CommitWorkspace } from "./commit-workspace.js";
 export { IntegrateWorkspace } from "./integrate-workspace.js";
 export { DeleteWorkspace } from "./delete-workspace.js";
@@ -87,6 +88,9 @@ export type { WorkspaceDeletionReservation } from "./workspace-deletion-reservat
 export type {
   IntegrationMethod,
   RepositoryIdentity,
+  WorkspaceDiff,
+  WorkspaceDiffFile,
+  WorkspaceDiffFileStatus,
   WorkspaceGitSnapshot,
   WorkspaceKind,
   WorkspaceMutationResult,

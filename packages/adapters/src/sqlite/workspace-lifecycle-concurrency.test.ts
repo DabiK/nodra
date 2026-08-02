@@ -154,6 +154,7 @@ describe("I5.1 workspace lifecycle concurrency", () => {
       inspectRepository: (value) => local.inspectRepository(value),
       createWorktree: (value) => local.createWorktree(value),
       snapshot: (value) => local.snapshot(value),
+      diff: (value) => local.diff(value),
       commit: (value) => local.commit(value),
       integrate: (value) => local.integrate(value),
       deleteActivity: async () => {

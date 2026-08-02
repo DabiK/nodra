@@ -37,6 +37,7 @@ function fakes(sourceRecord: WorkspaceRecord = record()) {
     inspectRepository: vi.fn(async () => ({ stableIdentity: "id", canonicalRemote: null, canonicalPath: "/src/repo", head: "deadbeef", branchName: "main" })),
     createWorktree: vi.fn(async () => ({ path: "/managed/wt", repository: { stableIdentity: "id", canonicalRemote: null, canonicalPath: "/managed/wt", head: "deadbeef", branchName: "nodra/task" } })),
     snapshot: vi.fn(async () => ({ head: "deadbeef", treeDigest: "t", diffDigest: "d", branchName: "main", capturedAt: new Date().toISOString() })),
+    diff: vi.fn(async () => ({ base: null, head: null, files: [] })),
     commit: vi.fn(async () => undefined),
     integrate: vi.fn(async () => undefined),
     deleteActivity: vi.fn(async () => undefined),

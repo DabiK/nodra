@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
-import { access, lstat, mkdir, realpath } from "node:fs/promises";
+import { access, lstat, mkdir, realpath, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import type {
   IntegrationMethod,
   RepositoryIdentity,
+  WorkspaceDiff,
+  WorkspaceDiffFile,
   WorkspaceGitSnapshot,
   WorkspacePort,
   WorktreeStatus
@@ -14,6 +16,9 @@ import type {
 import { DomainError } from "@nodra/domain";
 
 const execute = promisify(execFile);
+
+/** Taille maximale d'un fichier non suivi embarqué dans le diff (le reste est tronqué). */
+const MAX_UNTRACKED_DIFF_BYTES = 1024 * 1024;
 
 export class LocalWorkspaceAdapter implements WorkspacePort {
   private managedRoot: string;
@@ -113,6 +118,79 @@ export class LocalWorkspaceAdapter implements WorkspacePort {
       branchName: repository.branchName,
       capturedAt: new Date().toISOString()
     };
+  }
+
+  async diff(input: { path: string; base: string | null; head: string | null }): Promise<WorkspaceDiff> {
+    const repository = await this.inspectRepository(input.path);
+    const cwd = repository.canonicalPath;
+    const base = input.base ?? repository.head;
+    const head = input.head;
+    const range = head ? [base, head] : [base];
+
+    const [nameStatus, numstat, fullDiff] = await Promise.all([
+      this.git(cwd, ["diff", "--no-ext-diff", "--find-renames", "--name-status", ...range]),
+      this.git(cwd, ["diff", "--numstat", ...range]),
+      this.git(cwd, ["diff", "--no-ext-diff", "--unified=3", ...range])
+    ]);
+
+    const contentByPath = splitUnifiedDiff(fullDiff);
+    const countsByPath = new Map(parseNumstat(numstat));
+    const files: WorkspaceDiffFile[] = parseNameStatus(nameStatus).map((entry) => {
+      const counts = countsByPath.get(entry.path) ?? null;
+      const content = contentByPath.get(entry.path) ?? (entry.oldPath ? contentByPath.get(entry.oldPath) : undefined) ?? "";
+      return {
+        path: entry.path,
+        oldPath: entry.oldPath,
+        status: entry.status,
+        additions: counts?.additions ?? null,
+        deletions: counts?.deletions ?? null,
+        content
+      };
+    });
+
+    // Comparaison avec l'arbre de travail : les fichiers non suivis n'apparaissent
+    // dans aucun `git diff` — on les liste via `status --porcelain` et on fabrique
+    // un diff synthétique (ajout complet).
+    if (!head) {
+      const status = (await this.gitOptional(cwd, ["status", "--porcelain=v1", "--untracked-files=all"])) ?? "";
+      for (const line of status.split("\n")) {
+        if (!line.startsWith("?? ")) continue;
+        const untrackedPath = decodeGitPath(line.slice(3));
+        const absolute = resolve(cwd, untrackedPath);
+        let content = "";
+        let lineCount = 0;
+        try {
+          const raw = await readFile(absolute, "utf8");
+          const truncated = raw.length > MAX_UNTRACKED_DIFF_BYTES;
+          const body = truncated ? raw.slice(0, MAX_UNTRACKED_DIFF_BYTES) : raw;
+          const lines = body.split("\n");
+          // La ligne vide terminale (saut de ligne final) n'est pas un contenu.
+          if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+          lineCount = lines.length;
+          content = [
+            `diff --git a/${untrackedPath} b/${untrackedPath}`,
+            "new file mode 100644",
+            "--- /dev/null",
+            `+++ b/${untrackedPath}`,
+            `@@ -0,0 +1,${lineCount} @@`,
+            ...lines.map((line) => `+${line}`),
+            truncated ? "+… (diff tronqué)" : ""
+          ].join("\n");
+        } catch {
+          // Fichier illisible (supprimé entre le status et la lecture) : ignoré.
+        }
+        files.push({
+          path: untrackedPath,
+          oldPath: null,
+          status: "added",
+          additions: lineCount,
+          deletions: 0,
+          content
+        });
+      }
+    }
+
+    return { base, head, files };
   }
 
   async commit(input: { path: string; message: string }): Promise<void> {
@@ -308,4 +386,128 @@ export class LocalWorkspaceAdapter implements WorkspacePort {
       return null;
     }
   }
+}
+
+interface NameStatusEntry {
+  path: string;
+  oldPath: string | null;
+  status: WorkspaceDiffFile["status"];
+}
+
+/** Parse `git diff --name-status` : une ligne par fichier, `X\tpath` ou `X\told\tnew`. */
+function parseNameStatus(output: string): NameStatusEntry[] {
+  const entries: NameStatusEntry[] = [];
+  for (const rawLine of output.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const [code, ...rest] = line.split("\t");
+    const status = nameStatusToStatus(code ?? "");
+    const path = rest.length > 1 ? rest[rest.length - 1] ?? "" : rest[0] ?? "";
+    const oldPath = rest.length > 1 ? rest[0] ?? null : null;
+    if (!path) continue;
+    entries.push({ path: decodeGitPath(path), oldPath: oldPath === null ? null : decodeGitPath(oldPath), status });
+  }
+  return entries;
+}
+
+function nameStatusToStatus(code: string): WorkspaceDiffFile["status"] {
+  switch (code[0]) {
+    case "A":
+    case "C":
+      return "added";
+    case "D":
+      return "deleted";
+    case "R":
+      return "renamed";
+    default:
+      // M, T (typechange), U (unmerged)… : traité comme modifié.
+      return "modified";
+  }
+}
+
+/** Parse `git diff --numstat` : `adds\tdels\tpath` (ou `-\t-\tpath` pour un binaire). */
+function parseNumstat(output: string): Array<[string, { additions: number | null; deletions: number | null }]> {
+  const rows: Array<[string, { additions: number | null; deletions: number | null }]> = [];
+  for (const rawLine of output.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const [adds, dels, ...rest] = line.split("\t");
+    if (!rest.length) continue;
+    const path = decodeGitPath(rest.join("\t"));
+    const additions = adds === "-" ? null : Number.parseInt(adds ?? "", 10);
+    const deletions = dels === "-" ? null : Number.parseInt(dels ?? "", 10);
+    rows.push([path, { additions, deletions }]);
+  }
+  return rows;
+}
+
+/**
+ * Découpe un `git diff` unifié complet en blocs par fichier, indexés par le
+ * chemin de destination (`b/`), ou `a/` pour une suppression.
+ */
+function splitUnifiedDiff(output: string): Map<string, string> {
+  const blocks = new Map<string, string>();
+  if (!output.trim()) return blocks;
+  const chunks = output.split("\ndiff --git ");
+  for (let index = 0; index < chunks.length; index++) {
+    const chunk = chunks[index] ?? "";
+    const headerLine = index === 0 ? chunk : `diff --git ${chunk}`;
+    const firstLineEnd = headerLine.indexOf("\n");
+    const header = (firstLineEnd === -1 ? headerLine : headerLine.slice(0, firstLineEnd)).trim();
+    if (!header.startsWith("diff --git ")) continue;
+    const { aPath, bPath } = headerPaths(header);
+    const key = bPath === "/dev/null" ? aPath : bPath;
+    blocks.set(key, headerLine.replace(/\n$/, ""));
+  }
+  return blocks;
+}
+
+/** Extrait les chemins a/ et b/ d'un en-tête `diff --git a/x b/y` (préfixes retirés). */
+function headerPaths(header: string): { aPath: string; bPath: string } {
+  const rest = header.slice("diff --git ".length);
+  const tokens = rest.split(/\s+/).filter(Boolean);
+  const rawA = decodeGitPath(tokens[0] ?? "");
+  const rawB = decodeGitPath(tokens[1] ?? rawA);
+  const aPath = rawA.startsWith("a/") ? rawA.slice(2) : rawA;
+  const bPath = rawB.startsWith("b/") ? rawB.slice(2) : rawB;
+  return { aPath, bPath };
+}
+
+/**
+ * Décode un chemin au format C-quoting de Git (`"a\tb"`, échappements `\\`,
+ * `\"`, `\n`… et octaux `\ooo`). Retourne tel quel si non entre guillemets.
+ */
+function decodeGitPath(token: string): string {
+  if (!token.startsWith('"')) return token;
+  const inner = token.slice(1, -1);
+  let out = "";
+  for (let i = 0; i < inner.length; i++) {
+    const char = inner[i];
+    if (char !== "\\") {
+      out += char;
+      continue;
+    }
+    const next = inner[++i] ?? "";
+    switch (next) {
+      case "a": out += "\x07"; break;
+      case "b": out += "\b"; break;
+      case "t": out += "\t"; break;
+      case "n": out += "\n"; break;
+      case "v": out += "\v"; break;
+      case "f": out += "\f"; break;
+      case "r": out += "\r"; break;
+      case "\\": out += "\\"; break;
+      case '"': out += '"'; break;
+      default: {
+        if (next >= "0" && next <= "7") {
+          const octal = next + (inner[i + 1] ?? "") + (inner[i + 2] ?? "");
+          out += String.fromCharCode(Number.parseInt(octal, 8));
+          i += 2;
+        } else {
+          out += next;
+        }
+      }
+    }
+  }
+  return out;
 }

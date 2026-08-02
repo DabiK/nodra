@@ -60,6 +60,7 @@ import {
   CreatePipeline,
   CreateWorkspace,
   DeleteWorkspace,
+  DiffWorkspace,
   DispatchWorkflowOutbox,
   EnableAgentConfig,
   EnsureMissionObservationSession,
@@ -160,6 +161,7 @@ import {
   DATABASE,
   DATABASE_FILE,
   DELETE_WORKSPACE,
+  DIFF_WORKSPACE,
   DISPATCH_WORKFLOW_OUTBOX,
   GET_HEALTH,
   GET_PROVIDER_STATUS,
@@ -283,6 +285,12 @@ export class NodraModule {
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) =>
             new ReadWorkspace(new SqliteWorkspaceRepository(database))
+        },
+        {
+          provide: DIFF_WORKSPACE,
+          inject: [DATABASE, WORKSPACE_PORT],
+          useFactory: (database: NodraSqliteDatabase, workspace: LocalWorkspaceAdapter) =>
+            new DiffWorkspace(new SqliteWorkspaceRepository(database), workspace)
         },
         {
           provide: SNAPSHOT_WORKSPACE,

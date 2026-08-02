@@ -1,4 +1,4 @@
-import type { IntegrationMethod, RepositoryIdentity, WorkspaceGitSnapshot, WorktreeStatus } from "./workspace-model.js";
+import type { IntegrationMethod, RepositoryIdentity, WorkspaceDiff, WorkspaceGitSnapshot, WorktreeStatus } from "./workspace-model.js";
 
 export interface WorkspacePort {
   canonicalizeExisting(path: string): Promise<string>;
@@ -11,6 +11,8 @@ export interface WorkspacePort {
     baseRef: string;
   }): Promise<{ path: string; repository: RepositoryIdentity }>;
   snapshot(path: string): Promise<WorkspaceGitSnapshot>;
+  /** Diff unifié entre une ref de base et une ref (ou l'arbre de travail si head est null). */
+  diff(input: { path: string; base: string | null; head: string | null }): Promise<WorkspaceDiff>;
   commit(input: { path: string; message: string }): Promise<void>;
   integrate(input: {
     path: string;

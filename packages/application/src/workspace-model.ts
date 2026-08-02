@@ -61,3 +61,24 @@ export interface WorkspaceMutationResult {
   before: WorkspaceGitSnapshot | null;
   after: WorkspaceGitSnapshot | null;
 }
+
+export type WorkspaceDiffFileStatus = "added" | "modified" | "deleted" | "renamed";
+
+export interface WorkspaceDiffFile {
+  path: string;
+  oldPath: string | null;
+  status: WorkspaceDiffFileStatus;
+  /** Lignes ajoutées/supprimées (null pour les fichiers binaires). */
+  additions: number | null;
+  deletions: number | null;
+  /** Diff unifié texte pour ce fichier (peut être tronqué pour les très gros fichiers). */
+  content: string;
+}
+
+export interface WorkspaceDiff {
+  /** Ref comparée comme base (null si aucun HEAD n'a pu être résolu). */
+  base: string | null;
+  /** Ref comparée comme tête — null signifie l'arbre de travail (working tree). */
+  head: string | null;
+  files: WorkspaceDiffFile[];
+}

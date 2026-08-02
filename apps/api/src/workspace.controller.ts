@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Inject, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, Query } from "@nestjs/common";
 import type {
   CommitWorkspace,
   CreateWorkspace,
   DeleteWorkspace,
+  DiffWorkspace,
   IntegrateWorkspace,
   ReadWorkspace,
   ResolveWorktree,
@@ -25,6 +26,7 @@ import {
   COMMIT_WORKSPACE,
   CREATE_WORKSPACE,
   DELETE_WORKSPACE,
+  DIFF_WORKSPACE,
   INTEGRATE_WORKSPACE,
   READ_WORKSPACE,
   RESOLVE_WORKTREE,
@@ -37,6 +39,7 @@ export class WorkspaceController {
   constructor(
     @Inject(CREATE_WORKSPACE) private readonly createWorkspace: CreateWorkspace,
     @Inject(READ_WORKSPACE) private readonly readWorkspace: ReadWorkspace,
+    @Inject(DIFF_WORKSPACE) private readonly diffWorkspace: DiffWorkspace,
     @Inject(SNAPSHOT_WORKSPACE) private readonly snapshotWorkspace: SnapshotWorkspace,
     @Inject(COMMIT_WORKSPACE) private readonly commitWorkspace: CommitWorkspace,
     @Inject(INTEGRATE_WORKSPACE) private readonly integrateWorkspace: IntegrateWorkspace,
@@ -90,6 +93,15 @@ export class WorkspaceController {
   @Get(":id")
   show(@Param("id") id: string) {
     return this.readWorkspace.execute(toId(id));
+  }
+
+  @Get(":id/diff")
+  diff(@Param("id") id: string, @Query("base") base?: string, @Query("head") head?: string) {
+    return this.diffWorkspace.execute({
+      workspaceId: toId(id),
+      ...(base === undefined ? {} : { base: base || null }),
+      ...(head === undefined ? {} : { head: head || null })
+    });
   }
 
   @Post(":id/snapshots")
