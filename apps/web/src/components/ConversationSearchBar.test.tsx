@@ -31,17 +31,17 @@ describe("ConversationSearchBar", () => {
 
   it("shows the occurrence counter as current / total", () => {
     renderBar({ matchCount: 7, current: 2 });
-    expect(screen.getByRole("status")).toHaveTextContent("3 / 7");
+    expect(screen.getByRole("status").textContent).toBe("3 / 7");
   });
 
   it("shows the absence of results without crashing the counter", () => {
     renderBar({ matchCount: 0 });
-    expect(screen.getByRole("status")).toHaveTextContent("Aucun résultat");
+    expect(screen.getByRole("status").textContent).toBe("Aucun résultat");
   });
 
   it("hides the counter while the query is empty", () => {
     renderBar({ query: "", matchCount: 0 });
-    expect(screen.getByRole("status")).toHaveTextContent("");
+    expect(screen.getByRole("status").textContent).toBe("");
   });
 
   it("navigates with Enter (next) and Shift+Enter (previous)", () => {
@@ -62,9 +62,9 @@ describe("ConversationSearchBar", () => {
 
   it("disables navigation buttons when there are no matches", () => {
     renderBar({ matchCount: 0 });
-    expect(screen.getByRole("button", { name: /Occurrence précédente/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Occurrence suivante/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Fermer la recherche/ })).toBeEnabled();
+    expect((screen.getByRole("button", { name: /Occurrence précédente/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Occurrence suivante/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Fermer la recherche/ }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("navigates through the explicit buttons", () => {
