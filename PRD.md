@@ -68,7 +68,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #10 — Warning perte de contexte (compact / truncate) (labels: —)
+- [x] #10 — Warning perte de contexte (compact / truncate) (labels: —)
 
   **Issue #10 — détail complet**
   > ## Contexte
@@ -80,9 +80,9 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - Proposer une action : démarrer un nouveau fil, ou compact/truncate (à définir côté provider, peut être `steer` avec instruction de résumé)
   >
   > ## Acceptance
-  > - [ ] Bannière déclenchée sur seuil
-  > - [ ] Action claire proposée à l'utilisateur
-  > - [ ] Métriques visibles (tokens estimés)
+  > - [x] Bannière déclenchée sur seuil
+  > - [x] Action claire proposée à l'utilisateur
+  > - [x] Métriques visibles (tokens estimés)
   >
   > ## Méthode d'implémentation
   > - Cartographier le code avec des **subagents explore** avant d'implémenter (notamment `extractConversationStats`)

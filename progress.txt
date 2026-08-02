@@ -259,3 +259,34 @@
 
 ### Statut
 - [x] #9 — Recherche dans les conversations
+
+## Itération 9 — 2026-08-03 — Task #10 : Warning perte de contexte (compact / truncate)
+
+### Fait (3 commits atomiques, comme suggéré par l'issue : heuristique → bannière → action)
+1. **Heuristique** (`feat(web): heuristique de risque de perte de contexte…`)
+   - Nouveau service pur `conversation-context-service.ts` (+ 14 tests) : `assessConversationContext({turnCount, charCount, totalTokens?, events?})` → `ConversationContextRisk` — niveau `ok|warn|critical`, tokens (rapportés par le run quand dispo, sinon estimés `estimateTokensFromText` ≈ 4 chars/token, `tokenSource` "reported"/"estimated"), taux de troncature (`countTruncatedEvents` : scan récursif des payloads pour des clés "truncat*" véridiques, ex. `truncated`, `outputTruncated`), et `reasons` (libellés FR des critères déclenchés).
+   - Seuils exportés `CONTEXT_RISK_THRESHOLDS` : warn/critical = 80 k/160 k tokens, 25/50 tours, 20 %/40 % de troncature ; le niveau le plus sévère gagne.
+2. **Bannière** (`feat(web): bannière d'avertissement de conversation longue…`)
+   - `ConversationContextBanner` (+ 7 tests) : masquée si `ok`, titres warn/critical ("⚠ Conversation longue — risque de perte de contexte" / "…très longue — risque élevé…"), métriques "N tours · ≈ X tokens estimés/rapportés" (+ "% d'événements tronqués" si > 0), ligne de raisons, bouton d'action optionnel (désactivé si busy), `role="status"`.
+   - CSS `.context-risk-banner` (pattern `.overdue-banner` : ambre, liseré gauche, bouton) + variante `.critical` rouge + variante plate dans `.conversation-shell` (fil provider) + overrides dark.
+3. **Actions** (`feat(web): actions de remédiation sur la bannière…`)
+   - `ManagerChat` : risque calculé depuis `thread` (tours = `conversation.turns.length` de la conversation courante, repli sur le comptage des messages user normalisés ; tokens = `runTokenTotal(thread.run)` ; troncature = scan de `thread.events`) ; bannière sous l'en-tête avec action « ＋ Nouveau fil » (même handler que le bouton du rail : `setThreadId(null); setThread(null)`).
+   - `ProviderMissionConversationPage` : risque calculé depuis le snapshot (tours = `snapshot.turns.length` ; tokens estimés depuis les items — le snapshot provider ne porte pas d'usage) ; bannière sous le failure banner avec action « ⟳ Compacter le contexte » : `COMPACT_INSTRUCTION` (résumé structuré FR : objectif/état, décisions+résultats+fichiers, prochaines étapes) envoyée en **steer du tour actif** quand `canSteer`, sinon en nouveau tour (`startMissionProviderTurn`) quand `canStartTurn` — le compact/truncate côté provider est implémenté comme suggéré par l'issue ("peut être steer avec instruction de résumé"). Bannière sans action en lecture seule.
+   - Tests : +3 `ManagerChat.test.tsx` (bannière cachée sur fil court, bannière + métriques sur fil long, nouvelle conversation depuis l'action) et +2 `ProviderMissionConversationPage.test.tsx` (bannière + tokens estimés, compaction qui steers le tour actif avec l'instruction de résumé).
+
+### Vérifications
+- `npm run typecheck` : OK
+- `npx vitest run apps/web` : 40 fichiers / 294 tests OK (268 → 294, +26)
+- ESLint sur tous les fichiers touchés : propre
+
+### Décisions / notes / limites
+- **`extractConversationStats` reste non branché** : le snapshot du fil provider n'a ni usage ni événements bruts, et le chat manager dispose de données plus directes (`thread.run` + événements). Le nouveau service couvre l'évaluation ; l'ancien normalizer n'est pas modifié.
+- **Tokens du fil provider = estimation** (≈ 4 chars/token) : la snapshot provider ne transporte pas l'usage ; l'issue demandait une "taille approximative". Le chat manager, lui, affiche les tokens rapportés du run quand présents.
+- **Taux de troncature** : les adapters provider ne posent pas (encore) de marqueur "truncat*" dans les événements — le scan est prêt et testé, il se déclenchera dès que le payload en contiendra (ex. sorties tronquées). Le warn repose donc en pratique sur tours + tokens.
+- **Pas de nouvel appel réseau** : tout est dérivé des données déjà chargées (SSE existant) — aucune incidence perf.
+- **Seuils arbitraires mais exportés** : 80 k/160 k tokens, 25/50 tours, 20 %/40 % troncature — ajustables dans `CONTEXT_RISK_THRESHOLDS` (une fenêtre de contexte par modèle n'est pas fiable côté web sans catalogue enrichi).
+- **Incident outil externe** : pendant l'itération, la boucle de review (`afk-ralph-review.sh`) a nettoyé le working tree (modifications non commitées de l'étape 3 perdues, styles.css rétabli sur une version sans le CSS bannière). Corrigé en réappliquant les modifications et en restaurant styles.css depuis HEAD ; les commits 1-2 n'ont pas été affectés (tout était déjà commité). Leçon : committer chaque étape immédiatement.
+- Le build web (`npm run build -w @nodra/web`) reste bloqué par l'erreur pré-existante `ProviderMissionConversationPage.test.tsx:11` (TS2698, commit `4fa8361`) documentée aux itérations 7-8 — toujours hors périmètre.
+
+### Statut
+- [x] #10 — Warning perte de contexte (compact / truncate)
