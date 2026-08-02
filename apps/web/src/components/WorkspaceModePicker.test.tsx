@@ -82,10 +82,10 @@ describe("shared Terrain de travail is used by both screens", () => {
         draft={draft} providerOptions={providerOptions} selectedProvider={providerOptions.providers[0]}
         selectedModelId="m1" reasoningOptions={["medium"]} expanded creating={false} probingProviderId={null}
         folderOpen={false} folderBrowse={null} folderLoading={false} error="" notice="" missionCount={0}
-        stateCounts={{}} stateFilter="all" kindFilter="all"
+        stateCounts={{}} stateFilter="all" kindFilter="all" viewMode="board"
         onSubmit={noop} onDraftChange={noop} onExpandedChange={noop} onProviderChange={noop} onProbeProvider={noop}
         onStateFilterChange={noop} onKindFilterChange={noop} onFolderOpen={noop} onFolderClose={noop}
-        onFolderBrowse={noop} onFolderSelect={noop}
+        onFolderBrowse={noop} onFolderSelect={noop} onViewModeChange={noop}
       />
     );
     const config = screen.getByLabelText("Configuration de la nouvelle tâche");

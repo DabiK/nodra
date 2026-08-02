@@ -20,6 +20,9 @@ import { loadSchedule, rescheduleToday, scheduledDay, todayKey, type MissionSche
 import { listPipelines } from "./services/pipeline-service";
 import { probeProvider, selectDefaultModel } from "./services/provider-service";
 import { browseFolders } from "./services/workspace-service";
+import { loadViewMode, saveViewMode, type MissionViewMode } from "./services/view-mode-service";
+import { dragActionId, findDragTransition } from "./services/mission-drag-transitions";
+import { performMissionAction } from "./services/mission-action-service";
 
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -46,6 +49,7 @@ export function App() {
   const [stateFilter, setStateFilter] = useState("all");
   const [kindFilter, setKindFilter] = useState("all");
   const [sort, setSort] = useState("recent");
+  const [viewMode, setViewMode] = useState<MissionViewMode>(() => loadViewMode());
   const [createExpanded, setCreateExpanded] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
   const [folderBrowse, setFolderBrowse] = useState<FolderBrowseResult | null>(null);
@@ -90,6 +94,13 @@ export function App() {
 
   const refreshPipelines = () => void listPipelines().then(setPipelines).catch(() => undefined);
   const refreshManagers = () => void listManagers().then(setManagers).catch(() => undefined);
+
+  const moveMissionOnBoard = async (mission: MissionView, targetState: MissionState) => {
+    const transition = findDragTransition(mission, targetState);
+    if (!transition) throw new Error(`Transition vers ${targetState} interdite`);
+    await performMissionAction({ actionId: dragActionId(transition), mission, latestRunId: null });
+    setMissions(await listMissions());
+  };
 
   useEffect(() => {
     const onPopState = () => {
@@ -136,6 +147,11 @@ export function App() {
       saveSidebarCollapsed(next);
       return next;
     });
+  };
+
+  const changeViewMode = (mode: MissionViewMode) => {
+    setViewMode(mode);
+    saveViewMode(mode);
   };
 
   const missionPipelineIndex = useMemo(() => {
@@ -369,6 +385,8 @@ export function App() {
           onProbeProvider={(providerId) => void refreshProviderOptions(providerId)}
           onStateFilterChange={setStateFilter}
           onKindFilterChange={setKindFilter}
+          onViewModeChange={changeViewMode}
+          viewMode={viewMode}
           onFolderOpen={() => void openFolderBrowser(draft?.workspacePath || undefined)}
           onFolderClose={() => setFolderOpen(false)}
           onFolderBrowse={(path) => void openFolderBrowser(path)}
@@ -378,14 +396,18 @@ export function App() {
           }}
         />
 
-        <MissionRelay
-          missions={missions}
-          missionPipelineIndex={missionPipelineIndex}
-          onInspect={setInspectedMissionId}
-          onOpenPipeline={openPipeline}
-          onNewTask={() => { setCreateExpanded(true); document.getElementById("create")?.scrollIntoView({ behavior: "smooth" }); }}
-        />
-
+        {viewMode === "board" ? (
+          <MissionRelay
+            missions={missions}
+            missionPipelineIndex={missionPipelineIndex}
+            kindFilter={kindFilter}
+            stateFilter={stateFilter}
+            onInspect={setInspectedMissionId}
+            onOpenPipeline={openPipeline}
+            onTransition={moveMissionOnBoard}
+            onNewTask={() => { setCreateExpanded(true); document.getElementById("create")?.scrollIntoView({ behavior: "smooth" }); }}
+          />
+        ) : (
         <section className="panel missions-panel" id="missions">
           <div className="panel-head">
             <div>
@@ -444,6 +466,7 @@ export function App() {
             {!filtered.length && <p className="empty">Aucune mission ne correspond aux filtres.</p>}
           </div>
         </section>
+        )}
           </>
         )}
 

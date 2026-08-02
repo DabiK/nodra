@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import type { FolderBrowseResult, MissionIntakeDraft, MissionState, ProviderOptionsCatalog } from "../types";
+import type { MissionViewMode } from "../services/view-mode-service";
 import { permissionLabels, reasoningLabels } from "../services/provider-service";
 import { workspacePathFromName } from "../services/workspace-service";
 import { WorkspaceModePicker } from "./WorkspaceModePicker";
@@ -24,6 +25,7 @@ export function TaskIntakeCard({
   stateCounts,
   stateFilter,
   kindFilter,
+  viewMode,
   onSubmit,
   onDraftChange,
   onExpandedChange,
@@ -31,6 +33,7 @@ export function TaskIntakeCard({
   onProbeProvider,
   onStateFilterChange,
   onKindFilterChange,
+  onViewModeChange,
   onFolderOpen,
   onFolderClose,
   onFolderBrowse,
@@ -53,6 +56,7 @@ export function TaskIntakeCard({
   stateCounts: Partial<Record<MissionState, number>>;
   stateFilter: string;
   kindFilter: string;
+  viewMode: MissionViewMode;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   onDraftChange(patch: Partial<MissionIntakeDraft>): void;
   onExpandedChange(value: boolean): void;
@@ -60,6 +64,7 @@ export function TaskIntakeCard({
   onProbeProvider(providerId: string): void;
   onStateFilterChange(value: string): void;
   onKindFilterChange(value: string): void;
+  onViewModeChange(mode: MissionViewMode): void;
   onFolderOpen(): void;
   onFolderClose(): void;
   onFolderBrowse(path?: string): void;
@@ -143,10 +148,17 @@ export function TaskIntakeCard({
             </button>
           )}
           {draft?.kind !== "human" && (
-            <button type="button" className={`configure-chip${expanded ? " active" : ""}`} aria-expanded={expanded} onClick={() => onExpandedChange(!expanded)}>
+            <button type="button" className="configure-chip" aria-expanded={expanded} onClick={() => onExpandedChange(!expanded)}>
               ⚙ {expanded ? "Réduire" : "Configurer l'agent"}
             </button>
           )}
+          <span className="chip-divider" />
+          <button type="button" className={`view-chip view-mode${viewMode === "board" ? " active" : ""}`} aria-pressed={viewMode === "board"} onClick={() => onViewModeChange("board")} title="Vue en colonnes">
+            ▦ Tableau
+          </button>
+          <button type="button" className={`view-chip view-mode${viewMode === "list" ? " active" : ""}`} aria-pressed={viewMode === "list"} onClick={() => onViewModeChange("list")} title="Vue en liste">
+            ☰ Liste
+          </button>
         </div>
 
         {draft?.kind === "human" && (
