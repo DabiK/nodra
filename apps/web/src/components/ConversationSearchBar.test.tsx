@@ -31,17 +31,17 @@ describe("ConversationSearchBar", () => {
 
   it("shows the occurrence counter as current / total", () => {
     renderBar({ matchCount: 7, current: 2 });
-    expect(screen.getByRole("status").textContent).toBe("3 / 7");
+    expect(screen.getByRole("status", { name: "Occurrences" }).textContent).toBe("3 / 7");
   });
 
   it("shows the absence of results without crashing the counter", () => {
     renderBar({ matchCount: 0 });
-    expect(screen.getByRole("status").textContent).toBe("Aucun résultat");
+    expect(screen.getByRole("status", { name: "Occurrences" }).textContent).toBe("Aucun résultat");
   });
 
   it("hides the counter while the query is empty", () => {
     renderBar({ query: "", matchCount: 0 });
-    expect(screen.getByRole("status").textContent).toBe("");
+    expect(screen.getByRole("status", { name: "Occurrences" }).textContent).toBe("");
   });
 
   it("navigates with Enter (next) and Shift+Enter (previous)", () => {

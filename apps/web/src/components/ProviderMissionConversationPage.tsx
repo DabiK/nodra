@@ -20,6 +20,9 @@ import { subagentStatusLabel, subagentToolLabel } from "../services/subagent-lab
 import { SubagentExecution } from "./SubagentExecution";
 import { ModelPicker } from "./ModelPicker";
 import { PromptEnhanceDialog } from "./PromptEnhanceDialog";
+import { ConversationSearchBar } from "./ConversationSearchBar";
+import { HighlightedText } from "./HighlightedText";
+import { useConversationSearch } from "../hooks/useConversationSearch";
 import { useSseRefresh } from "../hooks/useSseRefresh";
 import { suppressServerEventsFor } from "../services/events-service";
 
@@ -99,32 +102,45 @@ function itemLabel(item: ProviderSessionDetailView["snapshot"]["items"][number],
   return item.role || "Activité";
 }
 
-function ProviderItem({ item, providerId }: { item: ProviderSessionDetailView["snapshot"]["items"][number]; providerId: string }) {
+function ProviderItem({ item, providerId, query, isSearchHit, isCurrentMatch }: { item: ProviderSessionDetailView["snapshot"]["items"][number]; providerId: string; query: string; isSearchHit: boolean; isCurrentMatch: boolean }) {
   const message = item.kind === "message";
   const user = item.role === "user";
   const subagent = item.kind === "subagent";
   const tool = !message && !subagent && (item.kind === "tool_call" || item.kind === "tool_result");
   const statusLabel = subagent ? subagentStatusLabel(item.text) : null;
+  const searching = query.trim() !== "";
   const body = message ? (
     <div className="provider-thread-markdown">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{item.text ?? "—"}</ReactMarkdown>
+      {searching && isSearchHit
+        ? <p className="provider-thread-search-text"><HighlightedText text={item.text ?? "—"} query={query} /></p>
+        : <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{item.text ?? "—"}</ReactMarkdown>}
     </div>
   ) : statusLabel ? (
     <span className="subagent-chip">{statusLabel}</span>
   ) : (
-    <p className={tool ? "provider-thread-tool-text" : undefined}>{item.text ?? "—"}</p>
+    <p className={tool ? "provider-thread-tool-text" : undefined}>
+      {searching && isSearchHit ? <HighlightedText text={item.text ?? "—"} query={query} /> : item.text ?? "—"}
+    </p>
   );
   return (
-    <article className={`provider-thread-item ${user ? "user" : message ? "assistant" : subagent ? "subagent" : "tool"}`} data-external-item-id={item.externalItemId}>
+    <article className={`provider-thread-item ${user ? "user" : message ? "assistant" : subagent ? "subagent" : "tool"}${isCurrentMatch ? " conversation-search-current" : ""}`} data-external-item-id={item.externalItemId}>
       <header><strong>{itemLabel(item, providerId)}</strong><span>{item.kind} · {item.externalItemId}</span></header>
-      {item.name ? <code>{subagentToolLabel(item.name) ?? item.name}</code> : null}
+      {item.name ? <code>{searching && isSearchHit ? <HighlightedText text={subagentToolLabel(item.name) ?? item.name} query={query} /> : subagentToolLabel(item.name) ?? item.name}</code> : null}
       {body}
       {subagent && item.subagent ? <SubagentExecution execution={item.subagent} /> : null}
     </article>
   );
 }
 
-function ProviderFeed({ detail, busy, thinking, sentText }: { detail: ProviderSessionDetailView | null; busy: boolean; thinking: boolean; sentText: string | null }) {
+function ProviderFeed({ detail, busy, thinking, sentText, searchQuery, searchHitIds, activeMatchId }: {
+  detail: ProviderSessionDetailView | null;
+  busy: boolean;
+  thinking: boolean;
+  sentText: string | null;
+  searchQuery: string;
+  searchHitIds: Set<string>;
+  activeMatchId: string | null;
+}) {
   if (!detail) return <div className="conversation-empty">Connexion au fil provider…</div>;
   const { turns, items } = detail.snapshot;
   const providerId = detail.identity.providerId;
@@ -133,11 +149,11 @@ function ProviderFeed({ detail, busy, thinking, sentText }: { detail: ProviderSe
     {sections.map((section) => section.turn ? (
       <section className="provider-thread-turn" data-external-turn-id={section.turn.externalTurnId} key={section.turn.externalTurnId}>
         <header><strong>Tour {section.turn.order}</strong><span className={isActiveTurn(section.turn.state) ? "active" : ""}>{section.turn.state}</span><code>{section.turn.externalTurnId}</code></header>
-        <div>{section.items.map((item) => <ProviderItem item={item} providerId={providerId} key={item.externalItemId} />)}</div>
+        <div>{section.items.map((item) => <ProviderItem item={item} providerId={providerId} query={searchQuery} isSearchHit={searchHitIds.has(item.externalItemId)} isCurrentMatch={activeMatchId === item.externalItemId} key={item.externalItemId} />)}</div>
       </section>
     ) : (
       <section className="provider-thread-turn" key={section.items[0]?.externalItemId}>
-        <div>{section.items.map((item) => <ProviderItem item={item} providerId={providerId} key={item.externalItemId} />)}</div>
+        <div>{section.items.map((item) => <ProviderItem item={item} providerId={providerId} query={searchQuery} isSearchHit={searchHitIds.has(item.externalItemId)} isCurrentMatch={activeMatchId === item.externalItemId} key={item.externalItemId} />)}</div>
       </section>
     ))}
     {!turns.length && !items.length ? <div className="conversation-empty">La conversation ne contient encore aucun élément.</div> : null}
@@ -167,6 +183,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   const [runModelId, setRunModelId] = useState<string | null>(null);
   const [runReasoningEffort, setRunReasoningEffort] = useState<ProviderReasoningEffort>("provider_default");
   const [enhanceOpen, setEnhanceOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const activationRef = useRef(false);
   const ensureRef = useRef(false);
@@ -294,10 +311,40 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   // Temps réel : le flux SSE remplace le polling toutes les 1,5 s.
   useSseRefresh(() => void refresh());
 
+  // Recherche dans le fil : texte des messages, sorties de tool calls et noms
+  // de sous-agents sont indexés côté client (issue #9).
+  const searchMessages = useMemo(() => (detail?.snapshot.items ?? []).map((item) => ({
+    id: item.externalItemId,
+    fields: item.kind === "subagent" ? [item.name] : [item.text]
+  })), [detail]);
+  const search = useConversationSearch(searchMessages);
+  const searchHitIds = useMemo(() => new Set(search.matches.map((match) => match.messageId)), [search.matches]);
+  const searching = search.query.trim() !== "";
+  const toggleSearch = () => {
+    setSearchOpen((open) => {
+      if (open) search.clear();
+      return !open;
+    });
+  };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    search.clear();
+  };
+
   useEffect(() => {
     const feed = feedRef.current;
-    if (feed) feed.scrollTop = feed.scrollHeight;
-  }, [detail?.snapshot.cursor, detail?.snapshot.items.length, detail?.snapshot.turns.length]);
+    if (!feed || searching) return; // en recherche, le défilement suit les occurrences
+    feed.scrollTop = feed.scrollHeight;
+  }, [detail?.snapshot.cursor, detail?.snapshot.items.length, detail?.snapshot.turns.length, searching]);
+
+  // Défilement vers l'occurrence active de la recherche.
+  useEffect(() => {
+    if (!search.activeMatch) return;
+    const feed = feedRef.current;
+    const target = Array.from(feed?.querySelectorAll("[data-external-item-id]") ?? [])
+      .find((element) => element.getAttribute("data-external-item-id") === search.activeMatch?.messageId);
+    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [search.activeMatch]);
 
   const activeTurn = useMemo(() => [...(detail?.snapshot.turns ?? [])].reverse().find((turn) => isActiveTurn(turn.state)) ?? null, [detail]);
   const canControl = detail?.link?.mode === "control";
@@ -343,7 +390,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
         <section className="conversation-shell">
           <header className="conversation-header provider-thread-header">
             <div className="conversation-title"><span className={`status-orb ${detail?.snapshot.session.state ?? "idle"}`} /><div><h1>{mission?.title ?? "Conversation provider"}</h1><p>{providerLabel(detail?.identity.providerId ?? "")} · {detail?.snapshot.session.state ?? "connexion"} · source externe</p></div></div>
-            <div className="conversation-actions"><button type="button" className="ghost-button" onClick={() => void refresh()}>Rafraîchir</button><a className="ghost-button" href="/?page=provider-sessions">Sessions provider</a><a className="ghost-button" href="/">← Missions</a></div>
+            <div className="conversation-actions"><button type="button" className="ghost-button" onClick={() => void refresh()}>Rafraîchir</button><button type="button" className="ghost-button" aria-pressed={searchOpen} onClick={toggleSearch}>⌕ Rechercher</button><a className="ghost-button" href="/?page=provider-sessions">Sessions provider</a><a className="ghost-button" href="/">← Missions</a></div>
           </header>
           {error ? <p className="inspector-error" role="alert">{error}</p> : null}
           {pending ? <p className="inspector-note" role="status">{pending}</p> : null}
@@ -354,7 +401,18 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
             </div>
           )}
           <div className="provider-thread-source"><span>Source de vérité provider</span><code>{detail?.identity.externalSessionRef ?? missionId}</code></div>
-          <div className="conversation-feed-wrap"><div className="agent-conversation provider-thread-feed" ref={feedRef} aria-live="polite"><ProviderFeed detail={detail} busy={busy !== null} thinking={activeTurn !== null} sentText={sentText} /></div></div>
+          {searchOpen ? (
+            <ConversationSearchBar
+              query={search.query}
+              matchCount={search.matchCount}
+              current={search.current}
+              onQueryChange={search.setQuery}
+              onNext={search.next}
+              onPrev={search.prev}
+              onClose={closeSearch}
+            />
+          ) : null}
+          <div className="conversation-feed-wrap"><div className="agent-conversation provider-thread-feed" ref={feedRef} aria-live="polite"><ProviderFeed detail={detail} busy={busy !== null} thinking={activeTurn !== null} sentText={sentText} searchQuery={search.query} searchHitIds={searchHitIds} activeMatchId={search.activeMatch?.messageId ?? null} /></div></div>
           <footer className="composer-wrap">
             <form className="agent-composer" onSubmit={submit}>
               <textarea rows={2} maxLength={20000} value={text} onChange={(event) => setText(event.target.value)} placeholder="Écris une instruction au provider…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />

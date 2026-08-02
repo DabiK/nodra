@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ProviderMissionConversationPage } from "./ProviderMissionConversationPage";
 
@@ -12,6 +12,12 @@ vi.mock("../services/events-service", async (importOriginal) => {
 });
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+// jsdom n'implémente pas scrollIntoView ; la recherche l'utilise pour
+// amener l'occurrence active dans la vue.
+beforeEach(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 const mission = { id: "mission/provider/1", projectId: null, title: "Provider mission", executionKind: "agent", state: "ACTIVE", version: 3, createdAt: "2026-01-01", updatedAt: "2026-01-01" };
 const capability = { state: "certified", reason: null, action: null };
@@ -323,5 +329,96 @@ describe("provider mission conversation", () => {
 
     await waitFor(() => expect(input.value).toBe("Enhanced prompt with much more detail."));
     expect(screen.queryByRole("heading", { name: "Améliorer le prompt" })).toBeNull();
+  });
+
+  it("searches the thread, highlights matches and navigates between occurrences", async () => {
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (init?.method === "POST") return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-new" });
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(detail);
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+    await screen.findByText("Provider mission");
+
+    fireEvent.click(screen.getByRole("button", { name: /Rechercher/ }));
+    const searchbox = screen.getByRole("searchbox");
+    fireEvent.change(searchbox, { target: { value: "Same" } });
+
+    // Deux occurrences (une par message), compteur affiché, surlignage en place.
+    expect((await screen.findByRole("status", { name: "Occurrences" })).textContent).toBe("1 / 2");
+    expect(document.querySelectorAll("mark.conversation-search-hit")).toHaveLength(2);
+    const articles = document.querySelectorAll("article.provider-thread-item");
+    expect(articles[0].classList.contains("conversation-search-current")).toBe(true);
+    expect(articles[1].classList.contains("conversation-search-current")).toBe(false);
+
+    // Entrée passe à l'occurrence suivante.
+    fireEvent.keyDown(searchbox, { key: "Enter" });
+    expect(screen.getByRole("status", { name: "Occurrences" }).textContent).toBe("2 / 2");
+    expect(articles[0].classList.contains("conversation-search-current")).toBe(false);
+    expect(articles[1].classList.contains("conversation-search-current")).toBe(true);
+
+    // Échap ferme la barre et efface la recherche.
+    fireEvent.keyDown(searchbox, { key: "Escape" });
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(document.querySelectorAll("mark.conversation-search-hit")).toHaveLength(0);
+  });
+
+  it("searches tool call results and subagent names", async () => {
+    const withTool = {
+      ...detail,
+      snapshot: {
+        ...detail.snapshot,
+        items: [
+          ...detail.snapshot.items,
+          { externalItemId: "item-tool", externalTurnId: "turn-active", role: "tool", kind: "tool_result", order: 4, text: "exit code 0 · 12 files changed", name: "shell", sourceAt: null, receivedAt: "2026-01-01" }
+        ]
+      }
+    };
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (init?.method === "POST") return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-new" });
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(withTool);
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+    await screen.findByText("Provider mission");
+
+    fireEvent.click(screen.getByRole("button", { name: /Rechercher/ }));
+    const searchbox = screen.getByRole("searchbox");
+    fireEvent.change(searchbox, { target: { value: "files changed" } });
+    expect((await screen.findByRole("status", { name: "Occurrences" })).textContent).toBe("1 / 1");
+    const toolText = document.querySelector(".provider-thread-tool-text");
+    expect(toolText?.querySelectorAll("mark.conversation-search-hit")).toHaveLength(1);
+    expect(toolText?.querySelector("mark")?.textContent).toBe("files changed");
+
+    // Le nom du sous-agent est aussi un champ recherchable (surligné dans le <code>).
+    fireEvent.change(searchbox, { target: { value: "codex" } });
+    expect((await screen.findByRole("status", { name: "Occurrences" })).textContent).toBe("1 / 1");
+    const code = Array.from(document.querySelectorAll("article.provider-thread-item > code"))
+      .find((node) => node.querySelector("mark.conversation-search-hit"));
+    expect(code?.querySelector("mark")?.textContent).toBe("codex");
+  });
+
+  it("reports no result when the query matches nothing", async () => {
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (init?.method === "POST") return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-new" });
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(detail);
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+    await screen.findByText("Provider mission");
+
+    fireEvent.click(screen.getByRole("button", { name: /Rechercher/ }));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "introuvable" } });
+    expect((await screen.findByRole("status", { name: "Occurrences" })).textContent).toBe("Aucun résultat");
+    expect(document.querySelectorAll("mark.conversation-search-hit")).toHaveLength(0);
   });
 });

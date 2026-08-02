@@ -52,7 +52,7 @@ export function ConversationSearchBar({
         onChange={(event) => onQueryChange(event.target.value)}
         onKeyDown={onKeyDown}
       />
-      <span className="conversation-search-count" role="status" aria-live="polite">{label}</span>
+      <span className="conversation-search-count" role="status" aria-label="Occurrences" aria-live="polite">{label}</span>
       <button
         type="button"
         className="conversation-search-nav"
