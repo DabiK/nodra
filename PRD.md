@@ -90,7 +90,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques (heuristique → bannière → action)
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #11 — Timeline d'audit sur la fiche mission (labels: —)
+- [x] #11 — Timeline d'audit sur la fiche mission (labels: —)
 
   **Issue #11 — détail complet**
   > ## Contexte

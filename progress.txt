@@ -316,3 +316,29 @@ La boucle de review a rejeté l'itération 9 : `npm run build -w @nodra/web` ét
 
 ### Statut
 - [x] #10 — Warning perte de contexte (compact / truncate) — REJECTED corrigé, build web au vert
+
+## Itération 9-ter — 2026-08-03 — Review REJECTED : corrections du panneau timeline d'audit (#11)
+
+### Contexte
+La boucle de review a rejeté l'itération #11 (timeline d'audit) : typecheck rouge committé (TS2554), 3 tests déterministes rouges dans `MissionInspector.test.tsx`, et l'intégration (`MissionInspector.tsx`, `styles.css`, `MissionInspector.test.tsx`, `.gitignore`) restée non commitée dans le working tree. Correctifs appliqués dans cette itération dédiée (aucune nouvelle tâche).
+
+### Fait (1 commit : `081c02f`)
+1. **TS2554 (committé)** — `mission-audit-view-service.test.ts:90` : `describeAuditEvent(event())` appelé sans argument alors que le helper exige `overrides` → `event({})`.
+2. **`describeAuditEvent` base** (`mission-export-service.ts`) : la transition s'affiche désormais même quand `fromState` est `null` (`(from ?? "null") → to`) — le panneau affiche « Création (null → DRAFT) » comme attendu par le test (au lieu de « Création » seul).
+3. **Cause racine du filtrage** (`MissionInspector.tsx`) : l'effet audit dépendait de `[missionId, data?.mission.state]` → `loadMissionAudit` fetché **deux fois** à l'ouverture (state `undefined` → `READY`) ; avec `mockResolvedValueOnce`, le 2ᵉ appel retombait sur le mock par défaut rejeté → `setAudit(null)` → démontage du panneau, filtre perdu, `panel` périmé. L'effet ne dépend plus que de `missionId` (l'historique est immuable ; `applyAction` le recharge explicitement après chaque action) — élimine aussi le double fetch redondant à chaque ouverture.
+4. **Intégration commitée** — `MissionInspector.tsx` (panneau `MissionAuditPanel` : filtres par catégorie avec badges de comptage, libellés enrichis, acteur + horodatage, état vide, message « aucun événement de ce type »), `styles.css` (classes `.mission-audit-*` + overrides dark), `MissionInspector.test.tsx` (5 tests), `.gitignore` (sentinel `.ralph/`) — désormais dans l'historique, la feature est livrée par les commits.
+
+### Vérifications
+- `npm run typecheck -w @nodra/web` : OK (TS2554 corrigé)
+- `npm run typecheck` (racine) : OK
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
+- `npx vitest run apps/web` : 41 fichiers / 315 tests OK (dont les 3 tests corrigés, 3/3 runs)
+- ESLint sur tous les fichiers touchés : propre
+- Working tree propre après commit
+
+### Décisions / notes
+- Le double fetch `result`/`runs` (`[missionId, data?.mission.state]`) est un pattern pré-existant non corrigé ici (hors périmètre review) ; seul l'effet audit, cause de la casse, a été changé.
+- Le libellé « (null → DRAFT) » est volontairement brut : il reflète la payload d'audit réelle (création depuis rien) et reste identique entre le panneau et l'export Markdown (même fonction de base).
+
+### Statut
+- [x] #11 — Timeline d'audit sur la fiche mission — REJECTED corrigé, feature complète commitée
