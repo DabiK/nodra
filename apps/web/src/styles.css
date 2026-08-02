@@ -186,7 +186,7 @@ label input:focus, label textarea:focus, label select:focus, input:focus, select
 .relay-lane.done .relay-signal { background: #e6efe9; color: #4c7a63; }
 .relay-lane.abandoned .relay-signal, .relay-lane.draft .relay-signal, .relay-lane.backlog .relay-signal { background: #ecebe6; color: #8a938b; }
 .relay-list { display: flex; flex-direction: column; gap: 8px; padding: 11px; overflow-y: auto; max-height: 460px; }
-.relay-task { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; border: 1px solid #e4e5de; border-radius: 12px; padding: 11px; background: white; cursor: grab; transition: border-color .15s, transform .1s, box-shadow .15s, opacity .15s; }
+.relay-task { display: flex; align-items: center; gap: 11px; width: 100%; min-width: 0; text-align: left; border: 1px solid #e4e5de; border-radius: 12px; padding: 11px; background: white; cursor: grab; transition: border-color .15s, transform .1s, box-shadow .15s, opacity .15s; }
 .relay-task:hover { border-color: var(--green); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(33,49,41,.08); }
 .relay-task:active { cursor: grabbing; }
 .relay-task:disabled { cursor: wait; opacity: 0.55; transform: none; }
@@ -196,13 +196,13 @@ label input:focus, label textarea:focus, label select:focus, input:focus, select
 .relay-lane.drop-forbidden { border-color: var(--red); background: #fdf6f4; }
 .relay-error { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 14px; border: 1px solid #ecc7c1; border-radius: 10px; background: #fdf1ef; color: #a43c33; font-size: 12px; font-weight: 600; }
 .relay-task-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.relay-task-copy small { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.relay-task-copy small { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .relay-task-copy small i { width: 6px; height: 6px; border-radius: 50%; background: #c3cbc4; }
 .relay-task.working .relay-task-copy small i { background: var(--green); animation: relay-live 1.2s ease-in-out infinite; }
 .relay-task.blocked .relay-task-copy small i { background: var(--red); }
 .relay-task.waiting .relay-task-copy small i { background: #3a6cbf; }
 .relay-task-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 13px Manrope; color: var(--ink); }
-.relay-task-copy em { color: #5f6c65; font-size: 11px; font-style: normal; }
+.relay-task-copy em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #5f6c65; font-size: 11px; font-style: normal; }
 .relay-arrow { flex: none; color: #b6beb7; font-size: 15px; }
 .relay-task:hover .relay-arrow { color: var(--green); }
 .relay-empty { display: flex; align-items: center; gap: 8px; padding: 16px 12px; color: var(--muted); font-size: 11px; }
@@ -211,12 +211,12 @@ label input:focus, label textarea:focus, label select:focus, input:focus, select
 .relay-overflow { margin: 0; padding: 8px 13px 11px; color: var(--muted); font-size: 10px; font-weight: 700; }
 
 /* Pipeline grouping inside lanes */
-.relay-pipeline-group { display: grid; gap: 6px; padding: 7px; border: 1px solid #cfd9cc; border-radius: 12px; background: #f4f7f1; }
+.relay-pipeline-group { display: grid; gap: 6px; min-width: 0; padding: 7px; border: 1px solid #cfd9cc; border-radius: 12px; background: #f4f7f1; }
 .relay-pipeline-tag { display: inline-flex; align-items: center; gap: 6px; color: var(--pipeline-accent, #4c6f57); font-size: 10px; font-weight: 900; letter-spacing: .03em; }
 .relay-pipeline-tag i { font-style: normal; color: var(--pipeline-accent, var(--green)); }
 .relay-pipeline-tag b { margin-left: auto; padding: 1px 6px; border-radius: 20px; background: white; color: var(--pipeline-accent, #4c6f57); font-size: 10px; }
 .relay-task.in-pipeline { box-shadow: 0 5px 14px rgba(33,49,41,.05); }
-.relay-task-pipeline { display: inline-flex; align-items: center; align-self: flex-start; gap: 4px; margin-top: 3px; padding: 1px 7px; border-radius: 20px; font-size: 9px; font-weight: 900; letter-spacing: .02em; cursor: pointer; }
+.relay-task-pipeline { display: inline-flex; align-items: center; align-self: flex-start; gap: 4px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 3px; padding: 1px 7px; border-radius: 20px; font-size: 9px; font-weight: 900; letter-spacing: .02em; cursor: pointer; }
 .relay-task-pipeline b { font-size: 10px; }
 .relay-task-pipeline:hover { filter: brightness(0.94); text-decoration: underline; }
 
