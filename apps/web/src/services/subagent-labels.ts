@@ -2,6 +2,10 @@ export function subagentStatusLabel(text: string | null): string | null {
   if (text === "started") return "Démarré";
   if (text === "interacted") return "Activité en cours";
   if (text === "interrupted") return "Interrompu";
+  if (text === "completed") return "Terminé";
+  if (text === "running") return "En cours";
+  if (text === "pending") return "En attente";
+  if (text === "failed") return "Échoué";
   return null;
 }
 export function subagentToolLabel(name: string | null): string | null {

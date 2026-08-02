@@ -294,12 +294,32 @@ export interface ProviderSessionListView {
   nextCursor: string | null;
 }
 
+export interface ProviderSubagentTranscriptItemView {
+  externalItemId: string;
+  role: string;
+  kind: string;
+  order: number;
+  text: string | null;
+  name: string | null;
+  sourceAt: string | null;
+}
+
+export interface ProviderSubagentExecutionView {
+  subSessionId: string;
+  status: string;
+  model: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  report: string | null;
+  transcript: ProviderSubagentTranscriptItemView[];
+}
+
 export interface ProviderSessionDetailView {
   identity: { id: string; providerId: string; externalSessionRef: string; ownership: "external_observed"; firstObservedAt: string; lastObservedAt: string };
   snapshot: {
     session: ProviderSessionSummaryView;
     turns: Array<{ externalTurnId: string; order: number; state: string; sourceStartedAt: string | null; sourceCompletedAt: string | null; receivedAt: string }>;
-    items: Array<{ externalItemId: string; externalTurnId: string | null; role: string; kind: string; order: number; text: string | null; name: string | null; sourceAt: string | null; receivedAt: string }>;
+    items: Array<{ externalItemId: string; externalTurnId: string | null; role: string; kind: string; order: number; text: string | null; name: string | null; sourceAt: string | null; receivedAt: string; subagent?: ProviderSubagentExecutionView | null }>;
     cursor: string | null;
   };
   link: ProviderSessionListItem["link"];

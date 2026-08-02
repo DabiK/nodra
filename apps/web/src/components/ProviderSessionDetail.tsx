@@ -2,6 +2,7 @@ import type { ProviderSessionDetailView } from "../types";
 import { providerLabel } from "../services/provider-label";
 import { providerSessionSections } from "../services/provider-session-sections";
 import { subagentStatusLabel, subagentToolLabel } from "../services/subagent-labels";
+import { SubagentExecution } from "./SubagentExecution";
 
 function itemRoleLabel(role: string, kind: string, providerId: string) {
   const label = providerLabel(providerId);
@@ -23,6 +24,7 @@ function SnapshotItem({ item, providerId }: { item: ProviderSessionDetailView["s
       <header><span className="provider-session-item-author"><i aria-hidden="true">{avatarLetter}</i>{itemRoleLabel(item.role, item.kind, providerId)}</span><small>{item.kind} · #{item.order}</small></header>
       {item.name ? <strong>{subagentToolLabel(item.name) ?? item.name}</strong> : null}
       {statusLabel ? <span className="subagent-chip">{statusLabel}</span> : <p>{item.text ?? "—"}</p>}
+      {isSubagent && item.subagent ? <SubagentExecution execution={item.subagent} /> : null}
     </article>
   );
 }
