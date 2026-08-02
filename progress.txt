@@ -86,3 +86,34 @@
 
 ### Statut
 - [x] #4 — Vue pipeline en timeline chronologique
+
+## Itération 4 — 2026-08-02 — Task #5 : Palette de commandes Cmd+K et raccourcis clavier
+
+### Fait (3 commits atomiques, comme suggéré par l'issue)
+1. **Palette Cmd+K** (`feat(web): palette de commandes Cmd+K…`)
+   - Service pur `palette-service.ts` (+ 8 tests) : `buildPaletteCommands` construit les commandes depuis l'état du board — navigation (Tâches/Pipelines/Managers/Sessions), « Créer une mission », runs de pipeline (Démarrer si non lancé ou run terminé/échoué, Avancer si actif/bloqué), missions (Accepter la delivery pour les missions agent en VALIDATION, Ouvrir la mission), recherche (`filterPaletteCommands`, insensible à la casse sur label/hint/mots-clés dont l'id de mission), groupement canonique.
+   - Composant `CommandPalette` (+ 11 tests) : dialog `role="dialog"` `aria-modal`, champ `role="combobox"` + `aria-controls`/`aria-activedescendant`, listbox d'options `role="option"` `aria-selected`, navigation ↑/↓/Home/End/Entrée/Esc, focus dans la recherche à l'ouverture et restitué à l'élément précédent à la fermeture, statut de résultat en pied de palette.
+   - Câblage global dans `App.tsx` : `⌘K`/`Ctrl+K` depuis n'importe quelle page (tasks/pipelines/managers/provider-sessions). Exécution : navigation, création (expand intake + scroll + focus), `startPipeline`/`advancePipelineRun` avec statut, accept delivery via `loadMissionResult` puis `accept-result` (si delivery structurée) sinon `validate`.
+2. **Raccourcis board + fiche** (`feat(web): raccourcis board…`)
+   - `MissionRelay` : `←`/`→` déplacent le focus entre colonnes (première carte de la colonne voisine, les colonnes vides sont sautées, bouclage, inactif dans les champs de saisie). 5 tests ajoutés.
+   - `MissionInspector` : `Esc` ferme la fiche — gardes : pas pendant la saisie, pas quand un sous-dialog est ouvert (model picker / worktree dialog, qui gèrent leur propre Esc). 3 tests (nouveau `MissionInspector.test.tsx`).
+3. **Help overlay `?`** (`feat(web): help overlay (?)…`)
+   - `ShortcutsHelp` (+ 5 tests) : overlay documentant les raccourcis (⌘K, ?, Esc, ←/→, ↵) et les actions de la palette, `role="dialog"` `aria-modal`, fermé par Esc/×/fond, focus managé.
+   - Touche `?` globale (ignorée pendant la saisie) + bouton « ? Raccourcis » dans la sidebar (prop optionnelle `onHelp`, 1 test ajouté) pour la découvrabilité.
+
+### Vérifications
+- `npm run typecheck` : OK
+- `npx tsc -b apps/web` + `npm run build -w @nodra/web` : OK
+- `npx vitest run apps/web` : 29 fichiers / 184 tests OK
+- Suite complète (web + packages) : 6 échecs **pré-existants et environnementaux** identiques à l'itération 3 (i7-run-controls.integration + temporal-envelope.integration : serveur Temporal non démarré / binaire Codex non certifié). Aucun lié à cette itération.
+- ESLint sur tous les fichiers touchés : propre
+
+### Décisions / notes / limites
+- **Périmètre de la palette** : l'app principale (4 pages). La page agent (`agent.html`) est un écran séparé (autre bundle React, pas de board) — pas de palette là-bas, cohérent avec le contexte de l'issue qui décrit la navigation `?page=` dans `App.tsx`.
+- « Accepter la delivery » depuis la palette : résout le dernier run (`latestRunForMission`) puis applique `accept-result` si delivery structurée, sinon `validate` — sans confirmation intermédiaire, cohérent avec les boutons de l'inspecteur.
+- « Enter pour créer » : comportement natif du formulaire (Enter dans le champ « Confier une tâche » soumet) — documenté dans l'overlay d'aide, rien à implémenter.
+- Le run lancé/avancé depuis la palette ne navigue pas automatiquement vers la page Pipelines (feedback via statut dans la palette + compteur sidebar).
+- Limite : les commandes « Ouvrir la mission » sont plafonnées à 30 missions pour borner la liste.
+
+### Statut
+- [x] #5 — Palette de commandes Cmd+K et raccourcis clavier
