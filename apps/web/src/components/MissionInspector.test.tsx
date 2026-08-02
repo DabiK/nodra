@@ -50,7 +50,10 @@ const mission: MissionView = {
   state: "READY",
   version: 1,
   createdAt: "2026-08-02T08:00:00Z",
-  updatedAt: "2026-08-02T09:00:00Z"
+  updatedAt: "2026-08-02T09:00:00Z",
+  runState: null,
+  runStartedAt: null,
+  lastAssistantMessage: null
 };
 
 function renderInspector(onClose = vi.fn()) {

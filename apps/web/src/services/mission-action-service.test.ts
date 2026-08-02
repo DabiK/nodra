@@ -18,6 +18,9 @@ function mission(overrides: Partial<MissionView>): MissionView {
     version: 2,
     createdAt: "2026-01-01T10:00:00Z",
     updatedAt: "2026-01-01T10:00:00Z",
+    runState: null,
+    runStartedAt: null,
+    lastAssistantMessage: null,
     ...overrides
   };
 }

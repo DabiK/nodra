@@ -17,6 +17,12 @@ export interface MissionView {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** État du dernier run de la mission (null si aucun run). */
+  runState: string | null;
+  /** Début du dernier run de la mission (null si aucun run). */
+  runStartedAt: string | null;
+  /** Dernier message assistant du dernier run s'il est encore actif, null sinon. */
+  lastAssistantMessage: string | null;
 }
 
 export interface AgentConfigView {
