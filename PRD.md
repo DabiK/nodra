@@ -24,7 +24,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #8 — Export de mission en Markdown (labels: —)
+- [x] #8 — Export de mission en Markdown (labels: —)
 
   **Issue #8 — détail complet**
   > ## Contexte
@@ -36,9 +36,9 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - Prévisualisation avant export
   >
   > ## Acceptance
-  > - [ ] Export en un clic depuis la fiche mission
-  > - [ ] Markdown GFM propre et lisible dans GitHub/VS Code
-  > - [ ] Copie presse-papier + téléchargement `.md`
+  > - [x] Export en un clic depuis la fiche mission
+  > - [x] Markdown GFM propre et lisible dans GitHub/VS Code
+  > - [x] Copie presse-papier + téléchargement `.md`
   >
   > ## Méthode d'implémentation
   > - Cartographier le code avec des **subagents explore** avant d'implémenter

@@ -191,3 +191,38 @@
 
 ### Statut
 - [x] #7 — Mini-cartes de run actif sur le board
+
+## Itération 7 — 2026-08-03 — Task #8 : Export de mission en Markdown
+
+### Fait (3 commits atomiques)
+1. **Timeline d'audit (backend)** (`feat(api): timeline d'audit d'une mission (GET /api/missions/:id/audit)`)
+   - `MissionAuditView` (id, commandId, eventType, actor, payload, occurredAt) + méthode `audit(id)` sur `MissionReadModel` (interface + implémentation SQLite : lecture de `business_audit_event` où `aggregateKind="mission"` et `aggregateId=id`, tri chronologique — l'index `idx_audit_aggregate` existant couvre la requête).
+   - Use case `ListMissionAudit` (404 si mission inconnue, timeline vide si aucun événement). Aucun import adapters dans le controller (contrainte architecture respectée).
+   - Endpoint `GET /api/missions/:id/audit` dans `mission.controller.ts` (à côté de `:id/runs`).
+   - Tests : 3 nouveaux dans `sqlite-mission-repository.test.ts` (chronologie + payloads fromState/toState + actor, mission sans événement → [] sans fuite inter-missions, mission inconnue → MISSION_NOT_FOUND).
+   - Note : cet endpoint servira aussi l'issue #11 (panneau timeline) — la lecture est livrée ici car l'export en a besoin ; le panneau UI reste un chantier #11 distinct.
+2. **Services web** (`feat(web): service d'export Markdown de mission + services audit et evidence`)
+   - `mission-export-service.ts` (pur, + 6 tests) : `buildMissionMarkdown` — sections titre/statut/dates, config agent (provider, modèle, réflexion, permissions, workspace, auto-commit, intégration), prompt, résultat déclaré + commentaire de décision, preuves (kind, id, collector, blobs), notes (localStorage), historique des runs (durée/tokens/coût via les formatters budget/timeline existants), timeline d'audit (libellés FR lisibles + transition `from → to`) ; helpers `escapeCell` (pipes/retours à la ligne), `toBlockquote`, `describeAuditEvent`, `exportFileName`.
+   - `mission-audit-service.ts` : `loadMissionAudit(missionId)` → GET /api/missions/:id/audit.
+   - `evidence-service.ts` : `loadRunEvidence(runId)` → GET /api/runs/:id/evidence (preuves du dernier run).
+3. **Dialog d'export** (`feat(web): dialog d'export Markdown de mission (prévisualisation, copie, téléchargement)`)
+   - `MissionExportDialog` : prévisualisation rendue en GFM (react-markdown + remark-gfm, déjà dans les deps, pattern `ProviderMissionConversationPage`), chargement parallèle audit + preuves, boutons « Copier » (navigator.clipboard avec fallback textarea/execCommand) et « Télécharger .md » (Blob + anchor), feedback via notices/erreurs existantes.
+   - `MissionInspector` : bouton « ⤓ Exporter » dans le footer de l'étape lecture (visible dès que la fiche est chargée), dialog ouvert par-dessus la fiche, fermé sans fermer la fiche.
+   - CSS : `.mission-export-*` (dialog, preview markdown avec styles tableaux/blockquotes/code, footer) + overrides dark.
+   - Tests : `MissionExportDialog.test.tsx` (6 tests : prévisualisation avec audit+notes, chargement des preuves quand un run existe, copie presse-papier, téléchargement .md, helpers clipboard/download), `MissionInspector.test.tsx` étendu (3 tests : ouverture du dialog, fermeture sans fermer la fiche, bouton absent tant que non chargé).
+
+### Vérifications
+- `npm run typecheck` (racine) : OK
+- `npx vitest run apps/web` : 33 fichiers / 227 tests OK (205 → 227)
+- Suite packages/application + adapters/sqlite + domain + apps/api (hors health/i6/i14) : 179 tests OK — `apps/api/pipeline.test.ts` s'est révélé **flaky** sous charge parallèle (1 échec au 1er run complet, passe en isolation et au run complet suivant) — non lié aux changements.
+- ESLint sur tous les fichiers touchés : propre
+
+### Décisions / notes / limites
+- **Build web** : `npm run build -w @nodra/web` échoue sur une erreur **pré-existante** hors périmètre — `ProviderMissionConversationPage.test.tsx:11` (TS2698 spread sur un import de module, introduit par le commit `4fa8361` « fix SSE » antérieur, vérifié par git stash : l'erreur existe sans mes changements). Le typecheck racine passe. À corriger dans une itération dédiée (signalé, non corrigé ici).
+- **Preuves « liens »** : pas de page UI evidence dans le web — l'export liste les preuves du dernier run avec id/kind/collecteur/blobs ; un lien cliquable nécessiterait une UI evidence (hors périmètre).
+- Les notes sont locales (localStorage) : l'export les inclut via `loadMissionNotes`, elles ne sont pas visibles côté serveur.
+- La timeline inclut les événements `mission` de la table d'audit (transitions + création, actor user/manager) ; les événements d'autres agrégats (run, workspace, gates, approvals) sont exclus par conception (agrégat mission).
+- Le run « dernier message » n'est pas dupliqué dans l'export : le résultat déclaré (delivery ou fallback assistant) est la section « Résultat déclaré ».
+
+### Statut
+- [x] #8 — Export de mission en Markdown
