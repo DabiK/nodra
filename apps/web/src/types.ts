@@ -139,6 +139,8 @@ export interface PipelineListNode {
   runStartedAt: string | null;
   runEndedAt: string | null;
   runAttempt: number | null;
+  /** Coût du dernier run de la mission (micro-dollars), null si inconnu. */
+  runCostMicros: number | null;
 }
 
 export interface PipelineListItem {
@@ -150,6 +152,8 @@ export interface PipelineListItem {
   runState: "queued" | "active" | "blocked" | "completed" | "failed" | "cancelled" | "archived" | null;
   startedAt: string | null;
   endedAt: string | null;
+  /** Somme des coûts connus des nœuds (micro-dollars), null si aucun. */
+  totalCostMicros: number | null;
   nodes: PipelineListNode[];
   edges: Array<{ fromNodeKey: string; toNodeKey: string }>;
 }
@@ -204,6 +208,30 @@ export interface MissionInspectorData {
   mission: MissionView;
   config: AgentConfigView | null;
   providerSession: ProviderSessionDetailView | null;
+}
+
+/** Un run de mission avec son usage (tokens) et son coût, tel qu'exposé par l'API. */
+export interface MissionRunView {
+  id: string;
+  attempt: number;
+  state: string;
+  providerId: string;
+  modelId: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationMs: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  costMicros: number | null;
+  usageKind: string | null;
+}
+
+/** Historique des runs d'une mission + coût total cumulé. */
+export interface MissionRunsView {
+  runs: MissionRunView[];
+  totalCostMicros: number | null;
 }
 
 export type ManagerState = "draft" | "ready" | "active" | "blocked" | "archived";

@@ -1,5 +1,5 @@
 import { api } from "../api";
-import type { AgentConfigView, MissionInspectorData, MissionIntakeDraft, MissionView, ProviderOptionsCatalog } from "../types";
+import type { AgentConfigView, MissionInspectorData, MissionIntakeDraft, MissionRunsView, MissionView, ProviderOptionsCatalog } from "../types";
 import { createWorkspaceForMission } from "./workspace-service";
 import { loadMissionProviderSession } from "./mission-provider-session-service";
 
@@ -43,6 +43,11 @@ export async function loadMissionInspector(missionId: string): Promise<MissionIn
     ])
     : [null, null];
   return { mission, config, providerSession };
+}
+
+/** Historique des runs d'une mission avec usage et coût, + total cumulé. */
+export async function loadMissionRuns(missionId: string): Promise<MissionRunsView> {
+  return api<MissionRunsView>(`/api/missions/${missionId}/runs`);
 }
 
 export async function updateAgentConfig(input: {

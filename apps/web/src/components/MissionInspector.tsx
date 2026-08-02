@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { AgentConfigView, MissionInspectorData, MissionView, ProviderOptionsCatalog, ProviderReasoningEffort, WorkspaceDraftKind } from "../types";
+import type { AgentConfigView, MissionInspectorData, MissionRunsView, MissionView, ProviderOptionsCatalog, ProviderReasoningEffort, WorkspaceDraftKind } from "../types";
 import { permissionLabels, reasoningLabels, selectDefaultModel } from "../services/provider-service";
-import { loadMissionInspector, updateAgentConfig } from "../services/mission-service";
+import { loadMissionInspector, loadMissionRuns, updateAgentConfig } from "../services/mission-service";
+import { formatCostMicros, formatTokenCount, runTokenTotal, usageKindLabel } from "../services/budget-service";
+import { formatDuration } from "../services/pipeline-timeline-service";
 import { createWorkspace, workspacePathFromName } from "../services/workspace-service";
 import { branchNameFromTitle, validateWorkspaceMode } from "../services/workspace-mode";
 import { createPrerequisitePipeline } from "../services/pipeline-service";
@@ -50,6 +52,7 @@ export function MissionInspector({
   const [step, setStep] = useState<"inspect" | "configure">("inspect");
   const [data, setData] = useState<MissionInspectorData | null>(null);
   const [result, setResult] = useState<MissionResultView | null>(null);
+  const [runs, setRuns] = useState<MissionRunsView | null>(null);
   const [form, setForm] = useState<InspectorForm | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -88,6 +91,14 @@ export function MissionInspector({
     void loadMissionResult(missionId)
       .then((next) => { if (!cancelled) setResult(next); })
       .catch(() => { if (!cancelled) setResult(null); });
+    return () => { cancelled = true; };
+  }, [missionId, data?.mission.state]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadMissionRuns(missionId)
+      .then((next) => { if (!cancelled) setRuns(next); })
+      .catch(() => { if (!cancelled) setRuns(null); });
     return () => { cancelled = true; };
   }, [missionId, data?.mission.state]);
 
@@ -201,13 +212,15 @@ export function MissionInspector({
         latestRunId: result?.latestRunId ?? null,
         declaredResult: result?.assistantMessage ?? undefined
       });
-      const [reloaded, reloadedResult] = await Promise.all([
+      const [reloaded, reloadedResult, reloadedRuns] = await Promise.all([
         loadMissionInspector(missionId),
-        loadMissionResult(missionId)
+        loadMissionResult(missionId),
+        loadMissionRuns(missionId).catch(() => null)
       ]);
       setData(reloaded);
       setForm(formFrom(reloaded, providerOptions));
       setResult(reloadedResult);
+      setRuns(reloadedRuns);
       setNotice(`${action.label} · action appliquée`);
     } catch (reason) {
       setError((reason as Error).message);
@@ -229,7 +242,7 @@ export function MissionInspector({
         </header>
 
         {step === "inspect" ? (
-          <InspectStep data={data} result={result} policy={policy} />
+          <InspectStep data={data} result={result} runs={runs} policy={policy} />
         ) : (
           <form id="mission-inspector-form" className="mission-configurator" onSubmit={save}>
             {!data?.config || !form ? (
@@ -321,13 +334,63 @@ function MissionNotesPanel({ missionId }: { missionId: string }) {
   );
 }
 
+function MissionBudgetPanel({ runs }: { runs: MissionRunsView | null }) {
+  if (!runs) return null;
+  const total = formatCostMicros(runs.totalCostMicros);
+  return (
+    <section className="mission-budget-panel" aria-label="Budget et usage de la mission">
+      <header>
+        <div>
+          <span className="eyebrow">BUDGET &amp; USAGE</span>
+          <strong>Coût par run et total</strong>
+        </div>
+        {runs.runs.length > 0 && (
+          <span className={`mission-budget-total${total === null ? " unknown" : ""}`}>
+            {total !== null ? `Total : ${total}` : "Coût non rapporté"}
+          </span>
+        )}
+      </header>
+      {runs.runs.length === 0 ? (
+        <p className="empty">Aucun run à ce jour — le coût apparaîtra dès la première exécution.</p>
+      ) : (
+        <ol className="mission-budget-runs">
+          {runs.runs.map((run) => {
+            const cost = formatCostMicros(run.costMicros);
+            const tokens = runTokenTotal(run);
+            const kind = usageKindLabel(run.usageKind);
+            return (
+              <li key={run.id} className={`run-state-${run.state.toLowerCase()}`}>
+                <span className="mission-budget-run-head">
+                  <strong>{run.state}</strong>
+                  <code title={run.id}>essai {run.attempt}</code>
+                  <small>{run.modelId}{run.providerId ? ` · ${run.providerId}` : ""}</small>
+                </span>
+                <span className="mission-budget-run-meta">
+                  {run.durationMs != null && <span>{formatDuration(run.durationMs)}</span>}
+                  {tokens !== null && <span>{formatTokenCount(tokens)} tokens</span>}
+                  {cost !== null
+                    ? <b className="mission-budget-cost">{cost}</b>
+                    : <b className="mission-budget-cost unknown">coût —</b>}
+                </span>
+                {kind && <small className="mission-budget-usage-kind">{kind}</small>}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 function InspectStep({
   data,
   result,
+  runs,
   policy
 }: {
   data: MissionInspectorData | null;
   result: MissionResultView | null;
+  runs: MissionRunsView | null;
   policy: MissionUiPolicy | null;
 }) {
   return (
@@ -367,6 +430,7 @@ function InspectStep({
           <p>{policy?.description ?? "Lecture de l'état mission..."}</p>
         </div>
         {data?.mission && <MissionNotesPanel missionId={data.mission.id} />}
+        {data?.mission && <MissionBudgetPanel runs={runs} />}
         {policy?.showResultPanel && (
           <section className="mission-result-panel" aria-label="Résultat produit">
             <header>
