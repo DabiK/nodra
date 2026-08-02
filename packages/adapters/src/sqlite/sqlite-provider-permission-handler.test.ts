@@ -165,4 +165,102 @@ describe("SqliteProviderPermissionHandler", () => {
     expect(database.orm.select().from(runs).where(eq(runs.id, "run-1")).get())
       .toMatchObject({ state: "RUNNING" });
   });
+
+  it("projects provider/usageReported tokens and cost onto the run", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "nodra-usage-"));
+    const workspacePath = await mkdtemp(join(tmpdir(), "nodra-usage-workspace-"));
+    const database = NodraSqliteDatabase.open(join(directory, "nodra.db"));
+    databases.push(database);
+    await migrateDatabase(database, resolve("packages/adapters/drizzle"));
+    const now = "2026-07-26T10:00:00.000Z";
+    database.orm.insert(workspaces).values({
+      id: "workspace-usage",
+      projectId: null,
+      kind: "scratch",
+      path: workspacePath,
+      state: "in_use",
+      createdAt: now
+    }).run();
+    database.orm.insert(missions).values({
+      id: "mission-usage",
+      projectId: null,
+      title: "usage",
+      executionKind: "agent",
+      state: "ACTIVE",
+      version: 2,
+      createdAt: now,
+      updatedAt: now
+    }).run();
+    database.orm.insert(conversations).values({
+      id: "conversation-usage",
+      missionId: "mission-usage",
+      managerId: null,
+      providerId: "opencode",
+      providerSessionRef: null,
+      state: "open",
+      createdAt: now
+    }).run();
+    database.orm.insert(runs).values({
+      id: "run-usage",
+      missionId: "mission-usage",
+      managerId: null,
+      conversationId: "conversation-usage",
+      userAttempt: 1,
+      state: "RUNNING",
+      temporalWorkflowId: "run/run-usage",
+      providerId: "opencode",
+      modelId: "model-1",
+      createdAt: now
+    }).run();
+    database.orm.insert(runConfigSnapshots).values({
+      runId: "run-usage",
+      resolutionSchemaVersion: 1,
+      providerIdRequested: "opencode",
+      providerIdResolved: "opencode",
+      modelIdRequested: "model-1",
+      modelIdResolved: "model-1",
+      providerOptionsSchemaVersion: 1,
+      providerOptionsJson: "{}",
+      providerCapabilitiesJson: JSON.stringify({
+        version: "fixture-v1",
+        contract: { status: "compatible_unverified" }
+      }),
+      promptKind: "mission",
+      promptCompositionSchemaVersion: 1,
+      promptEffective: "work",
+      promptMission: "work",
+      permissionPreset: "read_only",
+      budgetSnapshotJson: "{}",
+      workspaceId: "workspace-usage",
+      cwd: workspacePath,
+      createdAt: now
+    }).run();
+    const store = new SqliteProviderRunStore(database);
+
+    await store.persistEvent("run-usage", {
+      type: "provider/usageReported",
+      payload: {
+        tokenUsage: {
+          total: {
+            inputTokens: 363,
+            outputTokens: 30,
+            cachedInputTokens: 14080,
+            cacheWriteInputTokens: 0
+          }
+        },
+        costMicros: 458
+      },
+      occurredAt: "2026-07-26T10:00:05.000Z"
+    });
+
+    expect(database.orm.select().from(runs).where(eq(runs.id, "run-usage")).get())
+      .toMatchObject({
+        inputTokens: 363,
+        outputTokens: 30,
+        cacheReadTokens: 14080,
+        cacheWriteTokens: 0,
+        costMicros: 458,
+        usageKind: "reported"
+      });
+  });
 });

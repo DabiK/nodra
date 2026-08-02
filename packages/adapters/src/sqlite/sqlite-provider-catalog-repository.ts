@@ -34,7 +34,10 @@ export class SqliteProviderCatalogRepository implements ProviderCatalogRepositor
       capabilitiesJson: JSON.stringify(result.capabilities),
       modelsJson: JSON.stringify(result.models),
       probedAt: result.probedAt
-    }).onConflictDoNothing().run();
+    }).onConflictDoUpdate({
+      target: providerCatalogSnapshots.id,
+      set: { probedAt: result.probedAt }
+    }).run();
     return { ...result, catalogVersion };
   }
 

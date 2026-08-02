@@ -13,6 +13,7 @@ import { showWorkspace } from "../services/worktree-service";
 import { WorkspaceModePicker } from "./WorkspaceModePicker";
 import { WorktreeResolutionDialog } from "./WorktreeResolutionDialog";
 import { PixelAvatar } from "./PixelAvatar";
+import { ModelPicker } from "./ModelPicker";
 
 export interface InspectorForm {
   providerId: string;
@@ -407,9 +408,12 @@ function ConfigureStep({
           </label>
           <label>
             Modèle
-            <select value={form.modelId} onChange={(event) => onPatch({ modelId: event.target.value })}>
-              {selectedProvider?.models.map((model) => <option value={model.id} key={model.id}>{model.label}</option>)}
-            </select>
+            <ModelPicker
+              idPrefix="mission-config"
+              models={selectedProvider?.models ?? []}
+              value={form.modelId}
+              onChange={(modelId) => onPatch({ modelId })}
+            />
           </label>
           <label>
             Réflexion

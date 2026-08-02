@@ -30,9 +30,6 @@ export class CreateActiveMissionForProviderSession {
     requireProviderSessionCommandId(input.commandId);
     const identity = await this.sessions.load(input.providerSessionId);
     if (!identity) throw new DomainError(`Provider session ${input.providerSessionId} was not found`, "PROVIDER_SESSION_NOT_FOUND");
-    if (identity.providerId !== "codex") {
-      throw new DomainError(`Provider session ${input.providerSessionId} is not a Codex session`, "CAPABILITY_UNAVAILABLE");
-    }
     const provider = this.providers.resolve(identity.providerId);
     const snapshot = await executeProviderSessionSync(() => provider.readSession({
       providerId: identity.providerId,
@@ -44,7 +41,7 @@ export class CreateActiveMissionForProviderSession {
     }
     const cwd = await this.canonicalCwd(snapshot.session.cwd);
     const requestedTitle = input.title?.trim() || null;
-    const title = requestedTitle ?? snapshot.session.title?.trim() ?? `Codex session ${identity.externalSessionRef}`;
+    const title = requestedTitle ?? snapshot.session.title?.trim() ?? `Provider session ${identity.externalSessionRef}`;
     const missionPrompt = snapshot.items.find((item) => item.role === "user" && Boolean(item.text?.trim()))?.text?.trim() ?? title;
     const { projectId, ...command } = input;
     return this.sessions.createReadyAgentMissionAndAttach({
@@ -59,11 +56,11 @@ export class CreateActiveMissionForProviderSession {
   }
 
   private async canonicalCwd(cwd: string | null): Promise<string> {
-    if (!cwd?.trim()) throw new DomainError("The Codex session has no working directory", "WORKSPACE_CWD_REQUIRED");
+    if (!cwd?.trim()) throw new DomainError("The provider session has no working directory", "WORKSPACE_CWD_REQUIRED");
     try {
       return await realpath(cwd);
     } catch {
-      throw new DomainError(`The Codex session working directory does not exist: ${cwd}`, "WORKSPACE_CWD_UNAVAILABLE");
+      throw new DomainError(`The provider session working directory does not exist: ${cwd}`, "WORKSPACE_CWD_UNAVAILABLE");
     }
   }
 }

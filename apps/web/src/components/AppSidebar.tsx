@@ -73,9 +73,9 @@ export function AppSidebar({
           <span className="nav-label">Managers</span>
           {hasActiveManager ? <span className="count">•</span> : null}
         </a>
-        <a className={page === "provider-sessions" ? "active" : ""} href="/?page=provider-sessions" title="Sessions Codex" onClick={go("provider-sessions")}>
+        <a className={page === "provider-sessions" ? "active" : ""} href="/?page=provider-sessions" title="Sessions provider" onClick={go("provider-sessions")}>
           <span className="nav-icon" aria-hidden="true">◫</span>
-          <span className="nav-label">Sessions Codex</span>
+          <span className="nav-label">Sessions provider</span>
         </a>
       </nav>
       {missions.length > 0 ? (

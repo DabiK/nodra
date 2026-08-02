@@ -104,13 +104,33 @@ describe("OpenCodeProviderAdapter", () => {
         id: "local-engine/gemma3:4b",
         defaultReasoningEffort: "provider_default",
         supportedReasoningEfforts: ["provider_default", "high"]
+      }),
+      expect.objectContaining({
+        id: "opencode-go/deepseek-v4-flash",
+        displayName: "OpenCode Go / DeepSeek V4 Flash",
+        isDefault: true
       })
     ]);
     expect(requests).toEqual([
       "GET /global/health",
       "GET /doc",
-      "GET /config/providers"
+      "GET /config/providers",
+      "GET /provider"
     ]);
+  });
+
+  it("falls back to /config/providers models when GET /provider fails", async () => {
+    const requests: string[] = [];
+    const baseUrl = await fixtureServer(requests, [], { providerListStatus: 500 });
+    const result = await new OpenCodeProviderAdapter({ baseUrl }).probe();
+
+    expect(result.models).toEqual([
+      expect.objectContaining({ id: "local-engine/gemma3:4b" })
+    ]);
+    expect(result.models).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "opencode-go/deepseek-v4-flash" })])
+    );
+    expect(requests).toContain("GET /provider");
   });
 
   it("maps SSE, persists the assistant result and reaches a provider terminal", async () => {
@@ -152,11 +172,24 @@ describe("OpenCodeProviderAdapter", () => {
       "opencode/message.part.updated",
       "opencode/permission.updated",
       "opencode/session.idle",
+      "provider/usageReported",
       "provider/assistantMessage",
       "provider/executionCompleted"
     ]);
     expect(events.find((event) => event.type === "provider/assistantMessage")?.assistantMessage)
       .toBe("NODRA_I8_OPENCODE_OK");
+    expect(events.find((event) => event.type === "provider/usageReported")?.payload)
+      .toEqual({
+        tokenUsage: {
+          total: {
+            inputTokens: 1,
+            outputTokens: 1,
+            cachedInputTokens: 0,
+            cacheWriteInputTokens: 0
+          }
+        },
+        costMicros: 0
+      });
     expect(permissions).toEqual(["permission-1"]);
     expect(requests).toContain(
       "POST /session/session-fixture/permissions/permission-1"
@@ -213,7 +246,7 @@ describe("OpenCodeProviderAdapter", () => {
   const fixtureServer = async (
     requests: string[],
     promptBodies: Array<Record<string, unknown>> = [],
-    options: { terminalAfterPrompts?: number } = {}
+    options: { terminalAfterPrompts?: number; providerListStatus?: number } = {}
   ): Promise<string> => {
     let eventResponse: ServerResponse | undefined;
     const server = createServer(async (request, response) => {
@@ -234,6 +267,37 @@ describe("OpenCodeProviderAdapter", () => {
             models: { "gemma3:4b": model }
           }],
           default: { "local-engine": "gemma3:4b" }
+        });
+      }
+      if (url.pathname === "/provider") {
+        if (options.providerListStatus) {
+          response.writeHead(options.providerListStatus).end();
+          return;
+        }
+        return json(response, {
+          all: [{
+            id: "opencode-go",
+            name: "OpenCode Go",
+            source: "custom",
+            env: [],
+            models: {
+              "deepseek-v4-flash": {
+                id: "deepseek-v4-flash",
+                name: "DeepSeek V4 Flash",
+                release_date: "2026-01-01",
+                attachment: false,
+                reasoning: true,
+                temperature: true,
+                tool_call: true,
+                cost: { input: 0, output: 0 },
+                limit: { context: 128000, output: 8192 },
+                status: "active",
+                options: {}
+              }
+            }
+          }],
+          default: { "opencode-go": "deepseek-v4-flash" },
+          connected: ["local-engine"]
         });
       }
       if (url.pathname === "/event") {

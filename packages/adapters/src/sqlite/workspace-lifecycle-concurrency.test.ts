@@ -193,6 +193,53 @@ describe("I5.1 workspace lifecycle concurrency", () => {
     });
   });
 
+  it("terminalizes a run even when the mission already left ACTIVE before terminal", async () => {
+    await startMission("start-already-validated");
+    database.orm.insert(conversationItems).values({
+      id: "conversation-item/already-validated",
+      conversationId: "conversation-mission",
+      ordinal: 0,
+      kind: "assistant",
+      deliveryState: "acknowledged",
+      body: "Deterministic result",
+      createdAt: now,
+      acknowledgedAt: now
+    }).run();
+    database.orm.update(missions)
+      .set({ state: "VALIDATION", version: 3, updatedAt: "2026-07-26T12:00:30.000Z" })
+      .where(eq(missions.id, "mission")).run();
+
+    const activity = new SqliteRunWorkflowActivity(database);
+    await activity.recordStarted({
+      missionId: "mission",
+      commandId: "start-already-validated",
+      runId: "run-mission",
+      messageId: "started-already-validated",
+      schemaVersion: 1,
+      temporalRunId: "temporal-already-validated",
+      occurredAt: now
+    });
+    await expect(activity.recordTerminal({
+      missionId: "mission",
+      commandId: "start-already-validated",
+      runId: "run-mission",
+      messageId: "terminal-already-validated",
+      state: "SUCCEEDED",
+      schemaVersion: 1,
+      temporalRunId: "temporal-already-validated",
+      occurredAt: "2026-07-26T12:01:00.000Z"
+    })).resolves.toEqual({ applied: true });
+
+    expect(database.orm.select().from(runs).where(eq(runs.id, "run-mission")).get())
+      .toMatchObject({ state: "SUCCEEDED", endedAt: "2026-07-26T12:01:00.000Z" });
+    expect(workspaceState()).toBe("ready");
+    expect(database.orm.select().from(missions).where(eq(missions.id, "mission")).get())
+      .toMatchObject({ state: "VALIDATION", version: 3 });
+    expect(database.orm.select().from(businessAuditEvents)
+      .where(eq(businessAuditEvents.eventType, "RUN_TERMINAL_MISSION_TRANSITION_SKIPPED")).all())
+      .toHaveLength(1);
+  });
+
   it("keeps an approved confirmation unconsumed when start owns the workspace first", async () => {
     await startMission("start-wins");
     expect(workspaceState()).toBe("in_use");

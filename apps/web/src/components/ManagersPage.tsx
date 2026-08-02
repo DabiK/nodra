@@ -4,6 +4,7 @@ import { archiveManager, createManager, updateManager } from "../services/manage
 import { serverConfig } from "../services/config-service";
 import { ManagerChat } from "./ManagerChat";
 import { PixelAvatar } from "./PixelAvatar";
+import { ModelPicker } from "./ModelPicker";
 
 const DEFAULT_INSTRUCTION =
   "Transforme mes demandes en lots autonomes, explicites et testables. Vérifie l'état avant d'agir et privilégie des séquences simples avant de créer un pipeline.";
@@ -139,9 +140,7 @@ export function ManagersPage({
             </select>
           </label>
           <label>Modèle
-            <select value={draft.modelId} onChange={(event) => setDraft({ ...draft, modelId: event.target.value })}>
-              {modelsFor(draft.providerId).map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
-            </select>
+            <ModelPicker idPrefix="manager-create" models={modelsFor(draft.providerId)} value={draft.modelId} onChange={(modelId) => setDraft({ ...draft, modelId })} />
           </label>
           <label>Réflexion
             <select value={draft.reasoningEffort} onChange={(event) => setDraft({ ...draft, reasoningEffort: event.target.value })}>
@@ -194,9 +193,7 @@ export function ManagersPage({
                   </select>
                 </label>
                 <label>Modèle
-                  <select value={edit.modelId} onChange={(event) => setEdit({ ...edit, modelId: event.target.value })}>
-                    {modelsFor(edit.providerId).map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
-                  </select>
+                  <ModelPicker idPrefix="manager-edit" models={modelsFor(edit.providerId)} value={edit.modelId} onChange={(modelId) => setEdit({ ...edit, modelId })} />
                 </label>
                 <label>Réflexion
                   <select value={edit.reasoningEffort} onChange={(event) => setEdit({ ...edit, reasoningEffort: event.target.value })}>

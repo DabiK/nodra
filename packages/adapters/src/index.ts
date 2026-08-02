@@ -68,6 +68,8 @@ export {
   OpenCodeProviderAdapter,
   type OpenCodeProviderAdapterOptions
 } from "./opencode/opencode-provider-adapter.js";
+export { OpenCodeProviderSessionSyncAdapter } from "./opencode/opencode-provider-session-sync-adapter.js";
+export { OpenCodeProviderSessionControlAdapter } from "./opencode/opencode-provider-session-control-adapter.js";
 export { OpenCodeContractProbe } from "./opencode/opencode-contract-probe.js";
 export { OpenCodeEventMapper } from "./opencode/opencode-event-mapper.js";
 export { OpenCodeRunSupervisor } from "./opencode/opencode-run-supervisor.js";

@@ -359,16 +359,14 @@ export class SqliteProviderSessionRepository implements ProviderSessionRepositor
         if (!sessionRow) {
           throw new DomainError(`Provider session ${input.providerSessionId} was not found`, "PROVIDER_SESSION_NOT_FOUND");
         }
-        if (sessionRow.providerId !== "codex") {
-          throw new DomainError(`Provider session ${input.providerSessionId} is not a Codex session`, "CAPABILITY_UNAVAILABLE");
-        }
+        const providerId = sessionRow.providerId;
         const catalog = transaction.select().from(providerCatalogSnapshots)
-          .where(eq(providerCatalogSnapshots.providerId, "codex"))
+          .where(eq(providerCatalogSnapshots.providerId, providerId))
           .orderBy(desc(providerCatalogSnapshots.probedAt)).limit(1).get();
         const model = catalog ? this.selectModel(catalog.modelsJson) : null;
         const optionsSchemaVersion = catalog ? this.optionsSchemaVersion(catalog.capabilitiesJson) : null;
         if (!catalog || !model || optionsSchemaVersion === null) {
-          throw new DomainError("Codex has no usable persisted model catalog", "CAPABILITY_UNAVAILABLE");
+          throw new DomainError(`Provider ${providerId} has no usable persisted model catalog`, "CAPABILITY_UNAVAILABLE");
         }
         const workspace = transaction.select().from(workspaces).where(eq(workspaces.path, input.cwd)).get();
         if (workspace && (workspace.kind !== "repo" || workspace.state !== "ready")) {
@@ -415,7 +413,7 @@ export class SqliteProviderSessionRepository implements ProviderSessionRepositor
         transaction.insert(missionAgentConfigs).values({
           missionId: input.missionId,
           version: 0,
-          providerId: "codex",
+          providerId,
           modelId: model.id,
           reasoningEffort: model.reasoningEffort,
           providerOptionsSchemaVersion: optionsSchemaVersion,
@@ -462,7 +460,7 @@ export class SqliteProviderSessionRepository implements ProviderSessionRepositor
           config: {
             missionId: input.missionId,
             version: 0,
-            providerId: "codex",
+            providerId,
             modelId: model.id,
             reasoningEffort: model.reasoningEffort,
             providerOptions: { schemaVersion: optionsSchemaVersion, value: {} },

@@ -1,4 +1,4 @@
-import { createOpencodeClient, type Event, type Part, type Provider } from "@opencode-ai/sdk";
+import { createOpencodeClient, type AssistantMessage, type Event, type Part, type Provider } from "@opencode-ai/sdk";
 import {
   deriveProviderHealth,
   ProviderProtocolIncompatibleError,
@@ -61,8 +61,7 @@ export class OpenCodeProviderAdapter implements ProviderPort {
       digest = contract.digest;
       const required = Object.values(contract.requiredPrimitives).every(Boolean);
       const client = this.client();
-      const catalog = await client.config.providers({ throwOnError: true });
-      const models = this.models(catalog.data.providers, catalog.data.default);
+      const models = await this.probeModels(client);
       const capabilities = this.capabilities(version, digest, required, models.length > 0);
       return {
         providerId: this.providerId,
@@ -271,25 +270,60 @@ export class OpenCodeProviderAdapter implements ProviderPort {
       query: { directory },
       throwOnError: true
     });
-    const assistant = [...messages.data].reverse().find((message) => message.info.role === "assistant");
-    if (!assistant) throw new Error("OpenCode session became idle without an assistant message");
-    const text = assistant.parts
-      .filter((part): part is Extract<Part, { type: "text" }> => part.type === "text")
-      .map((part) => part.text)
-      .join("");
-    if (!text.trim()) throw new Error("OpenCode assistant message contained no text");
+    const assistants = messages.data.filter(
+      (message): message is { info: AssistantMessage; parts: Part[] } =>
+        message.info.role === "assistant"
+    );
+    if (assistants.length === 0) {
+      throw new Error("OpenCode session became idle without an assistant message");
+    }
+    let input = 0;
+    let output = 0;
+    let cacheRead = 0;
+    let cacheWrite = 0;
+    let cost = 0;
+    for (const assistant of assistants) {
+      const tokens = assistant.info.tokens;
+      input += tokens?.input ?? 0;
+      output += tokens?.output ?? 0;
+      cacheRead += tokens?.cache?.read ?? 0;
+      cacheWrite += tokens?.cache?.write ?? 0;
+      cost += assistant.info.cost ?? 0;
+    }
     await sink.event({
-      type: "provider/assistantMessage",
+      type: "provider/usageReported",
       payload: {
-        item: {
-          id: assistant.info.id,
-          type: "agentMessage",
-          text
-        }
+        tokenUsage: {
+          total: {
+            inputTokens: input,
+            outputTokens: output,
+            cachedInputTokens: cacheRead,
+            cacheWriteInputTokens: cacheWrite
+          }
+        },
+        costMicros: Math.round(cost * 1_000_000)
       },
-      assistantMessage: text,
       occurredAt: new Date().toISOString()
     });
+    for (const assistant of assistants) {
+      const text = assistant.parts
+        .filter((part): part is Extract<Part, { type: "text" }> => part.type === "text")
+        .map((part) => part.text)
+        .join("");
+      if (!text.trim()) continue;
+      await sink.event({
+        type: "provider/assistantMessage",
+        payload: {
+          item: {
+            id: assistant.info.id,
+            type: "agentMessage",
+            text
+          }
+        },
+        assistantMessage: text,
+        occurredAt: new Date().toISOString()
+      });
+    }
   }
 
   private client(directory?: string) {
@@ -298,6 +332,35 @@ export class OpenCodeProviderAdapter implements ProviderPort {
       fetch: this.fetchImplementation,
       ...(directory ? { directory } : {})
     });
+  }
+
+  private async probeModels(client: ReturnType<OpenCodeProviderAdapter["client"]>): Promise<ProviderModel[]> {
+    const catalog = await client.config.providers({ throwOnError: true });
+    const models = this.models(catalog.data.providers, catalog.data.default);
+    try {
+      const listed = await client.provider.list({ throwOnError: true });
+      const known = new Set(catalog.data.providers.map((provider) => provider.id));
+      const connected = new Set([...listed.data.connected, "opencode-go"]);
+      for (const provider of listed.data.all) {
+        if (known.has(provider.id) || !connected.has(provider.id)) continue;
+        for (const model of Object.values(provider.models)) {
+          models.push({
+            id: `${provider.id}/${model.id}`,
+            displayName: `${provider.name} / ${model.name}`,
+            description: `${provider.id} model exposed by OpenCode Serve`,
+            hidden: model.status === "deprecated",
+            isDefault: listed.data.default[provider.id] === model.id,
+            supportedReasoningEfforts: model.reasoning
+              ? ["provider_default", "high"]
+              : ["provider_default"],
+            defaultReasoningEffort: "provider_default"
+          });
+        }
+      }
+    } catch {
+      // GET /provider is optional; /config/providers models remain authoritative.
+    }
+    return models;
   }
 
   private models(providers: Provider[], defaults: Record<string, string>): ProviderModel[] {

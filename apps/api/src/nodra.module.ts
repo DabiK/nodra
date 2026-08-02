@@ -9,6 +9,8 @@ import {
   CodexProviderSessionControlAdapter,
   CodexProviderSessionSyncAdapter,
   OpenCodeProviderAdapter,
+  OpenCodeProviderSessionControlAdapter,
+  OpenCodeProviderSessionSyncAdapter,
   LazyTemporalConnection,
   LazyTemporalWorkflowAdapter,
   LocalCommandObservationAdapter,
@@ -113,6 +115,7 @@ import { ApprovalController } from "./approval.controller.js";
 import { AgentSessionController } from "./agent-session.controller.js";
 import { BusinessErrorFilter } from "./business-error.filter.js";
 import { DatabaseLifecycle } from "./database-lifecycle.js";
+import { ProviderProbeLifecycle } from "./provider-probe-lifecycle.js";
 import { DeliveryController } from "./delivery.controller.js";
 import { ConfirmationController } from "./confirmation.controller.js";
 import { EvidenceController } from "./evidence.controller.js";
@@ -350,13 +353,28 @@ export class NodraModule {
         {
           provide: PROVIDER_SESSION_SYNC_REGISTRY,
           useFactory: () => new ProviderSessionSyncRegistry(
-            options.providerSessionSyncPorts ?? [new CodexProviderSessionSyncAdapter()]
+            options.providerSessionSyncPorts ?? [
+              new CodexProviderSessionSyncAdapter(),
+              new OpenCodeProviderSessionSyncAdapter({
+                baseUrl: options.opencodeBaseUrl
+                  ?? process.env.NODRA_OPENCODE_URL
+                  ?? "http://127.0.0.1:4096"
+              })
+            ]
           )
         },
         {
           provide: PROVIDER_SESSION_CONTROL_REGISTRY,
           useFactory: () => new ProviderSessionControlRegistry(
-            options.providerSessionControlPorts ?? [new CodexProviderSessionControlAdapter()]
+            options.providerSessionControlPorts ?? [
+              new CodexProviderSessionControlAdapter(),
+              new OpenCodeProviderSessionControlAdapter({
+                baseUrl: options.opencodeBaseUrl
+                  ?? process.env.NODRA_OPENCODE_URL
+                  ?? "http://127.0.0.1:4096",
+                executionTimeoutMs: Number(process.env.NODRA_OPENCODE_EXECUTION_TIMEOUT_MS ?? "300000")
+              })
+            ]
           )
         },
         {
@@ -683,7 +701,8 @@ export class NodraModule {
         },
         { provide: APP_FILTER, useClass: BusinessErrorFilter },
         DatabaseLifecycle,
-        RuntimeLifecycle
+        RuntimeLifecycle,
+        ProviderProbeLifecycle
       ]
     };
   }

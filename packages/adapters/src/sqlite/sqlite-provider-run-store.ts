@@ -107,17 +107,20 @@ export class SqliteProviderRunStore {
       tx.update(runs).set({ state: "RUNNING", startedAt: input.occurredAt })
         .where(and(eq(runs.id, runId), eq(runs.state, "STARTING"))).run();
     }
-    if (input.type === "thread/tokenUsage/updated") {
+    if (input.type === "thread/tokenUsage/updated" || input.type === "provider/usageReported") {
       const usage = this.record(payload?.tokenUsage);
       const total = this.record(usage?.total);
       if (total) {
-        tx.update(runs).set({
+        const update: Partial<typeof runs.$inferInsert> = {
           inputTokens: this.number(total.inputTokens),
           outputTokens: this.number(total.outputTokens),
           cacheReadTokens: this.number(total.cachedInputTokens),
           cacheWriteTokens: this.number(total.cacheWriteInputTokens),
           usageKind: "reported"
-        }).where(eq(runs.id, runId)).run();
+        };
+        const costMicros = this.number(payload?.costMicros);
+        if (costMicros !== null) update.costMicros = costMicros;
+        tx.update(runs).set(update).where(eq(runs.id, runId)).run();
       }
     }
     if (input.type === "item/completed" || input.type === "provider/assistantMessage") {

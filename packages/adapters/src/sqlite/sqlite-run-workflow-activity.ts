@@ -135,8 +135,9 @@ export class SqliteRunWorkflowActivity {
           throw new Error("Terminal Run Workflow Activity could not release its workspace");
         }
         const missionState = input.state === "SUCCEEDED" ? "VALIDATION" : "BLOCKED";
+        const missionStillActive = run.mission.state === "ACTIVE";
         let missionVersion = run.mission.version + 1;
-        if (input.state === "SUCCEEDED") {
+        if (input.state === "SUCCEEDED" && missionStillActive) {
           const declaredResult = transaction.select({ body: conversationItems.body })
             .from(conversationItems)
             .where(and(
@@ -168,8 +169,31 @@ export class SqliteRunWorkflowActivity {
           eq(missions.executionKind, "agent"),
           eq(missions.state, "ACTIVE")
         )).run();
-        if (missionUpdated.changes !== 1) {
+        if (missionUpdated.changes !== 1 && missionStillActive) {
           throw new Error("Terminal Run Workflow Activity could not transition its agent mission");
+        }
+        if (missionUpdated.changes !== 1 && !missionStillActive) {
+          // The mission already left ACTIVE (e.g. a session-control turn raced
+          // the run terminal with its own auto-validation). The run itself
+          // still terminates normally: record the skipped transition instead
+          // of failing the whole terminal transaction, which would leave the
+          // run stuck in RUNNING forever.
+          transaction.insert(businessAuditEvents).values({
+            id: `audit/run-terminal-mission-skipped/${input.messageId}`,
+            aggregateKind: "run",
+            aggregateId: input.runId,
+            commandId: input.commandId,
+            eventType: "RUN_TERMINAL_MISSION_TRANSITION_SKIPPED",
+            actor: "manager",
+            payloadJson: JSON.stringify({
+              schemaVersion: 1,
+              missionId: input.missionId,
+              runId: input.runId,
+              state: input.state,
+              missionState: run.mission.state
+            }),
+            occurredAt: input.occurredAt
+          }).run();
         }
         transaction.insert(businessAuditEvents).values([{
           id: `audit/run-terminal/${input.messageId}`,

@@ -48,9 +48,9 @@ describe("AppSidebar", () => {
     expect(onNavigate).toHaveBeenCalledWith("pipelines");
   });
 
-  it("navigates to the Codex sessions observatory", () => {
+  it("navigates to the provider sessions observatory", () => {
     const { onNavigate } = renderSidebar(false);
-    fireEvent.click(screen.getByRole("link", { name: /Sessions Codex/ }));
+    fireEvent.click(screen.getByRole("link", { name: /Sessions provider/ }));
     expect(onNavigate).toHaveBeenCalledWith("provider-sessions");
   });
 });

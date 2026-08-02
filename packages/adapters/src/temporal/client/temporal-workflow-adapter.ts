@@ -34,7 +34,7 @@ export class TemporalWorkflowAdapter implements WorkflowPort {
         taskQueue: MISSION_TASK_QUEUE,
         workflowId,
         workflowIdConflictPolicy: WorkflowIdConflictPolicy.USE_EXISTING,
-        workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
+        workflowIdReusePolicy: WorkflowIdReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY,
         args: [args]
       });
       return { workflowId, runId: handle.firstExecutionRunId };

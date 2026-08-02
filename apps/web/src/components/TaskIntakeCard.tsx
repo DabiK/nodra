@@ -4,6 +4,7 @@ import { permissionLabels, reasoningLabels } from "../services/provider-service"
 import { workspacePathFromName } from "../services/workspace-service";
 import { WorkspaceModePicker } from "./WorkspaceModePicker";
 import { FolderDrawer } from "./FolderDrawer";
+import { ModelPicker } from "./ModelPicker";
 
 export function TaskIntakeCard({
   draft,
@@ -214,11 +215,12 @@ export function TaskIntakeCard({
               </label>
               <label>
                 Modèle
-                <select value={selectedModelId} onChange={(event) => onDraftChange({ modelId: event.target.value })}>
-                  {selectedProvider?.models.length
-                    ? selectedProvider.models.map((model) => <option value={model.id} key={model.id}>{model.label}{model.hidden ? " · hidden" : ""}</option>)
-                    : <option value={providerOptions.defaults.modelId}>{providerOptions.defaults.modelId}</option>}
-                </select>
+                <ModelPicker
+                  idPrefix="new-task"
+                  models={selectedProvider?.models ?? []}
+                  value={selectedModelId}
+                  onChange={(modelId) => onDraftChange({ modelId })}
+                />
               </label>
               <label>
                 Niveau de réflexion

@@ -90,4 +90,74 @@ describe("SqliteProviderCatalogRepository compatibility", () => {
       actionRequired: "update_required"
     });
   });
+
+  it("lets a subsequent successful probe refresh its snapshot and supersede a marked-incompatible one", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "nodra-provider-catalog-"));
+    const database = NodraSqliteDatabase.open(join(directory, "nodra.db"));
+    databases.push(database);
+    await migrateDatabase(database, resolve("packages/adapters/drizzle"));
+    const repository = new SqliteProviderCatalogRepository(database);
+    const available = { available: true, reason: null };
+    const snapshot: Parameters<SqliteProviderCatalogRepository["save"]>[0] = {
+      providerId: "codex",
+      adapterVersion: "fixture-v1",
+      binaryVersion: "codex_cli_rs/0.146.0",
+      authenticated: true,
+      authKind: "chatgpt",
+      health: { status: "ready" as const, reason: null, actionRequired: null },
+      models: [{
+        id: "model-1",
+        displayName: "Model One",
+        description: "",
+        hidden: false,
+        isDefault: true,
+        supportedReasoningEfforts: ["medium"],
+        defaultReasoningEffort: "medium"
+      }],
+      capabilities: {
+        schemaVersion: 1,
+        providerId: "codex",
+        version: "fixture-v1:codex_cli_rs/0.146.0",
+        availability: available,
+        authentication: available,
+        models: available,
+        contract: {
+          ...available,
+          status: "compatible_unverified",
+          expectedVersion: "codex_cli_rs/0.145.0",
+          currentVersion: "codex_cli_rs/0.146.0",
+          action: "warning"
+        },
+        start: available,
+        events: available,
+        cancel: available,
+        resume: available,
+        steer: { ...available, mode: "immediate" },
+        usage: { available: false, reason: "not_observed", kind: "none" },
+        attachments: { available: false, reason: "not_supported" },
+        mcp: { available: false, reason: "not_supported" },
+        permissionInterception: available,
+        optionsSchemaVersion: 1
+      },
+      probedAt: "2026-07-26T10:00:00.000Z"
+    };
+    await repository.save(snapshot);
+
+    await repository.markIncompatible({
+      providerId: "codex",
+      currentVersion: "codex_cli_rs/0.146.0",
+      reason: "protocol_incompatible",
+      occurredAt: "2026-07-26T10:01:00.000Z"
+    });
+    expect((await repository.latest("codex"))?.capabilities.start).toEqual({
+      available: false,
+      reason: "protocol_incompatible"
+    });
+
+    await repository.save({ ...snapshot, probedAt: "2026-07-26T10:02:00.000Z" });
+
+    const refreshed = await repository.latest("codex");
+    expect(refreshed?.capabilities.start).toEqual(available);
+    expect(refreshed?.probedAt).toBe("2026-07-26T10:02:00.000Z");
+  });
 });
