@@ -58,6 +58,23 @@ export function MissionInspector({
   const [worktree, setWorktree] = useState<{ id: string; branchName: string | null } | null>(null);
   const [showWorktreeDialog, setShowWorktreeDialog] = useState(false);
 
+  // Raccourci clavier : Escape ferme la fiche. Ignoré pendant la saisie et
+  // quand un sous-dialog (model picker, worktree) est ouvert — ces derniers
+  // gèrent leur propre Escape.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const target = event.target as HTMLElement | null;
+      if (target?.isContentEditable) return;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (document.querySelector(".model-picker-backdrop") || showWorktreeDialog) return;
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, showWorktreeDialog]);
+
   useEffect(() => {
     void loadMissionInspector(missionId)
       .then((result) => {

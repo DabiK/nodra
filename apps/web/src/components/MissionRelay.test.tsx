@@ -133,3 +133,53 @@ describe("MissionRelay drag & drop", () => {
     expect(validationLane.classList.contains("drop-forbidden")).toBe(true);
   });
 });
+
+describe("MissionRelay keyboard navigation", () => {
+  function focusFirstCard(title: string) {
+    const card = screen.getByRole("button", { name: `Ouvrir ${title}` });
+    card.focus();
+    return card;
+  }
+
+  it("moves focus to the first card of the next lane with ArrowRight", () => {
+    renderWithLanes(["READY", "ACTIVE"], [humanMission, mission({ id: "m-active", title: "Active task", executionKind: "agent", state: "ACTIVE" })]);
+    focusFirstCard("Human task");
+    fireEvent.keyDown(screen.getByLabelText("Prêtes"), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Ouvrir Active task" }));
+  });
+
+  it("moves focus to the previous lane with ArrowLeft", () => {
+    renderWithLanes(["READY", "ACTIVE", "VALIDATION"], [
+      humanMission,
+      mission({ id: "m-active", title: "Active task", executionKind: "agent", state: "ACTIVE" }),
+      mission({ id: "m-validation", title: "Validation task", executionKind: "agent", state: "VALIDATION" })
+    ]);
+    focusFirstCard("Validation task");
+    fireEvent.keyDown(screen.getByLabelText("À valider"), { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Ouvrir Active task" }));
+  });
+
+  it("wraps around to the first lane after the last one", () => {
+    renderWithLanes(["READY", "ACTIVE"], [humanMission, mission({ id: "m-active", title: "Active task", executionKind: "agent", state: "ACTIVE" })]);
+    focusFirstCard("Active task");
+    fireEvent.keyDown(screen.getByLabelText("Ça bosse"), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Ouvrir Human task" }));
+  });
+
+  it("skips empty lanes when moving between columns", () => {
+    renderWithLanes(["READY", "ACTIVE", "VALIDATION"], [humanMission, mission({ id: "m-validation", title: "Validation task", executionKind: "agent", state: "VALIDATION" })]);
+    focusFirstCard("Human task");
+    fireEvent.keyDown(screen.getByLabelText("Prêtes"), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Ouvrir Validation task" }));
+  });
+
+  it("does not hijack arrows typed inside inputs", () => {
+    renderWithLanes(["READY", "ACTIVE"], [humanMission, mission({ id: "m-active", title: "Active task", executionKind: "agent", state: "ACTIVE" })]);
+    const relay = document.querySelector(".task-relay")!;
+    const input = document.createElement("input");
+    relay.appendChild(input);
+    input.focus();
+    fireEvent.keyDown(input, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(input);
+  });
+});

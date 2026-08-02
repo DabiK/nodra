@@ -251,8 +251,35 @@ export function MissionRelay({ missions, missionPipelineIndex, kindFilter, state
     }
   };
 
+  // Raccourci clavier : ← / → déplacent le focus entre les colonnes du flux
+  // (focus sur la première carte de la colonne voisine, en ignorant les vides).
+  const handleRelayKeyDown = (event: { key: string; preventDefault(): void; target: EventTarget }) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    const target = event.target as HTMLElement | null;
+    if (!target || !target.closest) return;
+    if (target.closest("input, textarea, select")) return;
+    if (!target.closest(".relay-task, .relay-lane")) return;
+    const lanes = Array.from(target.closest(".relay-lanes")?.querySelectorAll<HTMLElement>(".relay-lane") ?? []);
+    if (!lanes.length) return;
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    const current = target.closest(".relay-lane") as HTMLElement | null;
+    const currentIndex = current ? lanes.indexOf(current) : -1;
+    for (let offset = 1; offset <= lanes.length; offset += 1) {
+      const nextIndex = currentIndex === -1
+        ? (direction === 1 ? 0 : lanes.length - 1)
+        : (currentIndex + direction * offset + lanes.length) % lanes.length;
+      if (nextIndex === currentIndex) break;
+      const firstCard = lanes[nextIndex]?.querySelector<HTMLElement>(".relay-task:not([disabled])");
+      if (firstCard) {
+        event.preventDefault();
+        firstCard.focus();
+        return;
+      }
+    }
+  };
+
   return (
-    <section className="task-relay" aria-labelledby="relayTitle">
+    <section className="task-relay" aria-labelledby="relayTitle" onKeyDown={handleRelayKeyDown}>
       <header className="relay-head">
         <div>
           <span className="eyebrow">EN DIRECT</span>
