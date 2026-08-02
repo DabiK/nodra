@@ -290,3 +290,29 @@
 
 ### Statut
 - [x] #10 — Warning perte de contexte (compact / truncate)
+
+## Itération 9-bis — 2026-08-03 — Review REJECTED : corrections du build web (itération #10)
+
+### Contexte
+La boucle de review a rejeté l'itération 9 : `npm run build -w @nodra/web` était cassé par du code de l'itération (pas seulement par l'erreur pré-existante déjà documentée). Correctifs appliqués dans cette itération dédiée (aucune nouvelle tâche).
+
+### Fait (2 commits atomiques)
+1. `fix(web): corrections TS du risque de contexte (#10) — discrimination kind, garde activeTurn, tours live`
+   - `ManagerChat.tsx` : le calcul `charCount` accédait `text`/`title`/`command`/`output` sur l'union `AgentConversationEvent` sans discrimination → TS2339 (x4). Désormais : branche dédiée `event.kind === "tool"` (title + command + output), tous les autres kinds (system/user/assistant/reasoning/error) sur `text` seul.
+   - Compte de tours rendu **réactif** (point optionnel de la review) : `turnCount = max(tours persistés de la liste de conversations, messages user du fil en live)`. La liste de conversations n'est rafraîchie qu'au montage et à l'envoi — figée pendant un long streaming — le fil (`thread.items`/`thread.events`, rechargé par SSE) suit la conversation en cours. Le max conserve le comptage historique persistant quand le fil ne porte que les items récents.
+   - `ProviderMissionConversationPage.tsx` : garde de nullité `if (steers && activeTurn)` sur l'appel `steerMissionProviderTurn` (TS18047 — `activeTurn` est `… ?? null`, l'analyse de flux ne le resserre pas via le booléen `steers`).
+2. `fix(web): build — spread type-safe du mock vi.mock (TS2698, pre-existant)`
+   - `ProviderMissionConversationPage.test.tsx:11` : `{ ...actual }` sur le résultat de `importOriginal()` (typé `unknown` sans nom de module dans vitest 4) → TS2698. Erreur **vérifiée pré-existante** (git blame : commit `4fa8361` « fix SSE », antérieur aux itérations 7-9, qui n'avaient ajouté que des tests plus bas dans le fichier) — corrigée ici quand même pour rendre le build entièrement vert comme demandé par la review : cast `(await importOriginal()) as Record<string, unknown>` avant le spread.
+
+### Vérifications
+- `npm run build -w @nodra/web` : **VERT** (tsc -b + vite build OK ; seul un warning de taille de chunk > 500 kB, pré-existant et informatif)
+- `npm run typecheck` (racine) : OK
+- `npx vitest run apps/web` : 40 fichiers / 294 tests OK (inchangé : les 2 tests bannière « fil long » passent toujours, le max conserve les 30 tours du fixture)
+- ESLint sur les 3 fichiers touchés : propre
+
+### Décisions / notes
+- Le build web est désormais vert sur l'ensemble du repo — l'erreur pré-existante documentée aux itérations 7-9 (TS2698) est corrigée, plus aucun « hors périmètre » ne bloque le build.
+- Le compte de tours affiché dans la bannière peut momentanément dépasser le nombre de tours persistés quand le fil live en montre plus (streaming en cours) — comportement voulu.
+
+### Statut
+- [x] #10 — Warning perte de contexte (compact / truncate) — REJECTED corrigé, build web au vert
