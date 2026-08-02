@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PipelineListItem, PipelineListNode } from "../types";
 import { advancePipelineRun, approveNodeTransition, publishNodeHandover, setNodeTransitionMode, startPipeline } from "../services/pipeline-service";
+import {
+  formatDuration,
+  loadPipelineViewMode,
+  nodeDurationMs,
+  pipelineTotalDurationMs,
+  runTimeRange,
+  savePipelineViewMode,
+  sortTimelineNodes,
+  type PipelineViewMode
+} from "../services/pipeline-timeline-service";
 
 const RUN_STATE_LABEL: Record<string, string> = {
   queued: "en file", active: "en cours", blocked: "à débloquer", completed: "terminé", failed: "échec", cancelled: "annulé", archived: "archivé"
@@ -59,7 +69,8 @@ function nodeStatus(node: PipelineListNode): { stateClass: string; label: string
   if (state === "completed") return { stateClass: "succeeded", label: "✓ DONE" };
   if (state === "active") return { stateClass: "running", label: "● LIVE" };
   if (state === "ready") return { stateClass: "ready", label: "▶ READY" };
-  if (state === "blocked" || state === "failed") return { stateClass: "blocked", label: "◇ BLOQUÉ" };
+  if (state === "failed") return { stateClass: "failed", label: "✕ ÉCHEC" };
+  if (state === "blocked") return { stateClass: "blocked", label: "◇ BLOQUÉ" };
   if (state === "skipped") return { stateClass: "skipped", label: "↷ IGNORÉ" };
   if (state === "pending") return { stateClass: "waiting", label: node.transitionMode === "human" ? "◇ FEU VERT" : "○ WAIT" };
   // No run yet → reflect mission state.
@@ -67,6 +78,7 @@ function nodeStatus(node: PipelineListNode): { stateClass: string; label: string
   if (node.missionState === "ACTIVE") return { stateClass: "running", label: "● LIVE" };
   if (node.missionState === "VALIDATION") return { stateClass: "decision", label: "◇ À VALIDER" };
   if (node.missionState === "BLOCKED") return { stateClass: "blocked", label: "◇ BLOQUÉ" };
+  if (node.missionState === "ABANDONED") return { stateClass: "failed", label: "✕ ABANDON" };
   if (node.missionState === "READY") return { stateClass: "ready", label: "▶ READY" };
   return { stateClass: "waiting", label: "○ WAIT" };
 }
@@ -88,7 +100,58 @@ function pipelineStatus(pipeline: PipelineListItem): { tone: string; text: strin
   return { tone: "idle", text: "En attente…" };
 }
 
-function PipelineCard({ pipeline, onInspect, onChanged }: { pipeline: PipelineListItem; onInspect(missionId: string): void; onChanged(): void }) {
+function PipelineTimeline({ pipeline, onInspect }: { pipeline: PipelineListItem; onInspect(missionId: string): void }) {
+  const rows = useMemo(() => sortTimelineNodes(pipeline.nodes), [pipeline.nodes]);
+  const totalDuration = pipelineTotalDurationMs(pipeline);
+  const executed = pipeline.nodes.filter((node) => node.runStartedAt !== null || node.nodeRunState === "completed").length;
+
+  return (
+    <div className="pipeline-timeline" aria-label={`Timeline chronologique de ${pipeline.name}`}>
+      {rows.length === 0 ? (
+        <p className="pipeline-empty-page">Aucune étape dans ce pipeline.</p>
+      ) : (
+        <ol className="timeline-rows">
+          {rows.map((node) => {
+            const status = nodeStatus(node);
+            const duration = nodeDurationMs(node);
+            const range = runTimeRange(node);
+            const needsApproval = Boolean(pipeline.runId) && node.nodeRunState === "pending" && node.transitionMode === "human";
+            return (
+              <li key={node.nodeKey} className={`timeline-row ${status.stateClass}${needsApproval ? " gate-waiting" : ""}`}>
+                <span className="timeline-rail" aria-hidden="true" />
+                <span className={`timeline-badge ${status.stateClass}`}>{status.label}</span>
+                <div className="timeline-row-body">
+                  <div className="timeline-row-title">
+                    <button type="button" className="node-title" onClick={() => onInspect(node.missionId)} title={node.missionTitle}>{node.missionTitle}</button>
+                    {node.transitionMode === "human" && (
+                      <span className={`node-gate ${needsApproval ? "waiting" : "clear"}`}>{needsApproval ? "◇ FEU VERT REQUIS" : "✋ TRANSITION MANUELLE"}</span>
+                    )}
+                    {node.runAttempt !== null && node.runAttempt > 1 && (
+                      <span className="timeline-attempt" title={`Tentative n°${node.runAttempt}`}>essai {node.runAttempt}</span>
+                    )}
+                  </div>
+                  <div className="timeline-row-meta">
+                    <span>{node.nodeKey} · {node.missionKind === "agent" ? "Agent" : "Humain"}</span>
+                    {range && <time>{range}</time>}
+                    <span className={`timeline-duration${duration === null ? " empty" : ""}`}>{formatDuration(duration)}</span>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      <footer className="timeline-summary">
+        <span>{executed}/{pipeline.nodes.length} étape{pipeline.nodes.length > 1 ? "s" : ""} exécutée{executed > 1 ? "s" : ""}</span>
+        {totalDuration !== null && <span>Durée totale : <b>{formatDuration(totalDuration)}</b></span>}
+        {pipeline.startedAt && <time>Début du run : {new Date(pipeline.startedAt).toLocaleString()}</time>}
+        {pipeline.endedAt && <time>Fin du run : {new Date(pipeline.endedAt).toLocaleString()}</time>}
+      </footer>
+    </div>
+  );
+}
+
+function PipelineCard({ pipeline, view, onViewChange, onInspect, onChanged }: { pipeline: PipelineListItem; view: PipelineViewMode; onViewChange(mode: PipelineViewMode): void; onInspect(missionId: string): void; onChanged(): void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const graph = useMemo(() => computeGraph(pipeline.nodes, pipeline.edges), [pipeline.nodes, pipeline.edges]);
@@ -116,6 +179,10 @@ function PipelineCard({ pipeline, onInspect, onChanged }: { pipeline: PipelineLi
           <small>{total} étape{total > 1 ? "s" : ""} · {completed}/{total} terminée{completed > 1 ? "s" : ""}{pipeline.runState ? ` · ${RUN_STATE_LABEL[pipeline.runState] ?? pipeline.runState}` : " · non démarré"}</small>
         </div>
         <div className="workflow-head-actions">
+          <div className="pipeline-view-toggle" role="group" aria-label="Vue du pipeline">
+            <button type="button" className={view === "graph" ? "active" : ""} aria-pressed={view === "graph"} onClick={() => onViewChange("graph")}>Graph</button>
+            <button type="button" className={view === "timeline" ? "active" : ""} aria-pressed={view === "timeline"} onClick={() => onViewChange("timeline")}>Timeline</button>
+          </div>
           {canStart && <button type="button" className="pipeline-action primary" disabled={busy !== null} onClick={() => void run("start", () => startPipeline(pipeline.id))}>{busy === "start" ? "…" : started ? "Relancer →" : "Démarrer →"}</button>}
           {canAdvance && <button type="button" className="pipeline-action" disabled={busy !== null} onClick={() => void run("advance", () => advancePipelineRun(pipeline.runId!))}>{busy === "advance" ? "…" : "↻ Avancer"}</button>}
         </div>
@@ -125,7 +192,10 @@ function PipelineCard({ pipeline, onInspect, onChanged }: { pipeline: PipelineLi
 
       {(() => { const status = pipelineStatus(pipeline); return <p className={`pipeline-status ${status.tone}`}><i aria-hidden="true" />{status.text}</p>; })()}
 
-      <div className="workflow-graph">
+      {view === "timeline" ? (
+        <PipelineTimeline pipeline={pipeline} onInspect={onInspect} />
+      ) : (
+        <div className="workflow-graph">
         <div className="graph-stage" style={{ width: graph.width, height: graph.height }}>
           <svg viewBox={`0 0 ${graph.width} ${graph.height}`} aria-hidden="true">
             <defs>
@@ -179,6 +249,7 @@ function PipelineCard({ pipeline, onInspect, onChanged }: { pipeline: PipelineLi
           })}
         </div>
       </div>
+      )}
       {error && <p className="pipeline-error" role="alert">{error}</p>}
     </article>
   );
@@ -193,6 +264,7 @@ function pipelineProgress(pipeline: PipelineListItem): { completed: number; tota
 export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged }: { pipelines: PipelineListItem[]; focusPipelineId?: string | null; onInspect(missionId: string): void; onChanged(): void }) {
   const [showAll, setShowAll] = useState(false);
   const [selectedId, setSelectedId] = useState("");
+  const [view, setView] = useState<PipelineViewMode>(() => loadPipelineViewMode());
   useEffect(() => { if (focusPipelineId) { setSelectedId(focusPipelineId); setShowAll(true); } }, [focusPipelineId]);
   const isDone = (pipeline: PipelineListItem) => pipeline.state === "archived" || pipeline.runState === "completed" || pipeline.runState === "cancelled" || pipeline.runState === "archived";
   const visible = pipelines.filter((pipeline) => showAll || !isDone(pipeline));
@@ -233,7 +305,14 @@ export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged
             })}
           </div>
           {selected
-            ? <PipelineCard key={selected.id} pipeline={selected} onInspect={onInspect} onChanged={onChanged} />
+            ? <PipelineCard
+                key={selected.id}
+                pipeline={selected}
+                view={view}
+                onViewChange={(mode) => { setView(mode); savePipelineViewMode(mode); }}
+                onInspect={onInspect}
+                onChanged={onChanged}
+              />
             : <p className="pipeline-empty-page">Aucun pipeline en cours. Active « Voir terminés » pour consulter l'historique.</p>}
         </>
       )}
