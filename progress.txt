@@ -91,7 +91,7 @@
 
 ### Fait (3 commits atomiques, comme suggéré par l'issue)
 1. **Palette Cmd+K** (`feat(web): palette de commandes Cmd+K…`)
-   - Service pur `palette-service.ts` (+ 8 tests) : `buildPaletteCommands` construit les commandes depuis l'état du board — navigation (Tâches/Pipelines/Managers/Sessions), « Créer une mission », runs de pipeline (Démarrer si non lancé ou run terminé/échoué, Avancer si actif/bloqué), missions (Accepter la delivery pour les missions agent en VALIDATION, Ouvrir la mission), recherche (`filterPaletteCommands`, insensible à la casse sur label/hint/mots-clés dont l'id de mission), groupement canonique.
+   - Service pur `palette-service.ts` (+ 11 tests — 7 `buildPaletteCommands` + 2 `filterPaletteCommands` + 2 `groupPaletteCommands`, confirmés par Vitest) : `buildPaletteCommands` construit les commandes depuis l'état du board — navigation (Tâches/Pipelines/Managers/Sessions), « Créer une mission », runs de pipeline (Démarrer si non lancé ou run terminé/échoué, Avancer si actif/bloqué), missions (Accepter la delivery pour les missions agent en VALIDATION, Ouvrir la mission), recherche (`filterPaletteCommands`, insensible à la casse sur label/hint/mots-clés dont l'id de mission), groupement canonique.
    - Composant `CommandPalette` (+ 11 tests) : dialog `role="dialog"` `aria-modal`, champ `role="combobox"` + `aria-controls`/`aria-activedescendant`, listbox d'options `role="option"` `aria-selected`, navigation ↑/↓/Home/End/Entrée/Esc, focus dans la recherche à l'ouverture et restitué à l'élément précédent à la fermeture, statut de résultat en pied de palette.
    - Câblage global dans `App.tsx` : `⌘K`/`Ctrl+K` depuis n'importe quelle page (tasks/pipelines/managers/provider-sessions). Exécution : navigation, création (expand intake + scroll + focus), `startPipeline`/`advancePipelineRun` avec statut, accept delivery via `loadMissionResult` puis `accept-result` (si delivery structurée) sinon `validate`.
 2. **Raccourcis board + fiche** (`feat(web): raccourcis board…`)
@@ -104,8 +104,15 @@
 ### Vérifications
 - `npm run typecheck` : OK
 - `npx tsc -b apps/web` + `npm run build -w @nodra/web` : OK
-- `npx vitest run apps/web` : 29 fichiers / 184 tests OK
-- Suite complète (web + packages) : 6 échecs **pré-existants et environnementaux** identiques à l'itération 3 (i7-run-controls.integration + temporal-envelope.integration : serveur Temporal non démarré / binaire Codex non certifié). Aucun lié à cette itération.
+- `npx vitest run apps/web` : 30 fichiers / 184 tests OK
+- Suite complète (web + packages) : **8 tests en échec dans 6 fichiers**, tous pré-existants et environnementaux :
+  1. `test/architecture-boundaries.test.ts` (1) — vérifié pré-existant à l'itération 3 (échoue aussi sans mes changements via git stash).
+  2. `apps/api/health.test.ts` (1) — attend un runtime Temporal disponible ; non démarré sur cette machine.
+  3. `apps/api/i6-provider.test.ts` (1) — version du binaire Codex non certifiée sur cette machine.
+  4. `apps/api/i14-provider-session.test.ts` (1) — idem binaire Codex non certifié.
+  5. `packages/adapters/src/temporal/i7-run-controls.integration.test.ts` (2) — hook timeout : `TestWorkflowEnvironment.createTimeSkipping()` ne démarre pas (binaire test-server Temporal indisponible).
+  6. `packages/adapters/src/temporal/temporal-envelope.integration.test.ts` (2) — serveur Temporal non démarré (WORKFLOW_NOT_FOUND).
+  Aucun lié à cette itération. À noter : contrairement à ce que laissait entendre la note de l'itération 3, l'ensemble d'échecs n'est pas strictement identique — l'itération 3 listait 5 fichiers / 6 échecs (sans `i7-run-controls`), l'itération 4 en compte 6 fichiers / 8 (`i7-run-controls` s'y ajoute, même cause environnementale Temporal). De plus, `ProviderMissionConversationPage.test.tsx` est **flaky** : il échoue rarement (timeout `waitFor`) quand la suite complète tourne sous charge parallèle, mais passe en isolation et dans la plupart des passes complètes — non lié aux changements.
 - ESLint sur tous les fichiers touchés : propre
 
 ### Décisions / notes / limites
