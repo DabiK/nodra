@@ -437,7 +437,7 @@ export function App() {
           </div>
 
           <div className="filters">
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher par titre ou id" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher par titre, id, notes, statut…" />
             <select value={stateFilter} onChange={(event) => setStateFilter(event.target.value)}>
               <option value="all">Tous les états</option>
               {missionStates.map((state) => <option value={state} key={state}>{state}</option>)}
