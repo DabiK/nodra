@@ -62,4 +62,49 @@ describe("mission UI policy for provider threads", () => {
     expect(policy.actions.find((action) => action.id === "submit")).toMatchObject({ enabled: false, primary: false });
     expect(policy.primaryAction).toMatchObject({ id: "open-provider-session", enabled: true });
   });
+
+  it("enables the conversation for a pipeline ACTIVE mission with a run but no provider session", () => {
+    const policy = getMissionUiPolicy({
+      mission: { id: "mission-pipe-1", projectId: null, title: "Pipeline step", executionKind: "agent", state: "ACTIVE", version: 2, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      hasAgentConfig: true,
+      latestRunId: "run-pipe-1",
+      latestRunState: "RUNNING",
+      hasDelivery: false,
+      hasResultText: false,
+      hasProviderSession: false
+    });
+
+    expect(policy.actions.find((action) => action.id === "open-provider-session")).toMatchObject({ enabled: true });
+    expect(policy.primaryAction).toMatchObject({ id: "open-provider-session", enabled: true });
+    expect(policy.primaryAction?.disabledReason).toBeUndefined();
+  });
+
+  it("enables the conversation for a DONE mission even without a run or session link", () => {
+    const policy = getMissionUiPolicy({
+      mission: { id: "mission-pipe-2", projectId: null, title: "Pipeline done", executionKind: "agent", state: "DONE", version: 4, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      hasAgentConfig: true,
+      latestRunId: null,
+      latestRunState: null,
+      hasDelivery: false,
+      hasResultText: false,
+      hasProviderSession: false
+    });
+
+    expect(policy.primaryAction).toMatchObject({ id: "open-provider-session", enabled: true });
+  });
+
+  it("keeps the conversation disabled for a READY mission with no run and no provider session", () => {
+    const policy = getMissionUiPolicy({
+      mission: { id: "mission-fresh", projectId: null, title: "Fresh", executionKind: "agent", state: "READY", version: 1, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      hasAgentConfig: true,
+      latestRunId: null,
+      latestRunState: null,
+      hasDelivery: false,
+      hasResultText: false,
+      hasProviderSession: false
+    });
+
+    expect(policy.actions.find((action) => action.id === "open-provider-session")).toMatchObject({ enabled: false });
+    expect(policy.primaryAction?.id).toBe("start");
+  });
 });

@@ -94,12 +94,15 @@ export function getMissionUiPolicy(context: MissionUiContext): MissionUiPolicy {
 
 function agentActions(context: MissionUiContext, canEditConfig: boolean): MissionUiAction[] {
   const deliveryReason = context.hasDelivery ? undefined : "Résultat structuré indisponible";
+  const conversationAvailable = Boolean(context.latestRunId)
+    || ["ACTIVE", "VALIDATION", "BLOCKED", "DONE", "ABANDONED"].includes(context.mission.state)
+    || Boolean(context.hasProviderSession);
   const providerConversation = (primary = false) => action({
     id: "open-provider-session",
     label: "Ouvrir la conversation",
-    enabled: Boolean(context.hasProviderSession),
+    enabled: conversationAvailable,
     primary,
-    disabledReason: context.hasProviderSession ? undefined : "Session provider non attachée"
+    disabledReason: conversationAvailable ? undefined : "Aucune conversation tant que la mission n'a pas de run"
   });
   const launch = (primary = false) => action({
     id: "start",

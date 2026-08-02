@@ -97,8 +97,13 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
       let nextMission = await showMission(missionId);
       if (nextMission.state === "READY" && !activationRef.current) {
         activationRef.current = true;
-        await activateMissionProviderSession(missionId, nextMission.version, commandId());
-        nextMission = await showMission(missionId);
+        try {
+          await activateMissionProviderSession(missionId, nextMission.version, commandId());
+          nextMission = await showMission(missionId);
+        } catch {
+          // Best-effort: sans lien provider à activer, on retombe sur le chemin
+          // load + ensure-observation ci-dessous (ou l'état "en attente").
+        }
       }
       let nextDetail: ProviderSessionDetailView | null = null;
       try {

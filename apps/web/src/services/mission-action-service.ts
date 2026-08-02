@@ -21,7 +21,11 @@ export async function performMissionAction(input: MissionActionInput) {
   }
   if (actionId === "open-provider-session") {
     if (mission.state === "READY") {
-      await activateMissionProviderSession(mission.id, mission.version, crypto.randomUUID());
+      try {
+        await activateMissionProviderSession(mission.id, mission.version, crypto.randomUUID());
+      } catch {
+        // Best-effort: l'activation ne fait sens que si un lien provider existe déjà.
+      }
     }
     location.assign(`/agent.html?missionId=${encodeURIComponent(mission.id)}`);
     return;
