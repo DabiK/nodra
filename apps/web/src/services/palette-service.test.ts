@@ -26,6 +26,7 @@ function pipeline(overrides: Partial<PipelineListItem>): PipelineListItem {
     runState: "active",
     startedAt: "2026-08-02T08:00:00Z",
     endedAt: null,
+    totalCostMicros: null,
     nodes: [],
     edges: [],
     ...overrides

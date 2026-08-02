@@ -14,7 +14,7 @@ function commands(): PaletteCommand[] {
       { id: "m1", projectId: null, title: "Refonte API", executionKind: "agent", state: "VALIDATION", version: 1, createdAt: "2026-08-02T08:00:00Z", updatedAt: "2026-08-02T09:00:00Z" } as MissionView,
       { id: "m2", projectId: null, title: "Doc utilisateur", executionKind: "human", state: "READY", version: 1, createdAt: "2026-08-02T08:00:00Z", updatedAt: "2026-08-02T09:00:00Z" } as MissionView
     ],
-    pipelines: [{ id: "p1", name: "Release", state: "active", createdAt: "", runId: null, runState: null, startedAt: null, endedAt: null, nodes: [], edges: [] } as PipelineListItem]
+    pipelines: [{ id: "p1", name: "Release", state: "active", createdAt: "", runId: null, runState: null, startedAt: null, endedAt: null, totalCostMicros: null, nodes: [], edges: [] } as PipelineListItem]
   });
 }
 

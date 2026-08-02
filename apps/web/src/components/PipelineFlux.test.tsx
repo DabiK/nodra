@@ -23,6 +23,7 @@ function node(overrides: Partial<PipelineListNode>): PipelineListNode {
     runStartedAt: "2026-07-26T08:00:00.000Z",
     runEndedAt: "2026-07-26T08:01:23.000Z",
     runAttempt: 1,
+    runCostMicros: null,
     ...overrides
   };
 }
@@ -37,6 +38,7 @@ function pipeline(overrides: Partial<PipelineListItem> = {}): PipelineListItem {
     runState: "active",
     startedAt: "2026-07-26T08:00:00.000Z",
     endedAt: null,
+    totalCostMicros: null,
     nodes: [
       node({
         nodeKey: "01-first",
@@ -145,6 +147,41 @@ describe("PipelinesPage timeline view", () => {
       })]
     });
     expect(screen.getByText("essai 3")).toBeTruthy();
+  });
+
+  it("shows the cost per step and the pipeline total in timeline view", () => {
+    localStorage.setItem("nodra.pipelines.view", "timeline");
+    renderPage({
+      pipelines: [pipeline({
+        totalCostMicros: 18_888,
+        nodes: [
+          node({ nodeKey: "01-first", missionTitle: "Première étape", runCostMicros: 12_345 }),
+          node({
+            nodeKey: "02-second",
+            missionId: "mission-b",
+            missionTitle: "Deuxième étape",
+            nodeRunState: "pending",
+            missionState: "READY",
+            runStartedAt: null,
+            runEndedAt: null,
+            runAttempt: null,
+            runCostMicros: 6_543
+          })
+        ]
+      })]
+    });
+
+    const rows = screen.getAllByRole("listitem");
+    expect(rows[0].textContent).toContain("$0.0123");
+    expect(rows[1].textContent).toContain("$0.0065");
+    expect(screen.getByText("Coût total :")).toBeTruthy();
+    expect(screen.getByText("$0.0189")).toBeTruthy();
+  });
+
+  it("hides the pipeline total when no step cost is known", () => {
+    localStorage.setItem("nodra.pipelines.view", "timeline");
+    renderPage({ pipelines: [pipeline({ totalCostMicros: null })] });
+    expect(screen.queryByText("Coût total :")).toBeNull();
   });
 
   it("opens the mission inspector when clicking a step title", () => {

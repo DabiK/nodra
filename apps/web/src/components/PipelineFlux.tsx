@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PipelineListItem, PipelineListNode } from "../types";
+import type { PipelineViewMode } from "../services/pipeline-timeline-service";
 import { advancePipelineRun, approveNodeTransition, publishNodeHandover, setNodeTransitionMode, startPipeline } from "../services/pipeline-service";
 import {
   formatDuration,
@@ -8,9 +9,9 @@ import {
   pipelineTotalDurationMs,
   runTimeRange,
   savePipelineViewMode,
-  sortTimelineNodes,
-  type PipelineViewMode
+  sortTimelineNodes
 } from "../services/pipeline-timeline-service";
+import { formatCostMicros } from "../services/budget-service";
 
 const RUN_STATE_LABEL: Record<string, string> = {
   queued: "en file", active: "en cours", blocked: "à débloquer", completed: "terminé", failed: "échec", cancelled: "annulé", archived: "archivé"
@@ -103,6 +104,7 @@ function pipelineStatus(pipeline: PipelineListItem): { tone: string; text: strin
 function PipelineTimeline({ pipeline, onInspect }: { pipeline: PipelineListItem; onInspect(missionId: string): void }) {
   const rows = useMemo(() => sortTimelineNodes(pipeline.nodes), [pipeline.nodes]);
   const totalDuration = pipelineTotalDurationMs(pipeline);
+  const totalCost = formatCostMicros(pipeline.totalCostMicros);
   const executed = pipeline.nodes.filter((node) => node.runStartedAt !== null || node.nodeRunState === "completed").length;
 
   return (
@@ -115,6 +117,7 @@ function PipelineTimeline({ pipeline, onInspect }: { pipeline: PipelineListItem;
             const status = nodeStatus(node);
             const duration = nodeDurationMs(node);
             const range = runTimeRange(node);
+            const cost = formatCostMicros(node.runCostMicros);
             const needsApproval = Boolean(pipeline.runId) && node.nodeRunState === "pending" && node.transitionMode === "human";
             return (
               <li key={node.nodeKey} className={`timeline-row ${status.stateClass}${needsApproval ? " gate-waiting" : ""}`}>
@@ -134,6 +137,7 @@ function PipelineTimeline({ pipeline, onInspect }: { pipeline: PipelineListItem;
                     <span>{node.nodeKey} · {node.missionKind === "agent" ? "Agent" : "Humain"}</span>
                     {range && <time>{range}</time>}
                     <span className={`timeline-duration${duration === null ? " empty" : ""}`}>{formatDuration(duration)}</span>
+                    {cost !== null && <span className="timeline-cost" title={`Coût du run de ${node.missionTitle}`}>{cost}</span>}
                   </div>
                 </div>
               </li>
@@ -144,6 +148,7 @@ function PipelineTimeline({ pipeline, onInspect }: { pipeline: PipelineListItem;
       <footer className="timeline-summary">
         <span>{executed}/{pipeline.nodes.length} étape{pipeline.nodes.length > 1 ? "s" : ""} exécutée{executed > 1 ? "s" : ""}</span>
         {totalDuration !== null && <span>Durée totale : <b>{formatDuration(totalDuration)}</b></span>}
+        {totalCost !== null && <span>Coût total : <b>{totalCost}</b></span>}
         {pipeline.startedAt && <time>Début du run : {new Date(pipeline.startedAt).toLocaleString()}</time>}
         {pipeline.endedAt && <time>Fin du run : {new Date(pipeline.endedAt).toLocaleString()}</time>}
       </footer>

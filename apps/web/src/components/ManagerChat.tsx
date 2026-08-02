@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { AgentSessionView, ManagerConversationView, ManagerThreadView, ManagerView } from "../types";
 import { latestManagerThread, listManagerConversations, loadManagerThread, sendManagerMessage, stopManager, deleteManagerThread } from "../services/manager-service";
 import { normalizeAgentConversation, extractRunFailure, type AgentConversationEvent } from "../services/agent-conversation-normalizer";
+import { formatCostMicros, formatTokenCount, runTokenTotal } from "../services/budget-service";
 import { PixelAvatar } from "./PixelAvatar";
 import { useSseRefresh } from "../hooks/useSseRefresh";
 
@@ -244,6 +245,12 @@ export function ManagerChat({
               </button>
             )}
             <small>{manager.modelId ?? "—"} · {manager.reasoningEffort ?? "provider_default"} · {manager.permissionPreset}</small>
+            {thread?.run && (
+              <span className="manager-run-usage" title={`Run ${thread.run.id}${thread.run.providerId ? ` · ${thread.run.providerId}` : ""}`}>
+                {formatCostMicros(thread.run.costMicros) ?? "coût —"}
+                {runTokenTotal(thread.run) !== null ? ` · ${formatTokenCount(runTokenTotal(thread.run))} tokens` : ""}
+              </span>
+            )}
           </div>
         </header>
 

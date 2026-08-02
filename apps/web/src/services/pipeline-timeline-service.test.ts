@@ -29,6 +29,7 @@ function node(overrides: Partial<PipelineListNode>): PipelineListNode {
     runStartedAt: null,
     runEndedAt: null,
     runAttempt: null,
+    runCostMicros: null,
     ...overrides
   };
 }
@@ -43,6 +44,7 @@ function pipeline(overrides: Partial<PipelineListItem> = {}): PipelineListItem {
     runState: "active",
     startedAt: "2026-07-26T08:00:00.000Z",
     endedAt: null,
+    totalCostMicros: null,
     nodes: [],
     edges: [],
     ...overrides
