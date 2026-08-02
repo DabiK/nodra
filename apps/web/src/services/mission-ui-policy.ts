@@ -4,6 +4,7 @@ export type MissionActionId =
   | "configure"
   | "start"
   | "open-provider-session"
+  | "submit"
   | "validate"
   | "accept-result"
   | "request-changes"
@@ -129,8 +130,19 @@ function agentActions(context: MissionUiContext, canEditConfig: boolean): Missio
             providerConversation(),
             action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
           ];
-    case "ACTIVE":
-      return [providerConversation(true)];
+    case "ACTIVE": {
+      const submitEnabled = Boolean(context.hasResultText || context.latestRunState === "SUCCEEDED");
+      return [
+        action({
+          id: "submit",
+          label: "Mettre en validation",
+          enabled: submitEnabled,
+          primary: submitEnabled,
+          disabledReason: submitEnabled ? undefined : "Aucun résultat de run terminé à soumettre"
+        }),
+        providerConversation(!submitEnabled)
+      ];
+    }
     case "VALIDATION":
       return [
         action({ id: "validate", label: "Valider ✓", enabled: true, primary: true }),

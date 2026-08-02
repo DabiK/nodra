@@ -118,6 +118,53 @@ describe("mission and Relay API", () => {
     expect(conflict.body).toMatchObject({ status: 409, code: "MISSION_VERSION_CONFLICT", commandId: "stale-command" });
   });
 
+  it("submits a finished agent mission to validation via POST /submit and rejects repeats", async () => {
+    const database = NodraSqliteDatabase.open(databaseFile);
+    try {
+      database.orm.insert(missions).values({
+        id: "submit-api",
+        projectId: null,
+        title: "Submit API",
+        executionKind: "agent",
+        state: "ACTIVE",
+        version: 1,
+        createdAt: "2026-08-01T12:00:00.000Z",
+        updatedAt: "2026-08-01T12:00:00.000Z"
+      }).run();
+    } finally {
+      database.close();
+    }
+
+    const submitted = await request(app.getHttpServer())
+      .post("/api/missions/submit-api/submit")
+      .send({ expectedVersion: 1, commandId: "submit-api-1", declaredResult: "Résultat de test E2E" })
+      .expect(201);
+    expect(submitted.body).toMatchObject({ id: "submit-api", state: "VALIDATION", version: 2 });
+
+    const relay = await request(app.getHttpServer()).get("/api/relay").expect(200);
+    expect(relay.body.decision_required).toEqual([
+      expect.objectContaining({ id: "submit-api", state: "VALIDATION", reasonCode: "mission_decision_required" })
+    ]);
+
+    const stale = await request(app.getHttpServer())
+      .post("/api/missions/submit-api/submit")
+      .send({ expectedVersion: 1, commandId: "submit-api-stale" })
+      .expect(409);
+    expect(stale.body).toMatchObject({ code: "MISSION_VERSION_CONFLICT", commandId: "submit-api-stale" });
+
+    const forbidden = await request(app.getHttpServer())
+      .post("/api/missions/submit-api/submit")
+      .send({ expectedVersion: 2, commandId: "submit-api-twice", declaredResult: "Encore" })
+      .expect(409);
+    expect(forbidden.body).toMatchObject({ code: "TRANSITION_FORBIDDEN" });
+
+    const missingResult = await request(app.getHttpServer())
+      .post("/api/missions/submit-api/submit")
+      .send({ expectedVersion: 2, commandId: "submit-api-empty", declaredResult: "" })
+      .expect(400);
+    expect(missingResult.body).toMatchObject({ code: "VALIDATION_RESULT_REQUIRED" });
+  });
+
   it("translates duplicated commands and missing projects to correlated problem details", async () => {
     await request(app.getHttpServer())
       .post("/api/missions")

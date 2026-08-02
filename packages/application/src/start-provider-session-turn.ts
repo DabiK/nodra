@@ -1,4 +1,5 @@
 import { DomainError, type Id } from "@nodra/domain";
+import { AutoValidateMissionAfterTurn } from "./auto-validate-mission-after-turn.js";
 import { requireProviderSessionCommandId } from "./provider-session-command.js";
 import { executeProviderSessionSync } from "./map-provider-session-sync-error.js";
 import type { ProviderSessionControlRegistry } from "./provider-session-control-registry.js";
@@ -15,7 +16,11 @@ export interface StartProviderSessionTurnInput {
 export class StartProviderSessionTurn {
   private readonly resolveSession: ResolveMissionProviderSession;
 
-  constructor(private readonly controls: ProviderSessionControlRegistry, sessions: ProviderSessionRepository) {
+  constructor(
+    private readonly controls: ProviderSessionControlRegistry,
+    sessions: ProviderSessionRepository,
+    private readonly validate: AutoValidateMissionAfterTurn
+  ) {
     this.resolveSession = new ResolveMissionProviderSession(sessions);
   }
 
@@ -27,10 +32,20 @@ export class StartProviderSessionTurn {
     const provider = this.controls.resolve(identity.providerId);
     const capabilities = await executeProviderSessionSync(() => provider.capabilities());
     if (capabilities.startTurn.state === "unavailable") throw new DomainError("Starting a provider turn is unavailable", "CAPABILITY_UNAVAILABLE");
-    return executeProviderSessionSync(() => provider.startTurn({
+    const result = await executeProviderSessionSync(() => provider.startTurn({
       ref: { providerId: identity.providerId, externalSessionId: identity.externalSessionRef },
       text,
       clientCommandId: input.commandId
     }));
+    // The turn completed: auto-validate the mission, but never fail the turn
+    // on a validation hiccup (the use case swallows expected errors already;
+    // this catch guarantees it cannot throw at all).
+    await this.validate.execute({
+      missionId: input.missionId,
+      ref: result.ref,
+      externalTurnId: result.externalTurnId,
+      occurredAt: new Date().toISOString()
+    }).catch(() => undefined);
+    return result;
   }
 }

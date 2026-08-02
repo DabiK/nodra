@@ -16,4 +16,50 @@ describe("mission UI policy for provider threads", () => {
     expect(policy.primaryAction).toMatchObject({ id: "open-provider-session", label: "Ouvrir la conversation", enabled: true });
     expect(policy.actions.map((action) => action.id)).toEqual(["open-provider-session", "abandon"]);
   });
+
+  it("offers manual submit to validation for an ACTIVE agent mission whose run succeeded with result text", () => {
+    const policy = getMissionUiPolicy({
+      mission: { id: "mission-2", projectId: null, title: "Done run", executionKind: "agent", state: "ACTIVE", version: 3, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      hasAgentConfig: true,
+      latestRunId: "run-finished",
+      latestRunState: "SUCCEEDED",
+      hasDelivery: false,
+      hasResultText: true,
+      hasProviderSession: false
+    });
+
+    expect(policy.actions.map((action) => action.id)).toEqual(["submit", "open-provider-session"]);
+    expect(policy.primaryAction).toMatchObject({ id: "submit", label: "Mettre en validation", enabled: true });
+    expect(policy.primaryAction?.disabledReason).toBeUndefined();
+  });
+
+  it("enables manual submit for a stuck ACTIVE mission with a SUCCEEDED run but no assistant text", () => {
+    const policy = getMissionUiPolicy({
+      mission: { id: "mission-3", projectId: null, title: "Stuck", executionKind: "agent", state: "ACTIVE", version: 4, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      hasAgentConfig: true,
+      latestRunId: "run-finished",
+      latestRunState: "SUCCEEDED",
+      hasDelivery: false,
+      hasResultText: false,
+      hasProviderSession: true
+    });
+
+    expect(policy.actions.find((action) => action.id === "submit")).toMatchObject({ enabled: true, primary: true });
+    expect(policy.primaryAction?.id).toBe("submit");
+  });
+
+  it("keeps the provider conversation primary while an ACTIVE run is still running without a result", () => {
+    const policy = getMissionUiPolicy({
+      mission: { id: "mission-4", projectId: null, title: "Running", executionKind: "agent", state: "ACTIVE", version: 2, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      hasAgentConfig: true,
+      latestRunId: "run-live",
+      latestRunState: "RUNNING",
+      hasDelivery: false,
+      hasResultText: false,
+      hasProviderSession: true
+    });
+
+    expect(policy.actions.find((action) => action.id === "submit")).toMatchObject({ enabled: false, primary: false });
+    expect(policy.primaryAction).toMatchObject({ id: "open-provider-session", enabled: true });
+  });
 });

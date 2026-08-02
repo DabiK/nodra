@@ -40,6 +40,7 @@ import {
 } from "@nodra/adapters";
 import {
   ActivateProviderSessionMission,
+  AutoValidateMissionAfterTurn,
   ChangeMissionState,
   AdvancePipeline,
   AttachProviderSession,
@@ -418,15 +419,23 @@ export class NodraModule {
         },
         {
           provide: START_PROVIDER_SESSION_TURN,
-          inject: [PROVIDER_SESSION_CONTROL_REGISTRY, DATABASE],
-          useFactory: (controls: ProviderSessionControlRegistry, database: NodraSqliteDatabase) =>
-            new StartProviderSessionTurn(controls, new SqliteProviderSessionRepository(database))
+          inject: [PROVIDER_SESSION_CONTROL_REGISTRY, DATABASE, PROVIDER_SESSION_SYNC_REGISTRY],
+          useFactory: (controls: ProviderSessionControlRegistry, database: NodraSqliteDatabase, providers: ProviderSessionSyncRegistry) =>
+            new StartProviderSessionTurn(
+              controls,
+              new SqliteProviderSessionRepository(database),
+              new AutoValidateMissionAfterTurn(new SqliteMissionRepository(database), providers)
+            )
         },
         {
           provide: STEER_PROVIDER_SESSION_TURN,
-          inject: [PROVIDER_SESSION_CONTROL_REGISTRY, DATABASE],
-          useFactory: (controls: ProviderSessionControlRegistry, database: NodraSqliteDatabase) =>
-            new SteerProviderSessionTurn(controls, new SqliteProviderSessionRepository(database))
+          inject: [PROVIDER_SESSION_CONTROL_REGISTRY, DATABASE, PROVIDER_SESSION_SYNC_REGISTRY],
+          useFactory: (controls: ProviderSessionControlRegistry, database: NodraSqliteDatabase, providers: ProviderSessionSyncRegistry) =>
+            new SteerProviderSessionTurn(
+              controls,
+              new SqliteProviderSessionRepository(database),
+              new AutoValidateMissionAfterTurn(new SqliteMissionRepository(database), providers)
+            )
         },
         {
           provide: PROVIDER_CATALOG,

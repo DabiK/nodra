@@ -9,6 +9,7 @@ import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { projects } from "./schema/core.js";
 import { SqliteMissionReadModel } from "./sqlite-mission-read-model.js";
 import { SqliteMissionRepository } from "./sqlite-mission-repository.js";
+import { missions } from "./schema/missions.js";
 import { verifyDatabase } from "./verify-database.js";
 
 const at = (minute: number) => `2026-07-22T12:${String(minute).padStart(2, "0")}:00.000Z`;
@@ -168,5 +169,73 @@ describe("SQLite human mission vertical slice", () => {
     expect(await getRelay.execute()).toEqual({ ready: [], active: [], blocked: [], decision_required: [] });
     expect(database.connection.prepare("select count(*) as count from business_audit_event").get()).toEqual({ count: 1 });
     expect(database.connection.prepare("select count(*) as count from outbox").get()).toEqual({ count: 1 });
+  });
+
+  it("submits a finished agent mission to VALIDATION without gate evidence and relays a decision", async () => {
+    database.orm.insert(missions).values({
+      id: "mission-submit",
+      projectId: null,
+      title: "Submit me",
+      executionKind: "agent",
+      state: "ACTIVE",
+      version: 4,
+      createdAt: at(0),
+      updatedAt: at(0)
+    }).run();
+
+    const submitted = await changeMissionState.execute({
+      missionId: asId("mission-submit"),
+      expectedVersion: 4,
+      action: { type: "submit", declaredResult: "Le résultat du run est prêt." },
+      context: context("submit-command", 1)
+    });
+    expect(submitted).toMatchObject({ state: "VALIDATION", version: 5 });
+    expect(await showMission.execute(asId("mission-submit"))).toMatchObject({ state: "VALIDATION", version: 5 });
+    expect((await getRelay.execute()).decision_required).toEqual([
+      expect.objectContaining({ id: "mission-submit", state: "VALIDATION", reasonCode: "mission_decision_required" })
+    ]);
+    const audit = database.connection
+      .prepare("select payload_json from business_audit_event where command_id = ?")
+      .get("submit-command") as { payload_json: string };
+    expect(JSON.parse(audit.payload_json)).toMatchObject({
+      action: "submit",
+      fromState: "ACTIVE",
+      toState: "VALIDATION",
+      declaredResult: "Le résultat du run est prêt."
+    });
+  });
+
+  it("rejects a manual submit without a declared result or outside ACTIVE", async () => {
+    database.orm.insert(missions).values({
+      id: "mission-submit-strict",
+      projectId: null,
+      title: "Strict submit",
+      executionKind: "agent",
+      state: "ACTIVE",
+      version: 2,
+      createdAt: at(0),
+      updatedAt: at(0)
+    }).run();
+
+    await expect(changeMissionState.execute({
+      missionId: asId("mission-submit-strict"),
+      expectedVersion: 2,
+      action: { type: "submit", declaredResult: "  " },
+      context: context("submit-empty", 1)
+    })).rejects.toMatchObject({ code: "VALIDATION_RESULT_REQUIRED" });
+
+    await changeMissionState.execute({
+      missionId: asId("mission-submit-strict"),
+      expectedVersion: 2,
+      action: { type: "submit", declaredResult: "Résultat valide." },
+      context: context("submit-valid", 2)
+    });
+    await expect(changeMissionState.execute({
+      missionId: asId("mission-submit-strict"),
+      expectedVersion: 3,
+      action: { type: "submit", declaredResult: "Encore un résultat." },
+      context: context("submit-twice", 3)
+    })).rejects.toMatchObject({ code: "TRANSITION_FORBIDDEN" });
+    expect(await showMission.execute(asId("mission-submit-strict"))).toMatchObject({ state: "VALIDATION", version: 3 });
   });
 });

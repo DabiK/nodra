@@ -9,6 +9,7 @@ export interface MissionActionInput {
   mission: MissionView;
   latestRunId: string | null;
   comment?: string;
+  declaredResult?: string;
 }
 
 export async function performMissionAction(input: MissionActionInput) {
@@ -29,6 +30,7 @@ export async function performMissionAction(input: MissionActionInput) {
   if (actionId === "request-changes") return decideDelivery(latestRunId, "request-changes", mission.version, input.comment ?? "Corrections demandées");
   if (actionId === "reject-result") return decideDelivery(latestRunId, "reject", mission.version, input.comment ?? "Résultat rejeté");
   if (actionId === "validate") return transition(mission, "accept");
+  if (actionId === "submit") return submitForValidation(mission, input.declaredResult);
   if (actionId === "resume") return transition(mission, "unblock");
   if (actionId === "abandon") return transition(mission, "abandon");
   if (actionId === "mark-ready") return transition(mission, "ready");
@@ -40,6 +42,20 @@ async function transition(mission: MissionView, route: "ready" | "pickup" | "unb
   return api<MissionView>(`/api/missions/${mission.id}/${route}`, {
     method: "POST",
     body: JSON.stringify({ expectedVersion: mission.version })
+  });
+}
+
+async function submitForValidation(mission: MissionView, declaredResult?: string) {
+  if (!declaredResult?.trim()) {
+    throw new Error("Aucun résultat assistant exploitable à soumettre pour validation.");
+  }
+  return api<MissionView>(`/api/missions/${mission.id}/submit`, {
+    method: "POST",
+    body: JSON.stringify({
+      expectedVersion: mission.version,
+      commandId: crypto.randomUUID(),
+      declaredResult
+    })
   });
 }
 

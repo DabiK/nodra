@@ -10,6 +10,7 @@ export type HumanMissionAction =
   | { type: "resume" }
   | { type: "request-correction" }
   | { type: "accept" }
+  | { type: "submit"; declaredResult: string }
   | { type: "close" }
   | { type: "abandon" };
 
@@ -27,6 +28,7 @@ const eventTypes: Record<HumanMissionAction["type"], string> = {
   resume: "MISSION_RESUMED",
   "request-correction": "MISSION_CORRECTION_REQUESTED",
   accept: "MISSION_ACCEPTED",
+  submit: "MISSION_SUBMITTED_FOR_VALIDATION",
   close: "MISSION_CLOSED",
   abandon: "MISSION_ABANDONED"
 };
@@ -58,13 +60,15 @@ export class ChangeMissionState {
     this.apply(mission, input.action, input.context.occurredAt);
     const after = mission.snapshot();
     const reason = input.action.type === "block" ? input.action.reason.trim() : undefined;
+    const declaredResult = input.action.type === "submit" ? input.action.declaredResult.trim() : undefined;
     const payload = {
       schemaVersion: 1,
       action: input.action.type,
       fromState: before.state,
       toState: after.state,
       missionVersion: after.version,
-      ...(reason === undefined ? {} : { reason })
+      ...(reason === undefined ? {} : { reason }),
+      ...(declaredResult === undefined ? {} : { declaredResult })
     };
     const queue = queueForState(after.state);
     let relay: MissionRelayRecord | null = null;
@@ -115,6 +119,7 @@ export class ChangeMissionState {
     else if (action.type === "resume") mission.resume(now);
     else if (action.type === "request-correction") mission.requestCorrection(now);
     else if (action.type === "accept") mission.accept(now, { accepted: true, actor: "user" });
+    else if (action.type === "submit") mission.recordAgentSuccess(now, action.declaredResult);
     else if (action.type === "close") mission.close(now);
     else mission.abandon(now);
   }

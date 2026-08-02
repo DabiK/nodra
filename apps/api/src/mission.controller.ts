@@ -41,6 +41,7 @@ import {
 import { CreateMissionDto } from "./dto/mission.dto.js";
 import { BlockMissionDto } from "./dto/block-mission.dto.js";
 import { MissionTransitionDto } from "./dto/mission-transition.dto.js";
+import { SubmitMissionDto } from "./dto/submit-mission.dto.js";
 import { EnableAgentConfigDto } from "./dto/enable-agent-config.dto.js";
 import { UpdateAgentConfigDto } from "./dto/update-agent-config.dto.js";
 import { MissionLookupQueryDto } from "./dto/mission-lookup-query.dto.js";
@@ -222,6 +223,11 @@ export class MissionController {
   @Post(":id/accept")
   accept(@Param("id") id: string, @Body() body: MissionTransitionDto) {
     return this.transition(id, body, { type: "accept" });
+  }
+
+  @Post(":id/submit")
+  submit(@Param("id") id: string, @Body() body: SubmitMissionDto) {
+    return this.transition(id, body, { type: "submit", declaredResult: body.declaredResult ?? "" });
   }
 
   @Post(":id/abandon")

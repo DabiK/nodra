@@ -180,7 +180,8 @@ export function MissionInspector({
       await performMissionAction({
         actionId: action.id,
         mission: data.mission,
-        latestRunId: result?.latestRunId ?? null
+        latestRunId: result?.latestRunId ?? null,
+        declaredResult: result?.assistantMessage ?? undefined
       });
       const [reloaded, reloadedResult] = await Promise.all([
         loadMissionInspector(missionId),

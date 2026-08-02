@@ -135,6 +135,7 @@ export { ActivateProviderSessionMission } from "./activate-provider-session-miss
 export { GetMissionProviderSessionControlCapabilities } from "./get-mission-provider-session-control-capabilities.js";
 export { StartProviderSessionTurn, type StartProviderSessionTurnInput } from "./start-provider-session-turn.js";
 export { SteerProviderSessionTurn, type SteerProviderSessionTurnInput } from "./steer-provider-session-turn.js";
+export { AutoValidateMissionAfterTurn, type AutoValidateMissionAfterTurnInput } from "./auto-validate-mission-after-turn.js";
 export { AttachProviderSession } from "./attach-provider-session.js";
 export { AttachExternalProviderSession } from "./attach-external-provider-session.js";
 export type { AttachExternalProviderSessionInput } from "./attach-external-provider-session.js";
