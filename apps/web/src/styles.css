@@ -256,6 +256,10 @@ label input:focus, label textarea:focus, label select:focus, input:focus, select
 .relay-task.waiting .relay-task-copy small i { background: #3a6cbf; }
 .relay-task-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 13px Manrope; color: var(--ink); }
 .relay-task-copy em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #5f6c65; font-size: 11px; font-style: normal; }
+.relay-task-live { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; color: #5f6c65; font-size: 11px; font-weight: 700; }
+.relay-task-live .thinking-dots { flex: none; }
+.relay-task-live .thinking-dots i { background: var(--green); }
+.relay-task-live b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--green); font-size: 10px; font-weight: 600; }
 .relay-arrow { flex: none; color: #b6beb7; font-size: 15px; }
 .relay-task:hover .relay-arrow { color: var(--green); }
 .relay-empty { display: flex; align-items: center; gap: 8px; padding: 16px 12px; color: var(--muted); font-size: 11px; }
@@ -1216,6 +1220,8 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
   .relay-task { border-color: #2b362d; background: #1b241d; }
   .relay-task:hover { border-color: var(--green); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3); }
   .relay-task-copy em { color: var(--muted); }
+  .relay-task-live { color: var(--muted); }
+  .relay-task-live b { color: var(--lime); }
   .relay-arrow { color: #4a564e; }
   .relay-lane.drop-allowed { border-color: var(--green); background: #18241d; }
   .relay-lane.drop-forbidden { border-color: var(--red); background: #241412; }

@@ -12,7 +12,16 @@ afterEach(() => {
 const noop = () => undefined;
 
 function mission(overrides: Partial<MissionView> & Pick<MissionView, "id" | "title" | "executionKind" | "state">): MissionView {
-  return { projectId: null, version: 2, createdAt: "2026-01-01T10:00:00Z", updatedAt: "2026-01-01T10:00:00Z", ...overrides };
+  return {
+    projectId: null,
+    version: 2,
+    createdAt: "2026-01-01T10:00:00Z",
+    updatedAt: "2026-01-01T10:00:00Z",
+    runState: null,
+    runStartedAt: null,
+    lastAssistantMessage: null,
+    ...overrides
+  };
 }
 
 const agentMission = mission({ id: "m-agent", title: "Agent task", executionKind: "agent", state: "READY" });
@@ -181,5 +190,86 @@ describe("MissionRelay keyboard navigation", () => {
     input.focus();
     fireEvent.keyDown(input, { key: "ArrowRight" });
     expect(document.activeElement).toBe(input);
+  });
+});
+
+describe("MissionRelay live run mini-cards", () => {
+  it("shows thinking dots, run state and last assistant message on an ACTIVE running card", () => {
+    renderWithLanes(["ACTIVE"], [
+      mission({
+        id: "m-live",
+        title: "Live task",
+        executionKind: "agent",
+        state: "ACTIVE",
+        runState: "RUNNING",
+        runStartedAt: "2026-08-02T10:00:00Z",
+        lastAssistantMessage: "J'analyse le code de la route /api/missions avant de proposer une refonte."
+      })
+    ]);
+    const status = screen.getByRole("status", { name: "Activité du run en cours" });
+    expect(status.querySelectorAll(".thinking-dots i").length).toBe(3);
+    expect(status.textContent).toContain("réfléchit");
+    expect(status.textContent).toContain("J'analyse le code");
+    expect(screen.queryByText("Travaille maintenant")).toBeNull();
+  });
+
+  it("shows thinking dots without a message while the run has not produced output yet", () => {
+    renderWithLanes(["ACTIVE"], [
+      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "STARTING", runStartedAt: "2026-08-02T10:00:00Z" })
+    ]);
+    const status = screen.getByRole("status", { name: "Activité du run en cours" });
+    expect(status.textContent).toContain("démarre");
+    expect(status.textContent).not.toContain("«");
+  });
+
+  it("labels a run waiting for human approval", () => {
+    renderWithLanes(["ACTIVE"], [
+      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "WAITING_APPROVAL", lastAssistantMessage: "Voici le diff, merci de valider." })
+    ]);
+    const status = screen.getByRole("status", { name: "Activité du run en cours" });
+    expect(status.textContent).toContain("attend une approbation");
+    expect(status.textContent).toContain("Voici le diff");
+  });
+
+  it("exposes the full last message via title for long output", () => {
+    const longMessage = "Un très long message de l'assistant qui dépasse la largeur de la carte et doit être tronqué visuellement par ellipsis tout en restant consultable au survol via l'attribut title.".repeat(1);
+    renderWithLanes(["ACTIVE"], [
+      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "RUNNING", lastAssistantMessage: longMessage })
+    ]);
+    const message = screen.getByTitle(longMessage);
+    expect(message.textContent).toBe(`« ${longMessage} »`);
+  });
+
+  it("keeps the static hint when the mission is ACTIVE but the run is finished", () => {
+    renderWithLanes(["ACTIVE"], [
+      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "DONE", runStartedAt: "2026-08-02T10:00:00Z", lastAssistantMessage: null })
+    ]);
+    expect(screen.queryByRole("status", { name: "Activité du run en cours" })).toBeNull();
+    expect(screen.getByText("Travaille maintenant")).toBeTruthy();
+  });
+
+  it("keeps the static hint when there is no run yet", () => {
+    renderWithLanes(["ACTIVE"], [
+      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: null, runStartedAt: null, lastAssistantMessage: null })
+    ]);
+    expect(screen.queryByRole("status", { name: "Activité du run en cours" })).toBeNull();
+    expect(screen.getByText("Travaille maintenant")).toBeTruthy();
+  });
+
+  it("does not show the live block on non-ACTIVE cards even with an active run", () => {
+    renderWithLanes(["VALIDATION"], [
+      mission({ id: "m-val", title: "Validation task", executionKind: "agent", state: "VALIDATION", runState: "RUNNING", lastAssistantMessage: "En attente." })
+    ]);
+    expect(screen.queryByRole("status", { name: "Activité du run en cours" })).toBeNull();
+    expect(screen.getByText("A rendu la main · attend ta décision")).toBeTruthy();
+  });
+
+  it("shows the live block on human ACTIVE missions too when a run is active", () => {
+    renderWithLanes(["ACTIVE"], [
+      mission({ id: "m-live", title: "Human live task", executionKind: "human", state: "ACTIVE", runState: "RUNNING", lastAssistantMessage: "Je travaille sur le livrable." })
+    ]);
+    const status = screen.getByRole("status", { name: "Activité du run en cours" });
+    expect(status.textContent).toContain("réfléchit");
+    expect(status.textContent).toContain("Je travaille sur le livrable");
   });
 });

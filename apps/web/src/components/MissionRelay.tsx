@@ -55,6 +55,23 @@ function cardHint(mission: MissionView): string {
   }
 }
 
+/** États de run où l'agent travaille encore : le live s'affiche pour ces runs (miroir du read model API). */
+const ACTIVE_RUN_STATES = new Set(["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"]);
+
+/** Libellé lisible de l'activité en cours d'un run actif. */
+const RUN_STATE_LIVE_LABEL: Record<string, string> = {
+  QUEUED: "en file d'attente",
+  STARTING: "démarre…",
+  RUNNING: "réfléchit…",
+  WAITING_APPROVAL: "attend une approbation",
+  CANCELLING: "annulation…"
+};
+
+/** True quand le dernier run de la mission travaille encore (live sur la carte). */
+function isRunLive(mission: MissionView): boolean {
+  return mission.state === "ACTIVE" && mission.runState !== null && ACTIVE_RUN_STATES.has(mission.runState);
+}
+
 function relativeTime(value: string): string {
   const diff = Date.now() - Date.parse(value);
   if (!Number.isFinite(diff)) return "";
@@ -90,7 +107,17 @@ function MissionCard({ mission, tone, pipeline, dragging, disabled, onInspect, o
       <span className="relay-task-copy">
         <small><i /> {mission.executionKind === "agent" ? "Agent" : "Humain"} · {relativeTime(mission.updatedAt)}{hasMissionNotes(mission.id) ? " · 📝 notes" : ""}</small>
         <strong>{mission.title}</strong>
-        <em>{cardHint(mission)}</em>
+        {isRunLive(mission) ? (
+          <span className="relay-task-live" role="status" aria-label="Activité du run en cours">
+            <span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span>
+            {RUN_STATE_LIVE_LABEL[mission.runState ?? ""] ?? "réfléchit…"}
+            {mission.lastAssistantMessage
+              ? <b title={mission.lastAssistantMessage}>« {mission.lastAssistantMessage} »</b>
+              : null}
+          </span>
+        ) : (
+          <em>{cardHint(mission)}</em>
+        )}
         {pipeline && (
           <span
             className="relay-task-pipeline"
