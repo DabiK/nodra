@@ -12,7 +12,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
 - [x] #5 — Palette de commandes Cmd+K et raccourcis clavier (labels: —)
   > ## Contexte
 
-- [ ] #6 — Budget / coût visible par run et mission (labels: —)
+- [x] #6 — Budget / coût visible par run et mission (labels: —)
   > ## Contexte
 
 - [ ] #7 — Mini-cartes de run actif sur le board (labels: —)

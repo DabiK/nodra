@@ -124,3 +124,41 @@
 
 ### Statut
 - [x] #5 — Palette de commandes Cmd+K et raccourcis clavier
+
+## Itération 5 — 2026-08-02 — Task #6 : Budget / coût visible par run et mission
+
+### Fait (5 commits atomiques)
+1. **Historique des runs par mission (backend)** (`feat(api): historique des runs par mission avec usage et coût…`)
+   - Nouveau use case `ListMissionRuns` (`list-mission-runs.ts`) + méthode `runs(id)` sur `MissionReadModel` (interface + implémentation `sqlite-mission-read-model.ts`) : runs du plus ancien au plus récent avec attempt, état, provider/model, bornes, durée, tokens (input/output/cache), `costMicros`, `usageKind`, + `totalCostMicros` (somme des coûts connus, null si aucun).
+   - Endpoint `GET /api/missions/:id/runs` dans `mission.controller.ts` (404 si mission inconnue via le use case, historique vide si mission sans run).
+   - Architecture respectée : **aucun import `@nodra/adapters` dans le controller** (contrainte `architecture-boundaries` — j'ai d'abord essayé une requête directe DB puis refactoré en couche application, le test « inbound controllers dependent on application only » passe).
+   - Tests : 3 nouveaux dans `sqlite-mission-repository.test.ts` (historique + tri + totaux, mission sans run → vide, mission inconnue → MISSION_NOT_FOUND).
+2. **Coût dans les vues pipeline (backend)** (`feat(api): coût par nœud et total dans les vues pipeline`)
+   - `runCostMicros` sur `PipelineListNodeView` et chaque nœud de `PipelineRunView` (coût du dernier run de mission), `totalCostMicros` sur `PipelineListItemView` et `PipelineRunView` (somme des coûts connus via helper `totalCost`). Étendu `latestRunByMission` (batch, pas de N+1).
+   - Test repository étendu : coûts par nœud + total dans list et showRun.
+3. **Service frontend** (`feat(web): service budget…`) — `budget-service.ts` (+ 16 tests) : `formatCostMicros` ("$0.0123" sous le dollar, "$12.34" au-delà), `microsToUsd`, `sumCostMicros`, `formatTotalCostMicros`, `formatTokenCount` ("1 234", "12,3 k", "1,2 M"), `runTokenTotal`, `usageKindLabel`.
+4. **Panneau Budget & usage dans la fiche mission** (`feat(web): panneau Budget & usage…`)
+   - `types.ts` : `MissionRunView`/`MissionRunsView` + champs coût pipeline ; `loadMissionRuns(missionId)` dans `mission-service.ts`.
+   - `MissionBudgetPanel` dans `MissionInspector.tsx` (sous le bloc-notes) : total cumulé en tête, une rangée par run (état, essai n, modèle, durée, tokens, coût, provenance du coût) ; rechargé après chaque action ; état vide explicite.
+   - Tests : 3 nouveaux dans `MissionInspector.test.tsx` (masqué tant que non chargé, détail par run + total, état vide).
+5. **Coût dans la timeline pipeline + chat manager** (`feat(web): coût visible dans la timeline pipeline…`)
+   - Timeline : chip coût par étape (`$0.0123`) + « Coût total » dans le footer ; masqué quand inconnu. Tests : 2 nouveaux dans `PipelineFlux.test.tsx`.
+   - Chat manager : badge coût + tokens du run courant dans l'en-tête (données déjà chargées via `thread.run`).
+   - CSS : classes `.mission-budget-*`, `.timeline-cost`, `.manager-run-usage` + overrides dark.
+
+### Vérifications
+- `npm run typecheck` (racine) : OK
+- `npm run build -w @nodra/web` : OK
+- Web : 31 fichiers / 205 tests OK (dont budget-service 16, MissionInspector 6, PipelineFlux 9)
+- packages/application + sqlite-mission-repository + sqlite-pipeline-repository : OK (292 tests dans le lot web+application+repo)
+- ESLint sur tous les fichiers touchés : propre
+- Suite complète : **8 échecs pré-existants vérifiés par git stash** (architecture `one class per file`, health/i6/i14 : Temporal/Codex environnement, i7-run-controls + temporal-envelope : serveur Temporal non démarré). Le 9e échec transitoire (controllers dépendant d'adapters) venait de mon premier jet d'endpoint en requête directe DB dans `mission.controller.ts` ; refactoré en couche application, le test passe désormais.
+
+### Décisions / notes / limites
+- **Unité = micro-dollars** (`costMicros`), cohérent avec le reste du code (`agent-conversation-normalizer` divise par 1 000 000 pour `costUsd`). Le coût est celui **rapporté par le provider** quand il existe (`usageKind=reported`) ; l'historique affiche aussi `estimated`/`unavailable` quand ils arriveront.
+- **Périmètre de visibilité** : fiche mission (par run + total mission), pipeline (par étape + total pipeline), chat manager (run courant). La page de conversation provider (`ProviderMissionConversationPage`) affiche le fil externe et ne charge pas la ligne run par défaut — le coût y est consultable via la fiche ; suivi possible si l'issue le demande.
+- Les **enveloppes de budget** (`budget_window`, `budget_override`, `budget_ledger`, confirmation de dépassement, `budgetSnapshotJson`) restent hors périmètre : cette issue ne porte que la **visibilité** du coût ; l'enforcement est un chantier FR-11 distinct.
+- Une mission sans aucun run ne casse pas l'endpoint (historique vide, total null).
+
+### Statut
+- [x] #6 — Budget / coût visible par run et mission
