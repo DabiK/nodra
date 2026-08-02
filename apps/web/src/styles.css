@@ -860,6 +860,22 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
 .overdue-banner-button { flex: none; border: 0; border-radius: 10px; background: #d8a11f; color: #241a00; padding: 10px 16px; font-weight: 800; font-size: 12px; box-shadow: 0 6px 16px rgba(216,161,31,.25); }
 .overdue-banner-button:hover { filter: brightness(1.05); transform: translateY(-1px); }
 
+/* ============ Context-loss warning banner (issue #10) ============ */
+.context-risk-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 14px 0 4px; padding: 12px 16px; border: 1px solid #e6d3a6; border-left: 4px solid #d8a11f; border-radius: 12px; background: linear-gradient(120deg, #fbf3dd, var(--panel)); box-shadow: var(--shadow); }
+.context-risk-banner.critical { border-color: #e6bcb6; border-left-color: #c0392b; background: linear-gradient(120deg, #fdf0ee, var(--panel)); }
+.context-risk-banner-text { display: grid; gap: 3px; min-width: 0; }
+.context-risk-banner-text strong { font: 800 12.5px Manrope; color: #7a5a12; }
+.context-risk-banner.critical .context-risk-banner-text strong { color: #8f2f24; }
+.context-risk-metrics { margin: 0; font-size: 11.5px; color: #8a7a55; overflow-wrap: anywhere; }
+.context-risk-banner.critical .context-risk-metrics { color: #9c5a4d; }
+.context-risk-reasons { color: #a3906a; font-size: 10.5px; }
+.context-risk-action { flex: none; border: 0; border-radius: 10px; background: #d8a11f; color: #241a00; padding: 9px 14px; font-weight: 800; font-size: 11.5px; cursor: pointer; box-shadow: 0 6px 16px rgba(216,161,31,.25); }
+.context-risk-action:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.context-risk-action:disabled { opacity: .55; cursor: default; transform: none; }
+.context-risk-banner.critical .context-risk-action { background: #c0392b; color: #fff6f4; box-shadow: 0 6px 16px rgba(192,57,43,.25); }
+/* Variante plate dans le shell de conversation (fil provider), comme le failure banner. */
+.conversation-shell > .context-risk-banner { margin: 0; border-width: 0 0 1px; border-left-width: 0; border-radius: 0; padding: 12px clamp(22px, 5vw, 70px); box-shadow: none; }
+
 /* ============ Workspace mode picker (shared Terrain de travail) ============ */
 .workspace-mode-warning { margin: 8px 0 0; padding: 8px 11px; border-radius: 8px; background: #fbf3dd; border: 1px solid #e6d3a6; color: #7a5a12; font-size: 11px; }
 .workspace-mode-error { margin: 8px 0 0; padding: 8px 11px; border-radius: 8px; background: #fbeaea; border: 1px solid #e6b3b3; color: #8a2b2b; font-size: 11px; font-weight: 600; }
@@ -1451,6 +1467,16 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
   .overdue-banner-text strong { color: #e0b85c; }
   .overdue-banner-text small { color: #b39a5f; }
   .overdue-banner-button { background: #d8a11f; color: #241a00; }
+  /* contexte long */
+  .context-risk-banner { border-color: #4a3f1c; background: linear-gradient(120deg, #241d0e, var(--panel)); }
+  .context-risk-banner-text strong { color: #e0b85c; }
+  .context-risk-metrics { color: #b39a5f; }
+  .context-risk-reasons { color: #8f7d52; }
+  .context-risk-action { background: #d8a11f; color: #241a00; }
+  .context-risk-banner.critical { border-color: #4a2a24; background: linear-gradient(120deg, #2a1210, var(--panel)); }
+  .context-risk-banner.critical .context-risk-banner-text strong { color: #e8a096; }
+  .context-risk-banner.critical .context-risk-metrics { color: #c48b80; }
+  .context-risk-banner.critical .context-risk-action { background: #c0392b; color: #fff6f4; }
   .workspace-mode-warning { background: #2b2415; border-color: #4a3f1c; color: #e0b85c; }
   .workspace-mode-error { background: #2c1815; border-color: #5a2f29; color: #f0a89e; }
   .mission-config-error { border-color: #5a2f29; background: #2c1815; color: #f0a89e; }
