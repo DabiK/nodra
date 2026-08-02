@@ -7,7 +7,7 @@ import { ProviderMissionConversationPage } from "./ProviderMissionConversationPa
 // ici on la neutralise pour vérifier que la garde côté composant empêche
 // elle-même la boucle (POST → event → refresh → POST…).
 vi.mock("../services/events-service", async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, suppressServerEventsFor: vi.fn() };
 });
 
