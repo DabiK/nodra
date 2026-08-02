@@ -131,8 +131,8 @@ describe("CodexProviderSessionSyncAdapter", () => {
 
     expect(child.received.at(-1)).toEqual({
       method: "thread/read",
-      id: 2,
-      params: { threadId: "thr_read_1", includeTurns: true }
+      id: 3,
+      params: { threadId: "sub_thr_1", includeTurns: true }
     });
     expect(snapshot).toEqual({
       session: {
@@ -168,7 +168,18 @@ describe("CodexProviderSessionSyncAdapter", () => {
         { externalItemId: "item_agent", externalTurnId: "turn_1", role: "assistant", kind: "message", order: 2, text: "Done with [REDACTED]", name: null, sourceAt: null, receivedAt },
         { externalItemId: "item_tool", externalTurnId: "turn_1", role: "tool", kind: "tool_result", order: 3, text: "ok password=[REDACTED]", name: "npm test --token=[REDACTED]", sourceAt: null, receivedAt },
         { externalItemId: "item_future", externalTurnId: "turn_1", role: "unknown", kind: "unknown", order: 4, text: null, name: null, sourceAt: null, receivedAt },
-        { externalItemId: "item_subagent_started", externalTurnId: "turn_1", role: "assistant", kind: "subagent", order: 5, text: "started", name: "nested/codex", sourceAt: null, receivedAt },
+        { externalItemId: "item_subagent_started", externalTurnId: "turn_1", role: "assistant", kind: "subagent", order: 5, text: "started", name: "nested/codex", sourceAt: null, receivedAt, subagent: {
+          subSessionId: "sub_thr_1",
+          status: "completed",
+          model: null,
+          startedAt: "2026-08-02T18:05:16.000Z",
+          finishedAt: "2026-08-02T18:05:52.000Z",
+          report: "Fichier créé: story-1.txt",
+          transcript: [
+            { externalItemId: "sub_user", role: "user", kind: "message", order: 0, text: "Créer story-1.txt", name: null, sourceAt: null },
+            { externalItemId: "sub_agent", role: "assistant", kind: "message", order: 1, text: "Fichier créé: story-1.txt", name: null, sourceAt: null }
+          ]
+        } },
         { externalItemId: "item_collab_spawn", externalTurnId: "turn_1", role: "assistant", kind: "subagent", order: 6, text: "Refactor the module", name: "spawnAgent", sourceAt: null, receivedAt },
         { externalItemId: "item_mcp", externalTurnId: "turn_2", role: "assistant", kind: "tool_call", order: 7, text: null, name: "fixture/lookup", sourceAt: null, receivedAt }
       ],

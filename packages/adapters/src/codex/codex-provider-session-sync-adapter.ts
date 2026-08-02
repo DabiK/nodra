@@ -16,6 +16,8 @@ import type {
   ProviderSessionSyncPort,
   ProviderSessionTurn,
   ProviderSessionTurnState,
+  ProviderSubagentExecution,
+  ProviderSubagentTranscriptItem,
   ProviderSubscription
 } from "@nodra/application";
 import { ProviderSessionSyncError } from "@nodra/application";
@@ -35,6 +37,15 @@ interface MappedItem {
   kind: ProviderSessionItemKind;
   text: string | null;
   name: string | null;
+  subagentThreadId?: string | null;
+}
+
+interface MappedThreadItem extends MappedItem {
+  externalItemId: string;
+  externalTurnId: string;
+  order: number;
+  sourceAt: null;
+  receivedAt: string;
 }
 
 const unavailable = (reason: string) => ({
@@ -105,12 +116,13 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
         const receivedAt = this.now();
         const turns = thread.turns.map((turn, order) => this.turn(turn, order, receivedAt));
         let itemOrder = 0;
-        const items = thread.turns.flatMap((turn) => {
+        const mappedItems = thread.turns.flatMap((turn) => {
           const externalTurnId = this.stringField(turn, "id", "turn id");
           const values = this.arrayField(turn, "items", "turn items");
           const toolNames = this.callToolNames(values);
-          return values.map((item) => this.item(item, externalTurnId, itemOrder++, receivedAt, toolNames));
+          return values.map((value) => this.item(value, externalTurnId, itemOrder++, receivedAt, toolNames));
         });
+        const items = await this.attachSubagentExecutions(mappedItems, client);
         return {
           session: this.summary(thread, receivedAt),
           turns,
@@ -216,7 +228,7 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
     order: number,
     receivedAt: string,
     toolNames: Map<string, string>
-  ): ProviderSessionItem {
+  ): MappedThreadItem {
     const record = this.record(value, "thread item");
     const externalItemId = this.stringField(record, "id", "thread item id");
     const mapped = this.mapItem(record, toolNames);
@@ -325,7 +337,8 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
           role: "assistant",
           kind: "subagent",
           text: this.optionalString(item.kind),
-          name: this.optionalString(item.agentPath) ?? this.optionalString(item.agentThreadId)
+          name: this.optionalString(item.agentPath) ?? this.optionalString(item.agentThreadId),
+          subagentThreadId: this.optionalString(item.agentThreadId)
         };
       case "collabAgentToolCall":
         return {
@@ -337,6 +350,102 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
       default:
         return { role: "unknown", kind: "unknown", text: null, name: null };
     }
+  }
+
+  private async attachSubagentExecutions(
+    items: MappedThreadItem[],
+    client: CodexJsonRpcClient
+  ): Promise<ProviderSessionItem[]> {
+    const targets = items.filter(
+      (item) => item.kind === "subagent" && item.subagentThreadId !== null && item.subagentThreadId !== undefined
+    );
+    if (targets.length === 0) return items.map(this.withoutSubagentThreadId);
+    const executions = await Promise.all(targets.map(async (item) => {
+      const execution = await this.subagentExecution(item.subagentThreadId!, client);
+      return execution ? { ...item, subagent: execution } : null;
+    }));
+    const byExternalItemId = new Map(
+      executions
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+        .map((item) => [item.externalItemId, item])
+    );
+    return items.map((item) => {
+      const enriched = byExternalItemId.get(item.externalItemId) ?? item;
+      return this.withoutSubagentThreadId(enriched);
+    });
+  }
+
+  private withoutSubagentThreadId(item: MappedThreadItem): ProviderSessionItem {
+    const { subagentThreadId: _threadId, ...rest } = item;
+    return rest;
+  }
+
+  private async subagentExecution(
+    subThreadId: string,
+    client: CodexJsonRpcClient
+  ): Promise<ProviderSubagentExecution | null> {
+    try {
+      const result = await client.request("thread/read", { threadId: subThreadId, includeTurns: true });
+      const thread = this.readResponse(result);
+      return {
+        subSessionId: subThreadId,
+        status: this.threadStatus(thread),
+        model: null,
+        startedAt: this.nullableTimestampField(thread, "createdAt", "thread createdAt"),
+        finishedAt: this.nullableTimestampField(thread, "updatedAt", "thread updatedAt"),
+        report: this.lastAgentMessage(thread),
+        transcript: this.threadTranscript(thread, this.now())
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private threadStatus(thread: Record<string, unknown>): string {
+    if (!isRecord(thread.status) || typeof thread.status.type !== "string") return "unknown";
+    return thread.status.type;
+  }
+
+  private threadTranscript(
+    thread: Record<string, unknown>,
+    receivedAt: string
+  ): ProviderSubagentTranscriptItem[] {
+    const turns = this.arrayField(thread, "turns", "thread turns")
+      .map((turn) => this.record(turn, "thread turn"));
+    const items = turns.flatMap((turn) => {
+      const values = this.arrayField(turn, "items", "turn items");
+      const toolNames = this.callToolNames(values);
+      return values.map((value) => {
+        const record = this.record(value, "thread item");
+        const externalItemId = this.stringField(record, "id", "thread item id");
+        const mapped = this.mapItem(record, toolNames);
+        return {
+          externalItemId,
+          role: mapped.role,
+          kind: mapped.kind,
+          order: 0,
+          text: mapped.text,
+          name: mapped.name,
+          sourceAt: null
+        };
+      });
+    });
+    return items.map((item, order) => ({ ...item, order }));
+  }
+
+  private lastAgentMessage(thread: Record<string, unknown>): string | null {
+    const turns = this.arrayField(thread, "turns", "thread turns")
+      .map((turn) => this.record(turn, "thread turn"));
+    for (let i = turns.length - 1; i >= 0; i--) {
+      const values = this.arrayField(turns[i]!, "items", "turn items");
+      for (let j = values.length - 1; j >= 0; j--) {
+        const item = this.record(values[j], "thread item");
+        if (item.type !== "agentMessage") continue;
+        const text = this.redactedString(this.optionalString(item.text));
+        if (text !== null) return text;
+      }
+    }
+    return null;
   }
 
   private toolItem(item: Record<string, unknown>, name: string | null): MappedItem {
