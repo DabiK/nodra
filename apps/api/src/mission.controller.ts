@@ -18,7 +18,7 @@ import type {
   SteerProviderSessionTurn,
   UpdateAgentConfig
 } from "@nodra/application";
-import { DomainError, toId } from "@nodra/application";
+import { DomainError, toId, type ProviderReasoningEffort } from "@nodra/application";
 import { randomUUID } from "node:crypto";
 import {
   ACTIVATE_PROVIDER_SESSION_MISSION,
@@ -131,14 +131,25 @@ export class MissionController {
   @Post(":id/provider-session/turns")
   @HttpCode(202)
   startProviderSessionTurn(@Param("id") id: string, @Body() body: StartProviderSessionTurnDto) {
-    return this.startProviderTurn.execute({ missionId: toId(id), commandId: toId(body.commandId), text: body.text });
+    return this.startProviderTurn.execute({
+      missionId: toId(id),
+      commandId: toId(body.commandId),
+      text: body.text,
+      ...(body.modelId ? { modelId: body.modelId } : {}),
+      ...(body.reasoningEffort ? { reasoningEffort: body.reasoningEffort as ProviderReasoningEffort } : {})
+    });
   }
 
   @Post(":id/provider-session/steer")
   @HttpCode(202)
   steerProviderSessionTurn(@Param("id") id: string, @Body() body: SteerProviderSessionTurnDto) {
     return this.steerProviderTurn.execute({
-      missionId: toId(id), commandId: toId(body.commandId), externalTurnId: body.externalTurnId, text: body.text
+      missionId: toId(id),
+      commandId: toId(body.commandId),
+      externalTurnId: body.externalTurnId,
+      text: body.text,
+      ...(body.modelId ? { modelId: body.modelId } : {}),
+      ...(body.reasoningEffort ? { reasoningEffort: body.reasoningEffort as ProviderReasoningEffort } : {})
     });
   }
 

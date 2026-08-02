@@ -9,8 +9,31 @@ const mission = { id: "mission/provider/1", projectId: null, title: "Provider mi
 const capability = { state: "certified", reason: null, action: null };
 const control = { identity: { id: "session-1", providerId: "opencode", externalSessionRef: "thread-real", ownership: "external_observed", firstObservedAt: "2026-01-01", lastObservedAt: "2026-01-01" }, link: { id: "link-1", missionId: mission.id, mode: "control", attachedAt: "2026-01-01", detachedAt: null }, capabilities: { schemaVersion: 1, providerId: "opencode", read: capability, startTurn: capability, steer: capability, queue: { state: "unavailable", reason: "no queue", action: null } } };
 const detail = { identity: control.identity, link: control.link, capabilities: { schemaVersion: 1, providerId: "opencode", listSessions: capability, readSession: capability, readHistory: capability, subscribe: capability, cursorResume: capability, attachedControl: capability }, snapshot: { session: { ref: { providerId: "opencode", externalSessionId: "thread-real" }, title: "Provider mission", cwd: "/repo", state: "active", sourceCreatedAt: null, sourceUpdatedAt: null, receivedAt: "2026-01-01" }, turns: [{ externalTurnId: "turn-active", order: 1, state: "in_progress", sourceStartedAt: null, sourceCompletedAt: null, receivedAt: "2026-01-01" }], items: [{ externalItemId: "item-a", externalTurnId: "turn-active", role: "assistant", kind: "message", order: 1, text: "Same provider text", name: null, sourceAt: null, receivedAt: "2026-01-01" }, { externalItemId: "item-b", externalTurnId: "turn-active", role: "assistant", kind: "message", order: 2, text: "Same provider text", name: null, sourceAt: null, receivedAt: "2026-01-01" }, { externalItemId: "item-subagent", externalTurnId: "turn-active", role: "assistant", kind: "subagent", order: 3, text: "started", name: "nested/codex", sourceAt: null, receivedAt: "2026-01-01" }], cursor: "cursor-1" } };
+const catalog = {
+  providers: [
+    {
+      id: "opencode", label: "OpenCode", status: "ready", reason: null,
+      models: [
+        { id: "openai/gpt-5", label: "OpenAI / GPT-5", description: "", hidden: false, isDefault: true, supportedReasoningEfforts: ["provider_default", "low", "high"], defaultReasoningEffort: "provider_default" },
+        { id: "anthropic/claude-sonnet", label: "Anthropic / Claude Sonnet", description: "", hidden: false, isDefault: false, supportedReasoningEfforts: ["provider_default"], defaultReasoningEffort: "provider_default" }
+      ]
+    },
+    { id: "codex", label: "Codex", status: "ready", reason: null, models: [] }
+  ],
+  reasoningEfforts: ["provider_default", "minimal", "low", "medium", "high", "xhigh"],
+  permissionPresets: ["read_only", "workspace", "full_access"],
+  defaults: { providerId: "opencode", modelId: "openai/gpt-5", reasoningEffort: "provider_default", permissionPreset: "workspace", providerOptions: { schemaVersion: 1, value: {} } }
+};
 
 function json(value: unknown) { return Promise.resolve(new Response(JSON.stringify(value), { status: 200, headers: { "content-type": "application/json" } })); }
+
+function fetchWithCatalog(handlers: (url: RequestInfo | URL, init?: RequestInit) => ReturnType<typeof json> | Promise<Response>, catalogValue = catalog) {
+  return vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+    const path = String(url);
+    if (path.endsWith("/providers/options")) return json(catalogValue);
+    return handlers(url, init);
+  });
+}
 
 describe("provider mission conversation", () => {
   it("activates an attached READY mission when its chat URL is opened directly", async () => {
@@ -192,5 +215,64 @@ describe("provider mission conversation", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(input.value).toBe("Do the next thing");
     expect(screen.queryByRole("status", { name: "Message envoyé" })).toBeNull();
+  });
+
+  it("offers model and reasoning controls bound to the session provider and applies them to the next turn", async () => {
+    const fetchMock = fetchWithCatalog((url, init) => {
+      const path = String(url);
+      if (init?.method === "POST") return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-new" });
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(detail);
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+
+    await screen.findByText("Provider mission");
+    await screen.findByLabelText("Niveau de réflexion du prochain tour");
+
+    const providerSelect = screen.getByLabelText("Provider lié à la session") as HTMLSelectElement;
+    expect(providerSelect.value).toBe("opencode");
+    expect(([...providerSelect.options].find((option) => !option.disabled)!).value).toBe("opencode");
+
+    fireEvent.change(screen.getByLabelText("Niveau de réflexion du prochain tour"), { target: { value: "high" } });
+    fireEvent.change(screen.getByPlaceholderText("Écris une instruction au provider…"), { target: { value: "Do the next thing" } });
+    fireEvent.click(screen.getByRole("button", { name: /Envoyer un nouveau tour/ }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => {
+      if (!String(url).endsWith("/turns") || init?.method !== "POST") return false;
+      const body = JSON.parse(String(init.body));
+      return body.text === "Do the next thing" && body.modelId === "openai/gpt-5" && body.reasoningEffort === "high";
+    })).toBe(true));
+  });
+
+  it("enhances the prompt in one shot with a chosen provider and model, then fills the composer", async () => {
+    const fetchMock = fetchWithCatalog((url, init) => {
+      const path = String(url);
+      if (path.endsWith("/llm/enhance") && init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        expect(body.providerId).toBe("opencode");
+        expect(body.modelId).toBe("openai/gpt-5");
+        expect(body.prompt).toBe("Do the next thing");
+        return json({ prompt: "Enhanced prompt with much more detail." });
+      }
+      if (init?.method === "POST") return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-new" });
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(detail);
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+
+    await screen.findByText("Provider mission");
+    const input = screen.getByPlaceholderText("Écris une instruction au provider…") as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "Do the next thing" } });
+    fireEvent.click(screen.getByRole("button", { name: /Améliorer/ }));
+
+    expect(await screen.findByRole("heading", { name: "Améliorer le prompt" })).toBeTruthy();
+    expect((screen.getByLabelText("Moteur") as HTMLSelectElement).value).toBe("opencode");
+    fireEvent.click(screen.getByRole("button", { name: /Améliorer le prompt/ }));
+
+    await waitFor(() => expect(input.value).toBe("Enhanced prompt with much more detail."));
+    expect(screen.queryByRole("heading", { name: "Améliorer le prompt" })).toBeNull();
   });
 });

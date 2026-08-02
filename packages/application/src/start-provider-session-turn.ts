@@ -1,7 +1,8 @@
 import { DomainError, type Id } from "@nodra/domain";
-import { AutoValidateMissionAfterTurn } from "./auto-validate-mission-after-turn.js";
+import type { AutoValidateMissionAfterTurn } from "./auto-validate-mission-after-turn.js";
 import { requireProviderSessionCommandId } from "./provider-session-command.js";
 import { executeProviderSessionSync } from "./map-provider-session-sync-error.js";
+import type { ProviderReasoningEffort } from "./provider-model.js";
 import type { ProviderSessionControlRegistry } from "./provider-session-control-registry.js";
 import type { ProviderSessionTurnCommandResult } from "./provider-session-control-model.js";
 import type { ProviderSessionRepository } from "./provider-session-repository.js";
@@ -11,6 +12,8 @@ export interface StartProviderSessionTurnInput {
   missionId: Id;
   commandId: Id;
   text: string;
+  modelId?: string;
+  reasoningEffort?: ProviderReasoningEffort;
 }
 
 export class StartProviderSessionTurn {
@@ -35,7 +38,9 @@ export class StartProviderSessionTurn {
     const result = await executeProviderSessionSync(() => provider.startTurn({
       ref: { providerId: identity.providerId, externalSessionId: identity.externalSessionRef },
       text,
-      clientCommandId: input.commandId
+      clientCommandId: input.commandId,
+      ...(input.modelId ? { modelId: input.modelId } : {}),
+      ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {})
     }));
     // The turn completed: auto-validate the mission, but never fail the turn
     // on a validation hiccup (the use case swallows expected errors already;

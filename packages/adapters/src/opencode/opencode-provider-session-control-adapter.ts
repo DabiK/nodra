@@ -1,4 +1,4 @@
-import { createOpencodeClient, type AssistantMessage } from "@opencode-ai/sdk";
+import { createOpencodeClient, type AssistantMessage, type SessionPromptAsyncData } from "@opencode-ai/sdk";
 import type {
   ProviderSessionControlCapabilities,
   ProviderSessionControlPort,
@@ -56,7 +56,7 @@ export class OpenCodeProviderSessionControlAdapter implements ProviderSessionCon
   async startTurn(input: ProviderSessionStartTurnInput): Promise<ProviderSessionTurnCommandResult> {
     this.assertRef(input.ref.providerId, input.ref.externalSessionId);
     try {
-      const externalTurnId = await this.command(input.ref.externalSessionId, input.text);
+      const externalTurnId = await this.command(input.ref.externalSessionId, input.text, input);
       return { ref: input.ref, externalTurnId };
     } catch (error) {
       throw this.mapError(error, input.ref.externalSessionId);
@@ -66,14 +66,14 @@ export class OpenCodeProviderSessionControlAdapter implements ProviderSessionCon
   async steer(input: ProviderSessionSteerInput): Promise<ProviderSessionTurnCommandResult> {
     this.assertRef(input.ref.providerId, input.ref.externalSessionId);
     try {
-      const externalTurnId = await this.command(input.ref.externalSessionId, input.text);
+      const externalTurnId = await this.command(input.ref.externalSessionId, input.text, input);
       return { ref: input.ref, externalTurnId };
     } catch (error) {
       throw this.mapError(error, input.ref.externalSessionId);
     }
   }
 
-  private async command(sessionId: string, text: string): Promise<string> {
+  private async command(sessionId: string, text: string, run: { modelId?: string; reasoningEffort?: string } = {}): Promise<string> {
     const client = this.client();
     const before = await client.session.messages({ path: { id: sessionId }, throwOnError: true });
     const knownUserIds = new Set(before.data.map((message) => message.info.id));
@@ -81,7 +81,7 @@ export class OpenCodeProviderSessionControlAdapter implements ProviderSessionCon
 
     await client.session.promptAsync({
       path: { id: sessionId },
-      body: { parts: [{ type: "text", text }] },
+      body: this.promptBody(text, run),
       throwOnError: true
     });
 
@@ -108,6 +108,33 @@ export class OpenCodeProviderSessionControlAdapter implements ProviderSessionCon
       false,
       `OpenCode session prompt timed out after ${this.executionTimeoutMs}ms`
     );
+  }
+
+  // OpenCode Serve accepts an optional per-prompt model override and a
+  // reasoning "variant" next to the text parts. The SDK body type does not
+  // expose these fields yet, so they are added with an explicit cast.
+  private promptBody(
+    text: string,
+    run: { modelId?: string; reasoningEffort?: string }
+  ): NonNullable<SessionPromptAsyncData["body"]> & { model?: unknown; variant?: string } {
+    return {
+      parts: [{ type: "text", text }],
+      ...(run.modelId ? { model: this.parseModelId(run.modelId) } : {}),
+      ...(run.reasoningEffort && run.reasoningEffort !== "provider_default"
+        ? { variant: run.reasoningEffort }
+        : {})
+    } as NonNullable<SessionPromptAsyncData["body"]> & { model?: unknown; variant?: string };
+  }
+
+  private parseModelId(modelId: string): { providerID: string; modelID: string } {
+    const separator = modelId.indexOf("/");
+    if (separator <= 0 || separator === modelId.length - 1) {
+      throw this.failure("PROTOCOL_INCOMPATIBLE", "", false, `OpenCode modelId ${modelId} is not namespaced`);
+    }
+    return {
+      providerID: modelId.slice(0, separator),
+      modelID: modelId.slice(separator + 1)
+    };
   }
 
   private delay(ms: number): Promise<void> {

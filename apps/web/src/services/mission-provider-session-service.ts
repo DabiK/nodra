@@ -1,6 +1,7 @@
 import { api } from "../api";
 import type {
   MissionProviderSessionCapabilitiesView,
+  ProviderReasoningEffort,
   ProviderSessionDetailView,
   ProviderSessionTurnCommandResult
 } from "../types";
@@ -31,16 +32,32 @@ export function ensureMissionObservationSession(missionId: string, commandId: st
   });
 }
 
-export function startMissionProviderTurn(missionId: string, text: string, commandId: string) {
+export interface ProviderTurnCommandInput {
+  modelId?: string;
+  reasoningEffort?: ProviderReasoningEffort;
+}
+
+export function startMissionProviderTurn(missionId: string, text: string, commandId: string, run?: ProviderTurnCommandInput) {
   return api<ProviderSessionTurnCommandResult>(`${missionPath(missionId)}/turns`, {
     method: "POST",
-    body: JSON.stringify({ text, commandId })
+    body: JSON.stringify({
+      text,
+      commandId,
+      ...(run?.modelId ? { modelId: run.modelId } : {}),
+      ...(run?.reasoningEffort ? { reasoningEffort: run.reasoningEffort } : {})
+    })
   });
 }
 
-export function steerMissionProviderTurn(missionId: string, externalTurnId: string, text: string, commandId: string) {
+export function steerMissionProviderTurn(missionId: string, externalTurnId: string, text: string, commandId: string, run?: ProviderTurnCommandInput) {
   return api<ProviderSessionTurnCommandResult>(`${missionPath(missionId)}/steer`, {
     method: "POST",
-    body: JSON.stringify({ externalTurnId, text, commandId })
+    body: JSON.stringify({
+      externalTurnId,
+      text,
+      commandId,
+      ...(run?.modelId ? { modelId: run.modelId } : {}),
+      ...(run?.reasoningEffort ? { reasoningEffort: run.reasoningEffort } : {})
+    })
   });
 }

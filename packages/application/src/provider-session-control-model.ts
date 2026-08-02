@@ -1,3 +1,4 @@
+import type { ProviderReasoningEffort } from "./provider-model.js";
 import type { ProviderSessionRef, ProviderSessionSyncCapability } from "./provider-session-sync-model.js";
 
 export interface ProviderSessionControlCapabilities {
@@ -13,6 +14,8 @@ export interface ProviderSessionStartTurnInput {
   ref: ProviderSessionRef;
   text: string;
   clientCommandId: string;
+  modelId?: string;
+  reasoningEffort?: ProviderReasoningEffort;
 }
 
 export interface ProviderSessionSteerInput extends ProviderSessionStartTurnInput {

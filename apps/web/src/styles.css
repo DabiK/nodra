@@ -969,3 +969,40 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 .model-picker-empty { margin: 0; padding: 18px 10px; color: var(--muted); font-size: 12px; text-align: center; }
 .model-picker-dialog footer { color: var(--muted); font-size: 11px; }
 .model-picker-dialog footer .secondary { border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: #fff; color: var(--ink); font: 800 11px Manrope; cursor: pointer; }
+
+/* ============ Provider thread run controls (moteur · modèle · réflexion) ============ */
+.provider-thread-run { display: grid; gap: 3px; }
+.provider-thread-run-label { color: var(--muted); font: 700 8px monospace; letter-spacing: .05em; }
+.provider-thread-run-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.provider-thread-run-controls .model-picker-trigger { width: 172px; padding: 7px 9px; }
+.provider-thread-run-select { display: grid; gap: 1px; }
+.provider-thread-run-select > span { padding: 0 2px; color: var(--muted); font: 700 8px Manrope; }
+.provider-thread-run-select select { width: auto; box-sizing: border-box; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: #fff; color: var(--ink); font: 600 11px Manrope; }
+.provider-thread-run-select select:disabled { opacity: .6; cursor: not-allowed; }
+.enhance-button { flex: none; border: 1px solid #cfd8cc; border-radius: 10px; padding: 10px 13px; background: #f4f7f0; color: #4c6a52; font-size: 11px; font-weight: 900; cursor: pointer; }
+.enhance-button:hover:not(:disabled) { border-color: var(--green); color: var(--green); }
+.enhance-button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ============ Prompt enhancement one-shot dialog ============ */
+.prompt-enhance-backdrop { z-index: 95; }
+.prompt-enhance-dialog { display: grid; gap: 12px; width: min(560px, 100%); max-height: min(680px, 90vh); box-sizing: border-box; overflow-y: auto; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: 0 24px 70px rgba(20, 30, 25, .35); }
+.prompt-enhance-dialog header, .prompt-enhance-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.prompt-enhance-dialog h2 { margin: 2px 0 0; font: 800 19px Manrope; }
+.prompt-enhance-dialog .icon-button { border: 0; background: transparent; color: var(--muted); font-size: 22px; cursor: pointer; }
+.prompt-enhance-dialog .icon-button:disabled { opacity: .4; cursor: not-allowed; }
+.prompt-enhance-source { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.prompt-enhance-preview { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fbfaf6; }
+.prompt-enhance-preview strong { display: block; margin-bottom: 4px; color: var(--green); font: 800 9px Manrope; letter-spacing: .06em; text-transform: uppercase; }
+.prompt-enhance-preview p { margin: 0; overflow: hidden; color: #5c685f; font: 500 12px/1.55 "DM Sans", system-ui, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-enhance-fields { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.prompt-enhance-field { display: grid; gap: 4px; }
+.prompt-enhance-field > span { padding: 0 2px; color: var(--muted); font: 700 9px Manrope; }
+.prompt-enhance-field select { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 7px; padding: 8px 9px; background: #fff; color: var(--ink); font: 600 11px Manrope; }
+.prompt-enhance-field .model-picker-trigger { width: 100%; }
+.prompt-enhance-dialog .inspector-error { margin: 0; border-radius: 8px; padding: 9px 11px; font-size: 10px; }
+.prompt-enhance-dialog footer .secondary { border: 1px solid var(--line); border-radius: 8px; padding: 7px 13px; background: #fff; color: var(--ink); font: 800 11px Manrope; cursor: pointer; }
+.prompt-enhance-dialog footer .secondary:disabled { opacity: .5; cursor: not-allowed; }
+.prompt-enhance-primary { border: 0; border-radius: 9px; padding: 8px 14px; background: var(--green); color: white; font: 900 11px Manrope; cursor: pointer; }
+.prompt-enhance-primary:hover:not(:disabled) { filter: brightness(.96); }
+.prompt-enhance-primary:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 700px) { .prompt-enhance-fields { grid-template-columns: 1fr; } }

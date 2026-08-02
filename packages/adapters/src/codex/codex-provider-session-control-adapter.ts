@@ -38,12 +38,16 @@ export class CodexProviderSessionControlAdapter implements ProviderSessionContro
     this.assertRef(input.ref.providerId, input.ref.externalSessionId);
     try {
       const result = await this.withClient(async (client) => {
-        await this.resumeThread(client, input.ref.externalSessionId);
+        await this.resumeThread(client, input.ref.externalSessionId, input);
         const completed = this.waitForTurnCompletion(client);
         const started = await client.request("turn/start", {
           threadId: input.ref.externalSessionId,
           clientUserMessageId: input.clientCommandId,
-          input: [{ type: "text", text: input.text }]
+          input: [{ type: "text", text: input.text }],
+          ...(input.modelId ? { model: input.modelId } : {}),
+          ...(input.reasoningEffort && input.reasoningEffort !== "provider_default"
+            ? { effort: input.reasoningEffort }
+            : {})
         });
         if (!isRecord(started) || !isRecord(started.turn) || typeof started.turn.id !== "string" || !started.turn.id) {
           throw new CodexProtocolError("turn/start returned an invalid turn reference");
@@ -64,13 +68,17 @@ export class CodexProviderSessionControlAdapter implements ProviderSessionContro
     this.assertRef(input.ref.providerId, input.ref.externalSessionId);
     try {
       const result = await this.withClient(async (client) => {
-        await this.resumeThread(client, input.ref.externalSessionId);
+        await this.resumeThread(client, input.ref.externalSessionId, input);
         const completed = this.waitForTurnCompletion(client);
         const steered = await client.request("turn/steer", {
           threadId: input.ref.externalSessionId,
           expectedTurnId: input.externalTurnId,
           clientUserMessageId: input.clientCommandId,
-          input: [{ type: "text", text: input.text }]
+          input: [{ type: "text", text: input.text }],
+          ...(input.modelId ? { model: input.modelId } : {}),
+          ...(input.reasoningEffort && input.reasoningEffort !== "provider_default"
+            ? { effort: input.reasoningEffort }
+            : {})
         });
         if (!isRecord(steered) || typeof steered.turnId !== "string" || !steered.turnId) {
           throw new CodexProtocolError("turn/steer returned an invalid turn reference");
@@ -90,12 +98,17 @@ export class CodexProviderSessionControlAdapter implements ProviderSessionContro
     }
   }
 
-  private async resumeThread(client: CodexJsonRpcClient, threadId: string): Promise<string> {
+  private async resumeThread(
+    client: CodexJsonRpcClient,
+    threadId: string,
+    run: { modelId?: string } = {}
+  ): Promise<string> {
     const result = await client.request("thread/resume", {
       threadId,
       approvalPolicy: "on-request",
       approvalsReviewer: "user",
-      sandbox: "workspace-write"
+      sandbox: "workspace-write",
+      ...(run.modelId ? { model: run.modelId } : {})
     });
     if (!isRecord(result) || !isRecord(result.thread) || typeof result.thread.id !== "string" || !result.thread.id) {
       throw new CodexProtocolError("thread/resume returned an invalid thread reference");

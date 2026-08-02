@@ -6,9 +6,11 @@ import { APP_FILTER } from "@nestjs/core";
 import {
   ContentAddressedBlobStore,
   CodexProviderAdapter,
+  CodexProviderOneShotAdapter,
   CodexProviderSessionControlAdapter,
   CodexProviderSessionSyncAdapter,
   OpenCodeProviderAdapter,
+  OpenCodeProviderOneShotAdapter,
   OpenCodeProviderSessionControlAdapter,
   OpenCodeProviderSessionSyncAdapter,
   LazyTemporalConnection,
@@ -61,6 +63,7 @@ import {
   DispatchWorkflowOutbox,
   EnableAgentConfig,
   EnsureMissionObservationSession,
+  EnhancePrompt,
   GetAgentConfig,
   GetHealth,
   GetProviderStatus,
@@ -96,6 +99,7 @@ import {
   ProbeProvider,
   PublishPipelineNodeHandover,
   ProviderRegistry,
+  ProviderOneShotRegistry,
   ProviderSessionControlRegistry,
   ProviderSessionSyncRegistry,
   PreviewAgentConfig,
@@ -132,6 +136,7 @@ import { WorkspaceController } from "./workspace.controller.js";
 import { ProviderController } from "./provider.controller.js";
 import { ProviderSessionController } from "./provider-session.controller.js";
 import { PipelineController } from "./pipeline.controller.js";
+import { LlmController } from "./llm.controller.js";
 import { RunController } from "./run.controller.js";
 import {
   AGENT_CONFIG_REPOSITORY,
@@ -178,6 +183,8 @@ import {
   ENSURE_MISSION_OBSERVATION_SESSION,
   START_PROVIDER_SESSION_TURN,
   STEER_PROVIDER_SESSION_TURN,
+  PROVIDER_ONE_SHOT_REGISTRY,
+  ENHANCE_PROMPT,
   READ_EVIDENCE,
   READ_WORKSPACE,
   RECONCILE_WORKFLOWS,
@@ -223,7 +230,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, ProviderSessionController, RunController, PipelineController],
+      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, ProviderSessionController, RunController, PipelineController, LlmController],
       providers: [
         { provide: REPOSITORY_ROOT, useValue: options.repositoryRoot ?? process.cwd() },
         { provide: DATA_ROOT, useValue: options.dataRoot ?? dirname(options.databaseFile) },
@@ -376,6 +383,23 @@ export class NodraModule {
               })
             ]
           )
+        },
+        {
+          provide: PROVIDER_ONE_SHOT_REGISTRY,
+          useFactory: () => new ProviderOneShotRegistry([
+            new CodexProviderOneShotAdapter(),
+            new OpenCodeProviderOneShotAdapter({
+              baseUrl: options.opencodeBaseUrl
+                ?? process.env.NODRA_OPENCODE_URL
+                ?? "http://127.0.0.1:4096",
+              executionTimeoutMs: Number(process.env.NODRA_OPENCODE_EXECUTION_TIMEOUT_MS ?? "300000")
+            })
+          ])
+        },
+        {
+          provide: ENHANCE_PROMPT,
+          inject: [PROVIDER_ONE_SHOT_REGISTRY],
+          useFactory: (providers: ProviderOneShotRegistry) => new EnhancePrompt(providers)
         },
         {
           provide: LIST_PROVIDER_SESSIONS,

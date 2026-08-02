@@ -120,6 +120,13 @@ export type {
 } from "./provider-session-control-model.js";
 export { ProviderSessionSyncError } from "./provider-session-sync-error.js";
 export { ProviderSessionSyncRegistry } from "./provider-session-sync-registry.js";
+export { ProviderOneShotRegistry } from "./provider-one-shot-registry.js";
+export type {
+  ProviderOneShotInput,
+  ProviderOneShotPort,
+  ProviderOneShotResult
+} from "./provider-one-shot-model.js";
+export { EnhancePrompt, type EnhancePromptInput, type EnhancePromptResult } from "./enhance-prompt.js";
 export { ListProviderSessions } from "./list-provider-sessions.js";
 export { ShowProviderSession } from "./show-provider-session.js";
 export { ReadMissionProviderSession } from "./read-mission-provider-session.js";

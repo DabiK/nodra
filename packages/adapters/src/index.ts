@@ -57,6 +57,7 @@ export { SqliteProviderCatalogRepository } from "./sqlite/sqlite-provider-catalo
 export { SqliteProviderSessionRepository } from "./sqlite/sqlite-provider-session-repository.js";
 export { SqliteRunControlRepository } from "./sqlite/sqlite-run-control-repository.js";
 export { CodexProviderAdapter } from "./codex/codex-provider-adapter.js";
+export { CodexProviderOneShotAdapter } from "./codex/codex-provider-one-shot-adapter.js";
 export { CodexProviderSessionSyncAdapter } from "./codex/codex-provider-session-sync-adapter.js";
 export { CodexProviderSessionControlAdapter } from "./codex/codex-provider-session-control-adapter.js";
 export { CodexJsonRpcClient } from "./codex/codex-json-rpc-client.js";
@@ -69,6 +70,7 @@ export {
   type OpenCodeProviderAdapterOptions
 } from "./opencode/opencode-provider-adapter.js";
 export { OpenCodeProviderSessionSyncAdapter } from "./opencode/opencode-provider-session-sync-adapter.js";
+export { OpenCodeProviderOneShotAdapter } from "./opencode/opencode-provider-one-shot-adapter.js";
 export { OpenCodeProviderSessionControlAdapter } from "./opencode/opencode-provider-session-control-adapter.js";
 export { OpenCodeContractProbe } from "./opencode/opencode-contract-probe.js";
 export { OpenCodeEventMapper } from "./opencode/opencode-event-mapper.js";

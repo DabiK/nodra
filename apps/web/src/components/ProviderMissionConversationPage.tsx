@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { MissionProviderSessionCapabilitiesView, MissionView, ProviderSessionDetailView } from "../types";
+import type { MissionProviderSessionCapabilitiesView, MissionView, ProviderOptionsCatalog, ProviderReasoningEffort, ProviderSessionDetailView } from "../types";
 import {
   activateMissionProviderSession,
   ensureMissionObservationSession,
@@ -10,6 +10,7 @@ import {
   startMissionProviderTurn,
   steerMissionProviderTurn
 } from "../services/mission-provider-session-service";
+import { loadProviderOptions, reasoningLabels } from "../services/provider-service";
 import { showMission } from "../services/mission-service";
 import { latestRunForMission } from "../services/mission-result-service";
 import { loadAgentSession } from "../services/agent-session-service";
@@ -17,6 +18,8 @@ import { extractRunFailure, type RunFailure } from "../services/agent-conversati
 import { providerSessionSections } from "../services/provider-session-sections";
 import { subagentStatusLabel, subagentToolLabel } from "../services/subagent-labels";
 import { SubagentExecution } from "./SubagentExecution";
+import { ModelPicker } from "./ModelPicker";
+import { PromptEnhanceDialog } from "./PromptEnhanceDialog";
 
 function capabilityAvailable(state: string | undefined) {
   return Boolean(state && state !== "unavailable");
@@ -34,6 +37,52 @@ function providerLabel(providerId: string) {
   if (providerId === "github-copilot") return "Copilot";
   if (providerId === "opencode") return "OpenCode";
   return providerId ? providerId.charAt(0).toUpperCase() + providerId.slice(1) : "Provider";
+}
+
+function runPrefsKey(missionId: string) {
+  return `nodra:thread-run:${missionId}`;
+}
+
+interface ThreadRunPrefs {
+  modelId: string | null;
+  reasoningEffort: ProviderReasoningEffort | null;
+}
+
+function loadRunPrefs(missionId: string): ThreadRunPrefs {
+  try {
+    const raw = localStorage.getItem(runPrefsKey(missionId));
+    if (!raw) return { modelId: null, reasoningEffort: null };
+    const parsed = JSON.parse(raw) as Partial<ThreadRunPrefs>;
+    return {
+      modelId: typeof parsed.modelId === "string" ? parsed.modelId : null,
+      reasoningEffort: typeof parsed.reasoningEffort === "string"
+        ? parsed.reasoningEffort as ProviderReasoningEffort
+        : null
+    };
+  } catch {
+    return { modelId: null, reasoningEffort: null };
+  }
+}
+
+function saveRunPrefs(missionId: string, prefs: ThreadRunPrefs) {
+  try {
+    localStorage.setItem(runPrefsKey(missionId), JSON.stringify(prefs));
+  } catch {
+    // Le stockage local peut être indisponible ; la préférence reste de session.
+  }
+}
+
+function modelsForProvider(catalog: ProviderOptionsCatalog, providerId: string) {
+  return catalog.providers.find((provider) => provider.id === providerId)?.models.filter((model) => !model.hidden) ?? [];
+}
+
+function reasoningEffortOptions(catalog: ProviderOptionsCatalog, modelId: string | null): ProviderReasoningEffort[] {
+  const model = catalog.providers
+    .flatMap((provider) => provider.models)
+    .find((candidate) => candidate.id === modelId);
+  return model && model.supportedReasoningEfforts.length > 0
+    ? model.supportedReasoningEfforts
+    : catalog.reasoningEfforts;
 }
 
 function itemLabel(item: ProviderSessionDetailView["snapshot"]["items"][number], providerId: string) {
@@ -102,6 +151,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   const [mission, setMission] = useState<MissionView | null>(null);
   const [detail, setDetail] = useState<ProviderSessionDetailView | null>(null);
   const [control, setControl] = useState<MissionProviderSessionCapabilitiesView | null>(null);
+  const [catalog, setCatalog] = useState<ProviderOptionsCatalog | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState<"send" | "steer" | null>(null);
   const [sentText, setSentText] = useState<string | null>(null);
@@ -109,9 +159,45 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   const [pending, setPending] = useState("");
   const [failure, setFailure] = useState<RunFailure | null>(null);
   const [connected, setConnected] = useState(false);
+  const [runModelId, setRunModelId] = useState<string | null>(null);
+  const [runReasoningEffort, setRunReasoningEffort] = useState<ProviderReasoningEffort>("provider_default");
+  const [enhanceOpen, setEnhanceOpen] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const activationRef = useRef(false);
+  const catalogRef = useRef(false);
   const commandRef = useRef<{ kind: "send" | "steer"; text: string; id: string } | null>(null);
+
+  useEffect(() => {
+    if (catalogRef.current) return;
+    catalogRef.current = true;
+    void loadProviderOptions()
+      .then((options) => { if (Array.isArray(options.providers)) setCatalog(options); })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!detail || !catalog) return;
+    const prefs = loadRunPrefs(missionId);
+    const models = modelsForProvider(catalog, detail.identity.providerId);
+    const modelId = prefs.modelId && models.some((model) => model.id === prefs.modelId)
+      ? prefs.modelId
+      : (models[0]?.id ?? null);
+    const selected = models.find((model) => model.id === modelId) ?? null;
+    const efforts = selected && selected.supportedReasoningEfforts.length > 0
+      ? selected.supportedReasoningEfforts
+      : catalog.reasoningEfforts;
+    const effort = prefs.reasoningEffort && efforts.includes(prefs.reasoningEffort)
+      ? prefs.reasoningEffort
+      : "provider_default";
+    setRunModelId(modelId);
+    setRunReasoningEffort(effort);
+  }, [detail, catalog, missionId]);
+
+  const persistRunPrefs = (modelId: string | null, effort: ProviderReasoningEffort) => {
+    setRunModelId(modelId);
+    setRunReasoningEffort(effort);
+    saveRunPrefs(missionId, { modelId, reasoningEffort: effort });
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -202,9 +288,13 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
     setBusy(kind);
     setError("");
     setSentText(value);
+    const run = {
+      ...(runModelId ? { modelId: runModelId } : {}),
+      ...(runReasoningEffort !== "provider_default" ? { reasoningEffort: runReasoningEffort } : {})
+    };
     try {
-      if (kind === "steer" && activeTurn) await steerMissionProviderTurn(missionId, activeTurn.externalTurnId, value, id);
-      else await startMissionProviderTurn(missionId, value, id);
+      if (kind === "steer" && activeTurn) await steerMissionProviderTurn(missionId, activeTurn.externalTurnId, value, id, run);
+      else await startMissionProviderTurn(missionId, value, id, run);
       commandRef.current = null;
       setText("");
       await refresh();
@@ -244,12 +334,53 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
             <form className="agent-composer" onSubmit={submit}>
               <textarea rows={2} maxLength={20000} value={text} onChange={(event) => setText(event.target.value)} placeholder="Écris une instruction au provider…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
               <div className="composer-bottom">
-                <div className="composer-options"><span className="thread-label">{detail?.identity.externalSessionRef ?? "session provider"}</span></div>
-                <div className="composer-actions">{canSteer ? <button type="button" className="steer-button" disabled={!text.trim() || busy !== null} onClick={() => void execute("steer")}>{busy === "steer" ? "Steer…" : "↳ Steer le tour actif"}</button> : null}<button type="submit" className="send-button" disabled={!text.trim() || !canStartTurn || busy !== null}>{busy === "send" ? "Envoi…" : "Envoyer un nouveau tour"} <span>⌘↵</span></button></div>
+                <div className="composer-options">
+                  {catalog && detail ? (
+                    <div className="provider-thread-run" aria-label="Moteur, modèle et réflexion du prochain tour">
+                      <span className="provider-thread-run-label">MOTEUR · MODÈLE · RÉFLEXION</span>
+                      <div className="provider-thread-run-controls">
+                        <label className="provider-thread-run-select" title="Le thread provider est lié à ce moteur ; le modèle et la réflexion sont libres.">
+                          <span>{providerLabel(detail.identity.providerId)}</span>
+                          <select value={detail.identity.providerId} aria-label="Provider lié à la session" disabled>
+                            {catalog.providers.map((provider) => (
+                              <option key={provider.id} value={provider.id}>{provider.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <ModelPicker models={modelsForProvider(catalog, detail.identity.providerId)} value={runModelId ?? ""} onChange={(modelId) => persistRunPrefs(modelId, "provider_default")} idPrefix="provider-thread" />
+                        <label className="provider-thread-run-select">
+                          <span>Réflexion</span>
+                          <select value={runReasoningEffort} onChange={(event) => persistRunPrefs(runModelId, event.target.value as ProviderReasoningEffort)} aria-label="Niveau de réflexion du prochain tour">
+                            {reasoningEffortOptions(catalog, runModelId).map((effort) => (
+                              <option key={effort} value={effort}>{reasoningLabels[effort] ?? effort}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+                  ) : null}
+                  <span className="thread-label">{detail?.identity.externalSessionRef ?? "session provider"}</span>
+                </div>
+                <div className="composer-actions">
+                  {catalog && text.trim() ? <button type="button" className="enhance-button" disabled={busy !== null} onClick={() => setEnhanceOpen(true)}>✦ Améliorer</button> : null}
+                  {canSteer ? <button type="button" className="steer-button" disabled={!text.trim() || busy !== null} onClick={() => void execute("steer")}>{busy === "steer" ? "Steer…" : "↳ Steer le tour actif"}</button> : null}
+                  <button type="submit" className="send-button" disabled={!text.trim() || !canStartTurn || busy !== null}>{busy === "send" ? "Envoi…" : "Envoyer un nouveau tour"} <span>⌘↵</span></button>
+                </div>
               </div>
             </form>
-            <p className="permission-note">Chaque envoi crée directement un tour chez le provider. Aucune file locale n’est utilisée.</p>
+            <p className="permission-note">Chaque envoi crée directement un tour chez le provider. Aucune file locale n’est utilisée. Le modèle et la réflexion choisis s’appliquent au prochain tour.</p>
           </footer>
+          {catalog && enhanceOpen && detail ? (
+            <PromptEnhanceDialog
+              prompt={text}
+              catalog={catalog}
+              initialProviderId={detail.identity.providerId}
+              initialModelId={runModelId ?? undefined}
+              initialReasoningEffort={runReasoningEffort}
+              onClose={() => setEnhanceOpen(false)}
+              onEnhanced={(prompt) => { setText(prompt); setEnhanceOpen(false); }}
+            />
+          ) : null}
         </section>
       </main>
     </div>
