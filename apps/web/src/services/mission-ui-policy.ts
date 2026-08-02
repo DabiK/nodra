@@ -2,6 +2,7 @@ import type { MissionState, MissionView } from "../types";
 
 export type MissionActionId =
   | "configure"
+  | "start"
   | "open-provider-session"
   | "validate"
   | "accept-result"
@@ -99,19 +100,35 @@ function agentActions(context: MissionUiContext, canEditConfig: boolean): Missio
     primary,
     disabledReason: context.hasProviderSession ? undefined : "Session provider non attachée"
   });
+  const launch = (primary = false) => action({
+    id: "start",
+    label: "Lancer →",
+    enabled: context.hasAgentConfig && !context.hasProviderSession,
+    primary,
+    disabledReason: context.hasProviderSession
+      ? "Session provider déjà attachée (utilise la conversation)"
+      : "Configuration agent manquante"
+  });
 
   switch (context.mission.state) {
     case "DRAFT":
       return [
         action({ id: "configure", label: "Configurer", enabled: canEditConfig, primary: true }),
+        launch(),
         providerConversation(),
         action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
       ];
     case "READY":
-      return [
-        providerConversation(true),
-        action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
-      ];
+      return context.hasProviderSession
+        ? [
+            providerConversation(true),
+            action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
+          ]
+        : [
+            launch(true),
+            providerConversation(),
+            action({ id: "abandon", label: "Abandonner", enabled: true, danger: true })
+          ];
     case "ACTIVE":
       return [providerConversation(true)];
     case "VALIDATION":

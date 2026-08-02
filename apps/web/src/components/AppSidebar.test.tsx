@@ -5,18 +5,20 @@ import { AppSidebar } from "./AppSidebar";
 
 afterEach(cleanup);
 
-function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.fn()) {
+function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.fn(), onSelectMission = vi.fn()) {
   render(
     <AppSidebar
       page="tasks"
       collapsed={collapsed}
       activePipelineCount={0}
       hasActiveManager={false}
+      missions={[]}
       onToggle={onToggle}
       onNavigate={onNavigate}
+      onSelectMission={onSelectMission}
     />
   );
-  return { onToggle, onNavigate };
+  return { onToggle, onNavigate, onSelectMission };
 }
 
 describe("AppSidebar", () => {

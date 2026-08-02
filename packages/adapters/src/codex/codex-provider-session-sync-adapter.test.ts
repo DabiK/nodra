@@ -176,8 +176,36 @@ describe("CodexProviderSessionSyncAdapter", () => {
     expect(child.killed).toEqual(["SIGTERM"]);
   });
 
-  it("rejects invalid stable response shapes and still closes the client", async () => {
+  it("maps raw tool items (custom tool calls, shell, file changes, images) with call id association and redaction", async () => {
+    const responses = await fixture("session-read-tools");
     const child = processFixture((message, send) => {
+      if ("id" in message) send({ ...responses.shift()!, id: message.id });
+    });
+    const adapter = new CodexProviderSessionSyncAdapter(
+      launcher(child.process),
+      () => receivedAt
+    );
+
+    const snapshot = await adapter.readSession({
+      providerId: "codex",
+      externalSessionId: "thr_read_tools"
+    });
+
+    expect(snapshot.items).toEqual([
+      { externalItemId: "ctc_snake", externalTurnId: "turn_tools", role: "assistant", kind: "tool_call", order: 0, text: "npm test --token=[REDACTED]", name: "exec", sourceAt: null, receivedAt },
+      { externalItemId: "ctco_snake", externalTurnId: "turn_tools", role: "tool", kind: "tool_result", order: 1, text: "ok password=[REDACTED]\nsecond part", name: "exec", sourceAt: null, receivedAt },
+      { externalItemId: "ctc_camel", externalTurnId: "turn_tools", role: "assistant", kind: "tool_call", order: 2, text: "rg --token=[REDACTED]", name: "grep", sourceAt: null, receivedAt },
+      { externalItemId: "ctco_camel", externalTurnId: "turn_tools", role: "tool", kind: "tool_result", order: 3, text: "found secret=[REDACTED]", name: "grep", sourceAt: null, receivedAt },
+      { externalItemId: "lsc_1", externalTurnId: "turn_tools", role: "tool", kind: "tool_result", order: 4, text: "hi password=[REDACTED]", name: "echo hi", sourceAt: null, receivedAt },
+      { externalItemId: "exec_fc", externalTurnId: "turn_tools", role: "tool", kind: "tool_result", order: 5, text: "/workspace/a.txt\nline1 secret=[REDACTED]", name: "/workspace/a.txt", sourceAt: null, receivedAt },
+      { externalItemId: "img_1", externalTurnId: "turn_tools", role: "assistant", kind: "tool_call", order: 6, text: null, name: "/tmp/out.png", sourceAt: null, receivedAt },
+      { externalItemId: "item_future_tool", externalTurnId: "turn_tools", role: "unknown", kind: "unknown", order: 7, text: null, name: null, sourceAt: null, receivedAt }
+    ]);
+    expect(JSON.stringify(snapshot)).not.toMatch(/abcdefghijklmnop|must-not-be-exposed/);
+    expect(child.killed).toEqual(["SIGTERM"]);
+  });
+
+  it("rejects invalid stable response shapes and still closes the client", async () => {    const child = processFixture((message, send) => {
       if (message.method === "initialize") send({ id: message.id, result: {} });
       if (message.method === "thread/list") {
         send({ id: message.id, result: { data: {}, nextCursor: 42 } });

@@ -57,6 +57,7 @@ describe("ListProviderSessions", () => {
       },
       load: async () => { throw new Error("not used"); },
       listActiveLinksForMission: async () => { throw new Error("not used"); },
+  latestSessionRefForMission: async () => null,
       attachToMission: async () => { throw new Error("not used"); },
       createReadyAgentMissionAndAttach: async () => { throw new Error("not used"); }
     };
@@ -121,6 +122,7 @@ describe("ListProviderSessions", () => {
       load: async () => null,
       loadActiveLink: async () => null,
       listActiveLinksForMission: async () => [],
+      latestSessionRefForMission: async () => null,
       attachToMission: async () => { throw new Error("not used"); },
       createReadyAgentMissionAndAttach: async () => { throw new Error("not used"); }
     } satisfies ProviderSessionRepository;

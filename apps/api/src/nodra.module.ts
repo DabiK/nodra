@@ -57,6 +57,7 @@ import {
   DeleteWorkspace,
   DispatchWorkflowOutbox,
   EnableAgentConfig,
+  EnsureMissionObservationSession,
   GetAgentConfig,
   GetHealth,
   GetProviderStatus,
@@ -96,6 +97,7 @@ import {
   ProviderSessionSyncRegistry,
   PreviewAgentConfig,
   ReadMissionProviderSession,
+  ResolveMissionProviderSession,
   ResolveAgentConfig,
   StructuredGateEvaluatorRegistry,
   IntegrateWorkspace,
@@ -169,6 +171,7 @@ import {
   READ_MISSION_PROVIDER_SESSION,
   GET_MISSION_PROVIDER_SESSION_CONTROL_CAPABILITIES,
   ACTIVATE_PROVIDER_SESSION_MISSION,
+  ENSURE_MISSION_OBSERVATION_SESSION,
   START_PROVIDER_SESSION_TURN,
   STEER_PROVIDER_SESSION_TURN,
   READ_EVIDENCE,
@@ -403,6 +406,15 @@ export class NodraModule {
           inject: [PROVIDER_SESSION_CONTROL_REGISTRY, DATABASE],
           useFactory: (controls: ProviderSessionControlRegistry, database: NodraSqliteDatabase) =>
             new ActivateProviderSessionMission(controls, new SqliteProviderSessionRepository(database))
+        },
+        {
+          provide: ENSURE_MISSION_OBSERVATION_SESSION,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) =>
+            new EnsureMissionObservationSession(
+              new SqliteProviderSessionRepository(database),
+              new ResolveMissionProviderSession(new SqliteProviderSessionRepository(database))
+            )
         },
         {
           provide: START_PROVIDER_SESSION_TURN,

@@ -59,6 +59,7 @@ export class ResolveAgentConfig {
     if (
       model
       && config.reasoningEffort
+      && config.reasoningEffort !== "provider_default"
       && !model.supportedReasoningEfforts.includes(config.reasoningEffort)
     ) {
       errors.push({

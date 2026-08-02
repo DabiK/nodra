@@ -23,8 +23,7 @@ export class StartProviderSessionTurn {
     requireProviderSessionCommandId(input.commandId);
     const text = input.text.trim();
     if (!text) throw new DomainError("A provider turn message is required", "PROVIDER_SESSION_MESSAGE_REQUIRED");
-    const { identity, link } = await this.resolveSession.execute(input.missionId);
-    if (link.mode !== "control") throw new DomainError("Provider session link is read-only", "PROVIDER_SESSION_CONTROL_FORBIDDEN");
+    const { identity } = await this.resolveSession.execute(input.missionId);
     const provider = this.controls.resolve(identity.providerId);
     const capabilities = await executeProviderSessionSync(() => provider.capabilities());
     if (capabilities.startTurn.state === "unavailable") throw new DomainError("Starting a provider turn is unavailable", "CAPABILITY_UNAVAILABLE");

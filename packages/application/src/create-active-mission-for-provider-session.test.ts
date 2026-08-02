@@ -14,6 +14,7 @@ const repository = (
   }),
   loadActiveLink: async () => { throw new Error("not used"); },
   listActiveLinksForMission: async () => { throw new Error("not used"); },
+  latestSessionRefForMission: async () => null,
   attachToMission: async () => { throw new Error("not used"); }
 });
 

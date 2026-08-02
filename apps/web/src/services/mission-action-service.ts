@@ -1,6 +1,7 @@
 import { api } from "../api";
 import type { MissionView } from "../types";
 import type { MissionActionId } from "./mission-ui-policy";
+import { startMissionSession } from "./agent-session-service";
 import { activateMissionProviderSession } from "./mission-provider-session-service";
 
 export interface MissionActionInput {
@@ -12,6 +13,11 @@ export interface MissionActionInput {
 
 export async function performMissionAction(input: MissionActionInput) {
   const { actionId, mission, latestRunId } = input;
+  if (actionId === "start") {
+    await startMissionSession(mission.id, mission.version);
+    location.assign(`/agent.html?missionId=${encodeURIComponent(mission.id)}`);
+    return;
+  }
   if (actionId === "open-provider-session") {
     if (mission.state === "READY") {
       await activateMissionProviderSession(mission.id, mission.version, crypto.randomUUID());

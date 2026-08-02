@@ -1,5 +1,11 @@
 export type AppPage = "tasks" | "pipelines" | "managers" | "provider-sessions";
 
+export interface SidebarMission {
+  id: string;
+  title: string;
+  state: string;
+}
+
 /**
  * Presentational left navigation. Collapsible: when `collapsed` is true only
  * the brand mark, the toggle and the nav icons remain; labels are hidden via
@@ -10,19 +16,27 @@ export function AppSidebar({
   collapsed,
   activePipelineCount,
   hasActiveManager,
+  missions,
   onToggle,
-  onNavigate
+  onNavigate,
+  onSelectMission
 }: {
   page: AppPage;
   collapsed: boolean;
   activePipelineCount: number;
   hasActiveManager: boolean;
+  missions: SidebarMission[];
   onToggle(): void;
   onNavigate(page: AppPage): void;
+  onSelectMission(missionId: string): void;
 }) {
   const go = (target: AppPage) => (event: { preventDefault(): void }) => {
     event.preventDefault();
     onNavigate(target);
+  };
+  const openMission = (missionId: string) => (event: { preventDefault(): void }) => {
+    event.preventDefault();
+    onSelectMission(missionId);
   };
   return (
     <aside className="sidebar" aria-label="Navigation">
@@ -64,6 +78,22 @@ export function AppSidebar({
           <span className="nav-label">Sessions Codex</span>
         </a>
       </nav>
+      {missions.length > 0 ? (
+        <div className="sidebar-missions" aria-label="Missions actives">
+          <span className="sidebar-section-label">Missions actives</span>
+          <ul>
+            {missions.map((mission) => (
+              <li key={mission.id}>
+                <a href="/" title={mission.title} onClick={openMission(mission.id)}>
+                  <span className={`sidebar-mission-dot state-${mission.state.toLowerCase()}`} aria-hidden="true" />
+                  <span className="sidebar-mission-title">{mission.title}</span>
+                  <span className="sidebar-mission-state">{mission.state}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </aside>
   );
 }

@@ -123,6 +123,14 @@ export { ProviderSessionSyncRegistry } from "./provider-session-sync-registry.js
 export { ListProviderSessions } from "./list-provider-sessions.js";
 export { ShowProviderSession } from "./show-provider-session.js";
 export { ReadMissionProviderSession } from "./read-mission-provider-session.js";
+export {
+  EnsureMissionObservationSession,
+  type EnsureMissionObservationSessionInput
+} from "./ensure-mission-observation-session.js";
+export {
+  ResolveMissionProviderSession,
+  type ResolvedMissionProviderSession
+} from "./resolve-mission-provider-session.js";
 export { ActivateProviderSessionMission } from "./activate-provider-session-mission.js";
 export { GetMissionProviderSessionControlCapabilities } from "./get-mission-provider-session-control-capabilities.js";
 export { StartProviderSessionTurn, type StartProviderSessionTurnInput } from "./start-provider-session-turn.js";
@@ -154,7 +162,7 @@ export type {
   ProviderSessionLinkMode,
   ProviderSessionOwnership
 } from "./provider-session-model.js";
-export type { ProviderSessionRepository } from "./provider-session-repository.js";
+export type { ProviderSessionRepository, LatestSessionRefForMission } from "./provider-session-repository.js";
 export type {
   ProviderHistoryPage,
   ProviderHistoryQuery,

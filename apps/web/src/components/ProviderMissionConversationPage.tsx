@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import type { MissionProviderSessionCapabilitiesView, MissionView, ProviderSessionDetailView } from "../types";
 import {
   activateMissionProviderSession,
+  ensureMissionObservationSession,
   loadMissionProviderSession,
   loadMissionProviderSessionCapabilities,
   startMissionProviderTurn,
@@ -32,17 +33,18 @@ function itemLabel(item: ProviderSessionDetailView["snapshot"]["items"][number],
   if (item.role === "assistant" && item.kind === "message") return providerLabel(providerId);
   if (item.role === "assistant") return `${providerLabel(providerId)} · activité`;
   if (item.role === "tool") return "Outil";
-  return item.role;
+  return item.role || "Activité";
 }
 
 function ProviderItem({ item, providerId }: { item: ProviderSessionDetailView["snapshot"]["items"][number]; providerId: string }) {
   const message = item.kind === "message";
   const user = item.role === "user";
+  const tool = !message && (item.kind === "tool_call" || item.kind === "tool_result");
   return (
     <article className={`provider-thread-item ${user ? "user" : message ? "assistant" : "tool"}`} data-external-item-id={item.externalItemId}>
       <header><strong>{itemLabel(item, providerId)}</strong><span>{item.kind} · {item.externalItemId}</span></header>
       {item.name ? <code>{item.name}</code> : null}
-      <p>{item.text ?? "—"}</p>
+      <p className={tool ? "provider-thread-tool-text" : undefined}>{item.text ?? "—"}</p>
     </article>
   );
 }
@@ -71,6 +73,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   const [text, setText] = useState("");
   const [busy, setBusy] = useState<"send" | "steer" | null>(null);
   const [error, setError] = useState("");
+  const [pending, setPending] = useState("");
   const [connected, setConnected] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const activationRef = useRef(false);
@@ -84,8 +87,31 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
         await activateMissionProviderSession(missionId, nextMission.version, commandId());
         nextMission = await showMission(missionId);
       }
-      const [nextDetail, nextControl] = await Promise.all([
-        loadMissionProviderSession(missionId),
+      let nextDetail: ProviderSessionDetailView | null = null;
+      try {
+        nextDetail = await loadMissionProviderSession(missionId);
+      } catch (reason) {
+        const message = (reason as Error).message;
+        if (message.includes("has no active provider session")) {
+          try {
+            await ensureMissionObservationSession(missionId, commandId());
+            nextDetail = await loadMissionProviderSession(missionId);
+          } catch {
+            setMission(nextMission);
+            setDetail(null);
+            setControl(null);
+            setConnected(false);
+            setError("");
+            setPending(nextMission.state === "READY" || nextMission.state === "DRAFT"
+              ? "Lance d'abord la mission depuis la liste pour démarrer le thread provider."
+              : "En attente du démarrage du thread provider…");
+            return;
+          }
+        } else {
+          throw reason;
+        }
+      }
+      const [nextControl] = await Promise.all([
         loadMissionProviderSessionCapabilities(missionId)
       ]);
       setMission(nextMission);
@@ -93,6 +119,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
       setControl(nextControl);
       setConnected(true);
       setError("");
+      setPending("");
     } catch (reason) {
       activationRef.current = false;
       setConnected(false);
@@ -113,8 +140,8 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
 
   const activeTurn = useMemo(() => [...(detail?.snapshot.turns ?? [])].reverse().find((turn) => isActiveTurn(turn.state)) ?? null, [detail]);
   const canControl = detail?.link?.mode === "control";
-  const canStartTurn = Boolean(canControl && capabilityAvailable(control?.capabilities.startTurn.state));
-  const canSteer = Boolean(canControl && detail?.snapshot.session.state === "active" && activeTurn && capabilityAvailable(control?.capabilities.steer.state));
+  const canStartTurn = Boolean(detail?.link && capabilityAvailable(control?.capabilities.startTurn.state));
+  const canSteer = Boolean(detail?.link && detail?.snapshot.session.state === "active" && activeTurn && capabilityAvailable(control?.capabilities.steer.state));
 
   const execute = async (kind: "send" | "steer") => {
     const value = text.trim();
@@ -143,7 +170,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
       <header className="agent-topbar">
         <a className="agent-brand" href="/"><span className="agent-logo">N</span><span><strong>Nodra</strong><small>Provider thread</small></span></a>
         <div className="connection-state"><span className={`live-dot ${connected ? "connected" : "error"}`} /><span>{connected ? "En direct" : "Reconnexion…"}</span></div>
-        <div className={`provider-thread-mode ${canControl ? "control" : "readonly"}`}>{canControl ? "CONTRÔLE ATTACHÉ" : "LECTURE SEULE"}</div>
+        <div className={`provider-thread-mode ${canControl ? "control" : canStartTurn ? "client" : "readonly"}`}>{canControl ? "CONTRÔLE ATTACHÉ" : canStartTurn ? "OBSERVATION + ENVOI" : "LECTURE SEULE"}</div>
       </header>
       <main className="provider-thread-main">
         <section className="conversation-shell">
@@ -152,6 +179,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
             <div className="conversation-actions"><button type="button" className="ghost-button" onClick={() => void refresh()}>Rafraîchir</button><a className="ghost-button" href="/?page=provider-sessions">Sessions provider</a><a className="ghost-button" href="/">← Missions</a></div>
           </header>
           {error ? <p className="inspector-error" role="alert">{error}</p> : null}
+          {pending ? <p className="inspector-note" role="status">{pending}</p> : null}
           <div className="provider-thread-source"><span>Source de vérité provider</span><code>{detail?.identity.externalSessionRef ?? missionId}</code></div>
           <div className="conversation-feed-wrap"><div className="agent-conversation provider-thread-feed" ref={feedRef} aria-live="polite"><ProviderFeed detail={detail} busy={busy !== null} /></div></div>
           <footer className="composer-wrap">

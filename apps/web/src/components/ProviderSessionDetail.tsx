@@ -4,7 +4,7 @@ function itemRoleLabel(role: string, kind: string) {
   if (role === "user") return "Vous";
   if (role === "assistant") return kind === "message" ? "Codex" : "Codex · activité";
   if (role === "system") return "Système";
-  return role;
+  return role === "unknown" || !role ? "Activité" : role;
 }
 
 function SnapshotItem({ item }: { item: ProviderSessionDetailView["snapshot"]["items"][number] }) {

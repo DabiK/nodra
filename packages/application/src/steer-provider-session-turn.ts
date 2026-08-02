@@ -26,8 +26,7 @@ export class SteerProviderSessionTurn {
     const externalTurnId = input.externalTurnId.trim();
     if (!text) throw new DomainError("A provider steer message is required", "PROVIDER_SESSION_MESSAGE_REQUIRED");
     if (!externalTurnId) throw new DomainError("An active provider turn reference is required", "PROVIDER_SESSION_TURN_REF_REQUIRED");
-    const { identity, link } = await this.resolveSession.execute(input.missionId);
-    if (link.mode !== "control") throw new DomainError("Provider session link is read-only", "PROVIDER_SESSION_CONTROL_FORBIDDEN");
+    const { identity } = await this.resolveSession.execute(input.missionId);
     const provider = this.controls.resolve(identity.providerId);
     const capabilities = await executeProviderSessionSync(() => provider.capabilities());
     if (capabilities.steer.state === "unavailable") throw new DomainError("Steering the provider turn is unavailable", "CAPABILITY_UNAVAILABLE");

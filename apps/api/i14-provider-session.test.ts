@@ -190,8 +190,8 @@ describe("I14 provider session snapshot API", () => {
       .expect(({ body }) => expect(body).toMatchObject({ code: "PROVIDER_SESSION_START_REQUIRED" }));
 
     await request(app.getHttpServer()).post(`/api/missions/${missionPathId}/provider-session/turns`)
-      .send({ text: "forbidden before activation", commandId: "turn-before-active" })
-      .expect(403).expect(({ body }) => expect(body).toMatchObject({ code: "PROVIDER_SESSION_CONTROL_FORBIDDEN" }));
+      .send({ text: "Continue from read-only client mode", commandId: "turn-before-activation" }).expect(202)
+      .expect({ ref: { providerId: "codex", externalSessionId: "thread-1" }, externalTurnId: "turn-started" });
     const read = await request(app.getHttpServer()).get(`/api/missions/${missionPathId}/provider-session`).expect(200);
     expect(read.body).toMatchObject({ identity: { externalSessionRef: "thread-1" }, link: { mode: "read_only" }, snapshot: { session: { ref: { externalSessionId: "thread-1" } } } });
     await request(app.getHttpServer()).get(`/api/missions/${missionPathId}/provider-session/capabilities`).expect(200)
@@ -211,7 +211,10 @@ describe("I14 provider session snapshot API", () => {
     await request(app.getHttpServer()).post(`/api/missions/${missionPathId}/provider-session/steer`)
       .send({ externalTurnId: "turn-started", text: "  Focus tests  ", commandId: "steer-control" }).expect(202)
       .expect({ ref: { providerId: "codex", externalSessionId: "thread-1" }, externalTurnId: "turn-started" });
-    expect(control.starts).toEqual([{ externalSessionId: "thread-1", text: "Continue externally", clientCommandId: "turn-control" }]);
+    expect(control.starts).toEqual([
+      { externalSessionId: "thread-1", text: "Continue from read-only client mode", clientCommandId: "turn-before-activation" },
+      { externalSessionId: "thread-1", text: "Continue externally", clientCommandId: "turn-control" }
+    ]);
     expect(control.steers).toEqual([{ externalSessionId: "thread-1", externalTurnId: "turn-started", text: "Focus tests", clientCommandId: "steer-control" }]);
 
     const verification = NodraSqliteDatabase.open(databaseFile);

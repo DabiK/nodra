@@ -24,6 +24,13 @@ export function activateMissionProviderSession(missionId: string, expectedVersio
   });
 }
 
+export function ensureMissionObservationSession(missionId: string, commandId: string) {
+  return api<ProviderSessionDetailView>(`${missionPath(missionId)}/ensure-observation`, {
+    method: "POST",
+    body: JSON.stringify({ commandId })
+  });
+}
+
 export function startMissionProviderTurn(missionId: string, text: string, commandId: string) {
   return api<ProviderSessionTurnCommandResult>(`${missionPath(missionId)}/turns`, {
     method: "POST",

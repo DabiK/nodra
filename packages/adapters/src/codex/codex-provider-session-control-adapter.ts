@@ -37,15 +37,24 @@ export class CodexProviderSessionControlAdapter implements ProviderSessionContro
   async startTurn(input: ProviderSessionStartTurnInput): Promise<ProviderSessionTurnCommandResult> {
     this.assertRef(input.ref.providerId, input.ref.externalSessionId);
     try {
-      const result = await this.withClient((client) => client.request("turn/start", {
-        threadId: input.ref.externalSessionId,
-        clientUserMessageId: input.clientCommandId,
-        input: [{ type: "text", text: input.text }]
-      }));
-      if (!isRecord(result) || !isRecord(result.turn) || typeof result.turn.id !== "string" || !result.turn.id) {
-        throw new CodexProtocolError("turn/start returned an invalid turn reference");
-      }
-      return { ref: input.ref, externalTurnId: result.turn.id };
+      const result = await this.withClient(async (client) => {
+        await this.resumeThread(client, input.ref.externalSessionId);
+        const completed = this.waitForTurnCompletion(client);
+        const started = await client.request("turn/start", {
+          threadId: input.ref.externalSessionId,
+          clientUserMessageId: input.clientCommandId,
+          input: [{ type: "text", text: input.text }]
+        });
+        if (!isRecord(started) || !isRecord(started.turn) || typeof started.turn.id !== "string" || !started.turn.id) {
+          throw new CodexProtocolError("turn/start returned an invalid turn reference");
+        }
+        const { turnId } = await completed;
+        if (turnId !== started.turn.id) {
+          throw new CodexProtocolError("turn/completed reported a different turn reference");
+        }
+        return started.turn.id;
+      });
+      return { ref: input.ref, externalTurnId: result };
     } catch (error) {
       throw this.mapError(error, input.ref.externalSessionId);
     }
@@ -54,22 +63,59 @@ export class CodexProviderSessionControlAdapter implements ProviderSessionContro
   async steer(input: ProviderSessionSteerInput): Promise<ProviderSessionTurnCommandResult> {
     this.assertRef(input.ref.providerId, input.ref.externalSessionId);
     try {
-      const result = await this.withClient((client) => client.request("turn/steer", {
-        threadId: input.ref.externalSessionId,
-        expectedTurnId: input.externalTurnId,
-        clientUserMessageId: input.clientCommandId,
-        input: [{ type: "text", text: input.text }]
-      }));
-      if (!isRecord(result) || typeof result.turnId !== "string" || !result.turnId) {
-        throw new CodexProtocolError("turn/steer returned an invalid turn reference");
-      }
-      if (result.turnId !== input.externalTurnId) {
-        throw new CodexProtocolError("turn/steer returned a different turn reference");
-      }
-      return { ref: input.ref, externalTurnId: result.turnId };
+      const result = await this.withClient(async (client) => {
+        await this.resumeThread(client, input.ref.externalSessionId);
+        const completed = this.waitForTurnCompletion(client);
+        const steered = await client.request("turn/steer", {
+          threadId: input.ref.externalSessionId,
+          expectedTurnId: input.externalTurnId,
+          clientUserMessageId: input.clientCommandId,
+          input: [{ type: "text", text: input.text }]
+        });
+        if (!isRecord(steered) || typeof steered.turnId !== "string" || !steered.turnId) {
+          throw new CodexProtocolError("turn/steer returned an invalid turn reference");
+        }
+        if (steered.turnId !== input.externalTurnId) {
+          throw new CodexProtocolError("turn/steer returned a different turn reference");
+        }
+        const { turnId } = await completed;
+        if (turnId !== input.externalTurnId) {
+          throw new CodexProtocolError("turn/completed reported a different turn reference");
+        }
+        return steered.turnId;
+      });
+      return { ref: input.ref, externalTurnId: result };
     } catch (error) {
       throw this.mapError(error, input.ref.externalSessionId);
     }
+  }
+
+  private async resumeThread(client: CodexJsonRpcClient, threadId: string): Promise<string> {
+    const result = await client.request("thread/resume", {
+      threadId,
+      approvalPolicy: "on-request",
+      approvalsReviewer: "user",
+      sandbox: "workspace-write"
+    });
+    if (!isRecord(result) || !isRecord(result.thread) || typeof result.thread.id !== "string" || !result.thread.id) {
+      throw new CodexProtocolError("thread/resume returned an invalid thread reference");
+    }
+    return result.thread.id;
+  }
+
+  private waitForTurnCompletion(client: CodexJsonRpcClient): Promise<{ turnId: string; status: string }> {
+    return new Promise<{ turnId: string; status: string }>((resolve, reject) => {
+      client.onNotification(async (method, params) => {
+        if (method !== "turn/completed") return;
+        const turn = isRecord(params) && isRecord(params.turn) ? params.turn : null;
+        if (!turn || typeof turn.id !== "string" || !turn.id) {
+          reject(new CodexProtocolError("turn/completed returned an invalid turn reference"));
+          return;
+        }
+        resolve({ turnId: turn.id, status: typeof turn.status === "string" ? turn.status : "unknown" });
+      });
+      client.onFailure(reject);
+    });
   }
 
   private async withClient<T>(operation: (client: CodexJsonRpcClient) => Promise<T>): Promise<T> {

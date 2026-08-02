@@ -7,16 +7,17 @@ import { CodexProviderSessionControlAdapter } from "./codex-provider-session-con
 
 type Message = Record<string, unknown>;
 
-const processFixture = (respond: (message: Message) => unknown) => {
+const processFixture = (respond: (message: Message, notify: (method: string, params: unknown) => void) => unknown) => {
   const stdin = new PassThrough(); const stdout = new PassThrough(); const stderr = new PassThrough();
   const emitter = new EventEmitter() as EventEmitter & { stdin: PassThrough; stdout: PassThrough; stderr: PassThrough; kill(signal?: string): boolean };
   const received: Message[] = []; let buffer = "";
+  const notify = (method: string, params: unknown) => stdout.write(`${JSON.stringify({ method, params })}\n`);
   stdin.on("data", (chunk) => {
     buffer += chunk.toString();
     while (buffer.includes("\n")) {
       const index = buffer.indexOf("\n"); const message = JSON.parse(buffer.slice(0, index)) as Message;
       buffer = buffer.slice(index + 1); received.push(message);
-      if ("id" in message) stdout.write(`${JSON.stringify({ id: message.id, result: respond(message) })}\n`);
+      if ("id" in message) stdout.write(`${JSON.stringify({ id: message.id, result: respond(message, notify) })}\n`);
     }
   });
   emitter.stdin = stdin; emitter.stdout = stdout; emitter.stderr = stderr;
@@ -27,23 +28,41 @@ const processFixture = (respond: (message: Message) => unknown) => {
 const launcher = (process: ChildProcessWithoutNullStreams): CodexProcessLauncher => ({ launch: () => process });
 
 describe("CodexProviderSessionControlAdapter", () => {
-  it("starts a turn on the exact provider thread without creating or resuming a thread", async () => {
-    const child = processFixture((message) => message.method === "turn/start" ? { turn: { id: "turn-new" } } : {});
+  it("resumes the exact provider thread then starts a turn on it", async () => {
+    const child = processFixture((message, notify) => {
+      if (message.method === "thread/resume") return { thread: { id: "thread-real" } };
+      if (message.method === "turn/start") {
+        notify("turn/completed", { threadId: "thread-real", turn: { id: "turn-new", status: "completed" } });
+        return { turn: { id: "turn-new" } };
+      }
+      return {};
+    });
     const result = await new CodexProviderSessionControlAdapter(launcher(child.process)).startTurn({
       ref: { providerId: "codex", externalSessionId: "thread-real" },
       clientCommandId: "command-start", text: "Continue the investigation"
     });
 
+    expect(child.received[2]).toEqual({
+      method: "thread/resume", id: 2,
+      params: { threadId: "thread-real", approvalPolicy: "on-request", approvalsReviewer: "user", sandbox: "workspace-write" }
+    });
     expect(child.received.at(-1)).toEqual({
-      method: "turn/start", id: 2,
+      method: "turn/start", id: 3,
       params: { threadId: "thread-real", clientUserMessageId: "command-start", input: [{ type: "text", text: "Continue the investigation" }] }
     });
-    expect(child.received.some(({ method }) => method === "thread/start" || method === "thread/resume")).toBe(false);
+    expect(child.received.some(({ method }) => method === "thread/start")).toBe(false);
     expect(result).toEqual({ ref: { providerId: "codex", externalSessionId: "thread-real" }, externalTurnId: "turn-new" });
   });
 
-  it("steers the exact active turn and exposes no local queue capability", async () => {
-    const child = processFixture((message) => message.method === "turn/steer" ? { turnId: "turn-active" } : {});
+  it("resumes the thread then steers the exact active turn and exposes no local queue capability", async () => {
+    const child = processFixture((message, notify) => {
+      if (message.method === "thread/resume") return { thread: { id: "thread-real" } };
+      if (message.method === "turn/steer") {
+        notify("turn/completed", { threadId: "thread-real", turn: { id: "turn-active", status: "completed" } });
+        return { turnId: "turn-active" };
+      }
+      return {};
+    });
     const adapter = new CodexProviderSessionControlAdapter(launcher(child.process));
     expect(await adapter.capabilities()).toMatchObject({
       providerId: "codex", read: { state: "compatible_unverified" }, startTurn: { state: "compatible_unverified" },
@@ -53,8 +72,12 @@ describe("CodexProviderSessionControlAdapter", () => {
       ref: { providerId: "codex", externalSessionId: "thread-real" }, externalTurnId: "turn-active",
       clientCommandId: "command-steer", text: "Focus on the failing test"
     })).resolves.toEqual({ ref: { providerId: "codex", externalSessionId: "thread-real" }, externalTurnId: "turn-active" });
+    expect(child.received[2]).toEqual({
+      method: "thread/resume", id: 2,
+      params: { threadId: "thread-real", approvalPolicy: "on-request", approvalsReviewer: "user", sandbox: "workspace-write" }
+    });
     expect(child.received.at(-1)).toEqual({
-      method: "turn/steer", id: 2,
+      method: "turn/steer", id: 3,
       params: { threadId: "thread-real", expectedTurnId: "turn-active", clientUserMessageId: "command-steer", input: [{ type: "text", text: "Focus on the failing test" }] }
     });
   });

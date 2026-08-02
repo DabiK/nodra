@@ -4,6 +4,7 @@ import type {
   AttachProviderSessionInput,
   CreateReadyAgentMissionAndAttachInput,
   CreatedProviderSessionMissionResult,
+  LatestSessionRefForMission,
   ObserveProviderSessionInput,
   ProviderSessionAttachmentResult,
   ProviderSessionIdentity,
@@ -14,10 +15,12 @@ import { asId, DomainError, Mission, type Id } from "@nodra/domain";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { projects, workspaces } from "./schema/core.js";
+import { conversations } from "./schema/conversations.js";
 import { missionAgentConfigs, missions } from "./schema/missions.js";
 import { businessAuditEvents, outbox } from "./schema/operations.js";
 import { providerCatalogSnapshots } from "./schema/provider-catalog.js";
 import { providerSessionLinks, providerSessions } from "./schema/provider-sessions.js";
+import { runs } from "./schema/runs.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
 
 export class SqliteProviderSessionRepository implements ProviderSessionRepository {
@@ -96,6 +99,26 @@ export class SqliteProviderSessionRepository implements ProviderSessionRepositor
         .orderBy(asc(providerSessionLinks.attachedAt), asc(providerSessionLinks.id))
         .all()
         .map((row) => this.toLink(row));
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
+  async latestSessionRefForMission(missionId: Id): Promise<LatestSessionRefForMission | null> {
+    try {
+      const row = this.database.orm
+        .select({
+          providerId: conversations.providerId,
+          externalSessionRef: conversations.providerSessionRef
+        })
+        .from(runs)
+        .innerJoin(conversations, eq(conversations.id, runs.conversationId))
+        .where(eq(runs.missionId, missionId))
+        .orderBy(desc(runs.userAttempt), desc(runs.createdAt))
+        .limit(1)
+        .get();
+      if (!row?.externalSessionRef) return null;
+      return { providerId: row.providerId, externalSessionRef: row.externalSessionRef };
     } catch (error) {
       throw translateSqliteError(error);
     }

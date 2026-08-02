@@ -239,6 +239,20 @@ export function App() {
     }
   };
 
+  const activeSidebarMissions = useMemo(
+    () => missions
+      .filter((mission) => ["DRAFT", "READY", "ACTIVE", "BLOCKED", "VALIDATION"].includes(mission.state))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 10)
+      .map((mission) => ({ id: mission.id, title: mission.title, state: mission.state })),
+    [missions]
+  );
+
+  const selectMission = (missionId: string) => {
+    setInspectedMissionId(missionId);
+    navigate("tasks");
+  };
+
   return (
     <main className={appShellClassName(sidebarCollapsed)}>
       <AppSidebar
@@ -246,8 +260,10 @@ export function App() {
         collapsed={sidebarCollapsed}
         activePipelineCount={activePipelineCount}
         hasActiveManager={managers.some((manager) => manager.state === "active")}
+        missions={activeSidebarMissions}
         onToggle={toggleSidebar}
         onNavigate={navigate}
+        onSelectMission={selectMission}
       />
 
       <section className="workspace">

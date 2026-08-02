@@ -18,6 +18,7 @@ describe("AttachExternalProviderSession", () => {
       load: async () => null,
       loadActiveLink: async () => null,
       listActiveLinksForMission: async () => [],
+      latestSessionRefForMission: async () => null,
       createReadyAgentMissionAndAttach: async () => { throw new Error("not used"); }
     } satisfies ProviderSessionRepository;
     const providers = {
@@ -46,6 +47,7 @@ describe("AttachExternalProviderSession", () => {
       observe: async () => { observed = true; throw new Error("not used"); },
       attachToMission: async () => { throw new Error("not used"); },
       load: async () => null, loadActiveLink: async () => null, listActiveLinksForMission: async () => [],
+      latestSessionRefForMission: async () => null,
       createReadyAgentMissionAndAttach: async () => { throw new Error("not used"); }
     } satisfies ProviderSessionRepository;
     const providers = { resolve: () => ({ providerId: "codex", readSession: async () => ({

@@ -3,6 +3,7 @@ import type {
   ActivateProviderSessionMission,
   ChangeMissionState,
   CreateMission,
+  EnsureMissionObservationSession,
   HumanMissionAction,
   ListMissions,
   MissionListFilter,
@@ -24,6 +25,7 @@ import {
   CHANGE_MISSION_STATE,
   CREATE_MISSION,
   ENABLE_AGENT_CONFIG,
+  ENSURE_MISSION_OBSERVATION_SESSION,
   GET_AGENT_CONFIG,
   GET_MISSION_PROVIDER_SESSION_CONTROL_CAPABILITIES,
   LIST_MISSIONS,
@@ -45,6 +47,7 @@ import { MissionLookupQueryDto } from "./dto/mission-lookup-query.dto.js";
 import { ActivateProviderSessionMissionDto } from "./dto/activate-provider-session-mission.dto.js";
 import { StartProviderSessionTurnDto } from "./dto/start-provider-session-turn.dto.js";
 import { SteerProviderSessionTurnDto } from "./dto/steer-provider-session-turn.dto.js";
+import { EnsureMissionObservationSessionDto } from "./dto/ensure-mission-observation-session.dto.js";
 
 @Controller("api/missions")
 export class MissionController {
@@ -61,6 +64,7 @@ export class MissionController {
     @Inject(READ_MISSION_PROVIDER_SESSION) private readonly readProviderSession: ReadMissionProviderSession,
     @Inject(GET_MISSION_PROVIDER_SESSION_CONTROL_CAPABILITIES) private readonly providerSessionControlCapabilities: GetMissionProviderSessionControlCapabilities,
     @Inject(ACTIVATE_PROVIDER_SESSION_MISSION) private readonly activateProviderSession: ActivateProviderSessionMission,
+    @Inject(ENSURE_MISSION_OBSERVATION_SESSION) private readonly ensureObservationSession: EnsureMissionObservationSession,
     @Inject(START_PROVIDER_SESSION_TURN) private readonly startProviderTurn: StartProviderSessionTurn,
     @Inject(STEER_PROVIDER_SESSION_TURN) private readonly steerProviderTurn: SteerProviderSessionTurn
   ) {}
@@ -110,6 +114,15 @@ export class MissionController {
   activateProviderSessionMission(@Param("id") id: string, @Body() body: ActivateProviderSessionMissionDto) {
     return this.activateProviderSession.execute({
       missionId: toId(id), expectedVersion: body.expectedVersion, commandId: toId(body.commandId),
+      actor: "user", occurredAt: new Date().toISOString()
+    });
+  }
+
+  @Post(":id/provider-session/ensure-observation")
+  @HttpCode(200)
+  ensureMissionObservationSession(@Param("id") id: string, @Body() body: EnsureMissionObservationSessionDto) {
+    return this.ensureObservationSession.execute({
+      missionId: toId(id), commandId: toId(body.commandId),
       actor: "user", occurredAt: new Date().toISOString()
     });
   }

@@ -32,6 +32,7 @@ const repository = (load: ProviderSessionRepository["load"]): ProviderSessionRep
   loadActiveLink: async () => null,
   observe: async () => { throw new Error("not used"); },
   listActiveLinksForMission: async () => { throw new Error("not used"); },
+  latestSessionRefForMission: async () => null,
   attachToMission: async () => { throw new Error("not used"); },
   createReadyAgentMissionAndAttach: async () => { throw new Error("not used"); }
 });

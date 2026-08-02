@@ -108,7 +108,8 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
         const items = thread.turns.flatMap((turn) => {
           const externalTurnId = this.stringField(turn, "id", "turn id");
           const values = this.arrayField(turn, "items", "turn items");
-          return values.map((item) => this.item(item, externalTurnId, itemOrder++, receivedAt));
+          const toolNames = this.callToolNames(values);
+          return values.map((item) => this.item(item, externalTurnId, itemOrder++, receivedAt, toolNames));
         });
         return {
           session: this.summary(thread, receivedAt),
@@ -213,11 +214,12 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
     value: unknown,
     externalTurnId: string,
     order: number,
-    receivedAt: string
+    receivedAt: string,
+    toolNames: Map<string, string>
   ): ProviderSessionItem {
     const record = this.record(value, "thread item");
     const externalItemId = this.stringField(record, "id", "thread item id");
-    const mapped = this.mapItem(record);
+    const mapped = this.mapItem(record, toolNames);
     return {
       externalItemId,
       externalTurnId,
@@ -228,7 +230,19 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
     };
   }
 
-  private mapItem(item: Record<string, unknown>): MappedItem {
+  private callToolNames(values: unknown[]): Map<string, string> {
+    const toolNames = new Map<string, string>();
+    for (const value of values) {
+      const item = this.record(value, "thread item");
+      if (item.type !== "custom_tool_call" && item.type !== "customToolCall") continue;
+      const callId = this.optionalString(item.call_id ?? item.callId);
+      const name = this.optionalString(item.name);
+      if (callId !== null && name !== null) toolNames.set(callId, name);
+    }
+    return toolNames;
+  }
+
+  private mapItem(item: Record<string, unknown>, toolNames: Map<string, string>): MappedItem {
     switch (item.type) {
       case "userMessage":
         return {
@@ -258,6 +272,36 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
           text: this.redactedString(this.optionalString(item.aggregatedOutput)),
           name: this.redactedString(this.optionalString(item.command))
         };
+      case "custom_tool_call":
+      case "customToolCall":
+        return {
+          role: "assistant",
+          kind: "tool_call",
+          text: this.redactedString(this.optionalString(item.input)),
+          name: this.redactedString(this.optionalString(item.name))
+        };
+      case "custom_tool_call_output":
+      case "customToolCallOutput":
+        return {
+          role: "tool",
+          kind: "tool_result",
+          text: this.redactedString(this.outputText(item.output, 2000)),
+          name: this.redactedString(this.callToolName(item, toolNames))
+        };
+      case "localShellCall":
+        return {
+          role: "tool",
+          kind: "tool_result",
+          text: this.redactedString(this.optionalString(item.output) ?? this.optionalString(item.aggregatedOutput)),
+          name: this.redactedString(this.optionalString(item.command) ?? "shell")
+        };
+      case "fileChange":
+        return this.fileChangeItem(item);
+      case "imageGeneration":
+        return this.toolItem(
+          item,
+          this.optionalString(item.path) ?? this.optionalString(item.description) ?? "imageGeneration"
+        );
       case "mcpToolCall":
         return this.toolItem(item, this.joinName(item.server, item.tool));
       case "dynamicToolCall":
@@ -289,6 +333,48 @@ export class CodexProviderSessionSyncAdapter implements ProviderSessionSyncPort 
       text: hasResult ? this.redactedJson(item.result) : null,
       name: this.redactedString(name)
     };
+  }
+
+  private fileChangeItem(item: Record<string, unknown>): MappedItem {
+    const changes = Array.isArray(item.changes)
+      ? item.changes.filter((change): change is Record<string, unknown> => isRecord(change))
+      : [];
+    const paths = changes
+      .map((change) => this.optionalString(change.path))
+      .filter((path): path is string => path !== null);
+    const text = changes
+      .map((change) => {
+        const path = this.optionalString(change.path);
+        const diff = this.optionalString(change.diff);
+        return diff === null ? path : [path, diff].filter((part): part is string => part !== null).join("\n");
+      })
+      .filter((part): part is string => part !== null)
+      .join("\n\n")
+      .slice(0, 2000);
+    return {
+      role: "tool",
+      kind: "tool_result",
+      text: this.redactedString(text.length > 0 ? text : null),
+      name: this.redactedString(paths.length > 0 ? paths.join(", ") : "fileChange")
+    };
+  }
+
+  private outputText(value: unknown, limit: number): string | null {
+    if (!Array.isArray(value)) return null;
+    const parts = value
+      .filter((part): part is Record<string, unknown> => isRecord(part)
+        && (part.type === "input_text" || part.type === "text"))
+      .map((part) => this.optionalString(part.text))
+      .filter((part): part is string => part !== null);
+    if (parts.length === 0) return null;
+    const text = parts.join("\n");
+    return text.length > limit ? `${text.slice(0, limit)}…` : text;
+  }
+
+  private callToolName(item: Record<string, unknown>, toolNames: Map<string, string>): string | null {
+    const callId = this.optionalString(item.call_id ?? item.callId);
+    if (callId === null) return null;
+    return toolNames.get(callId) ?? null;
   }
 
   private userText(value: unknown): string | null {
