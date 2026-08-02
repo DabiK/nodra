@@ -6,6 +6,9 @@ import { latestManagerThread, listManagerConversations, loadManagerThread, sendM
 import { normalizeAgentConversation, extractRunFailure, type AgentConversationEvent } from "../services/agent-conversation-normalizer";
 import { formatCostMicros, formatTokenCount, runTokenTotal } from "../services/budget-service";
 import { PixelAvatar } from "./PixelAvatar";
+import { ConversationSearchBar } from "./ConversationSearchBar";
+import { HighlightedText } from "./HighlightedText";
+import { useConversationSearch } from "../hooks/useConversationSearch";
 import { useSseRefresh } from "../hooks/useSseRefresh";
 
 const ACTIVE_RUN = new Set(["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"]);
@@ -24,22 +27,32 @@ function toSession(thread: ManagerThreadView | null): AgentSessionView | null {
   };
 }
 
-function ManagerEvent({ event, manager }: { event: AgentConversationEvent; manager: ManagerView }) {
+function ManagerEvent({ event, manager, query, isSearchHit, isCurrentMatch }: {
+  event: AgentConversationEvent;
+  manager: ManagerView;
+  query: string;
+  isSearchHit: boolean;
+  isCurrentMatch: boolean;
+}) {
+  const searching = query.trim() !== "";
+  const highlight = (text: string | undefined) => (
+    searching && isSearchHit ? <HighlightedText text={text ?? ""} query={query} /> : text
+  );
   if (event.kind === "system") {
-    return <div className="manager-system">{event.text}</div>;
+    return <div className="manager-system" data-search-id={event.id}>{highlight(event.text)}</div>;
   }
   if (event.kind === "tool" || event.kind === "reasoning") {
     const title = event.kind === "reasoning" ? "🧠 Réflexion" : event.title;
     const command = event.kind === "tool" ? event.command : undefined;
     const output = event.kind === "tool" ? event.output : event.text;
     return (
-      <div className="manager-tool">
-        <div className="manager-tool-title">{title}</div>
-        {command && <pre className="manager-tool-pre">{command}</pre>}
+      <div className={`manager-tool${isCurrentMatch ? " conversation-search-current" : ""}`} data-search-id={event.id}>
+        <div className="manager-tool-title">{highlight(title)}</div>
+        {command && <pre className="manager-tool-pre">{highlight(command)}</pre>}
         {output && (
           <details className="manager-tool-details" open={!command}>
             <summary>Afficher la sortie</summary>
-            <pre className="manager-tool-pre">{output}</pre>
+            <pre className="manager-tool-pre">{highlight(output)}</pre>
           </details>
         )}
       </div>
@@ -47,23 +60,25 @@ function ManagerEvent({ event, manager }: { event: AgentConversationEvent; manag
   }
   if (event.kind === "error") {
     return (
-      <div className="manager-bubble from-agent">
-        <div className="manager-bubble-body error">⚠ {event.text}</div>
+      <div className="manager-bubble from-agent" data-search-id={event.id}>
+        <div className="manager-bubble-body error">⚠ {highlight(event.text)}</div>
       </div>
     );
   }
   return (
-    <div className={`manager-bubble ${event.kind === "user" ? "from-user" : "from-agent"}`}>
+    <div className={`manager-bubble ${event.kind === "user" ? "from-user" : "from-agent"}${isCurrentMatch ? " conversation-search-current" : ""}`} data-search-id={event.id}>
       {event.kind !== "user" && <PixelAvatar id={manager.id} title={manager.name} mini />}
       <div className="manager-bubble-body">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={{
-            a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
-          }}
-        >
-          {event.text}
-        </ReactMarkdown>
+        {searching && isSearchHit
+          ? <p className="conversation-search-text"><HighlightedText text={event.text} query={query} /></p>
+          : <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+              }}
+            >
+              {event.text}
+            </ReactMarkdown>}
       </div>
     </div>
   );
@@ -84,6 +99,7 @@ export function ManagerChat({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -132,9 +148,39 @@ export function ManagerChat({
     return extractRunFailure(toSession(thread));
   }, [thread]);
 
+  // Recherche dans le fil : texte des messages, événements (système,
+  // réflexion, erreurs) et contenus des tool calls (titre, commande, sortie).
+  const searchMessages = useMemo(() => events.map((event) => ({
+    id: event.id,
+    fields: event.kind === "tool" ? [event.title, event.command, event.output] : [event.text]
+  })), [events]);
+  const search = useConversationSearch(searchMessages);
+  const searchHitIds = useMemo(() => new Set(search.matches.map((match) => match.messageId)), [search.matches]);
+  const searching = search.query.trim() !== "";
+  const toggleSearch = () => {
+    setSearchOpen((open) => {
+      if (open) search.clear();
+      return !open;
+    });
+  };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    search.clear();
+  };
+
   useEffect(() => {
+    if (searching) return; // en recherche, le défilement suit les occurrences
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [events.length, running]);
+  }, [events.length, running, searching]);
+
+  // Défilement vers l'occurrence active de la recherche.
+  useEffect(() => {
+    if (!search.activeMatch) return;
+    const log = scrollRef.current;
+    const target = Array.from(log?.querySelectorAll("[data-search-id]") ?? [])
+      .find((element) => element.getAttribute("data-search-id") === search.activeMatch?.messageId);
+    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [search.activeMatch]);
 
   const send = async (newConversation = false) => {
     const text = draft.trim();
@@ -239,6 +285,14 @@ export function ManagerChat({
             <h2>{threadId ? "Conversation" : "Nouvelle conversation"}</h2>
           </div>
           <div className="manager-chat-head-actions">
+            <button
+              type="button"
+              className="conversation-search-toggle"
+              aria-pressed={searchOpen}
+              title="Rechercher dans la conversation"
+              aria-label="Rechercher dans la conversation"
+              onClick={toggleSearch}
+            >⌕</button>
             {running && (
               <button className="manager-stop" disabled={busy} onClick={() => void emergencyStop()}>
                 ⏹ Arrêt d'urgence
@@ -254,6 +308,18 @@ export function ManagerChat({
           </div>
         </header>
 
+        {searchOpen ? (
+          <ConversationSearchBar
+            query={search.query}
+            matchCount={search.matchCount}
+            current={search.current}
+            onQueryChange={search.setQuery}
+            onNext={search.next}
+            onPrev={search.prev}
+            onClose={closeSearch}
+          />
+        ) : null}
+
         <div className="manager-chat-log" ref={scrollRef}>
           {!threadId && !events.length && (
             <div className="manager-chat-hello">
@@ -268,7 +334,16 @@ export function ManagerChat({
               <p>{failure.detail}</p>
             </div>
           )}
-          {events.map((event) => <ManagerEvent key={event.id} event={event} manager={manager} />)}
+          {events.map((event) => (
+            <ManagerEvent
+              key={event.id}
+              event={event}
+              manager={manager}
+              query={search.query}
+              isSearchHit={searchHitIds.has(event.id)}
+              isCurrentMatch={search.activeMatch?.messageId === event.id}
+            />
+          ))}
           {running && (
             <div className="manager-bubble from-agent">
               <PixelAvatar id={manager.id} title={manager.name} mini />
