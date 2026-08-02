@@ -136,6 +136,9 @@ export interface PipelineListNode {
   missionState: MissionState;
   nodeRunState: PipelineNodeRunState | null;
   transitionMode: "auto" | "human";
+  runStartedAt: string | null;
+  runEndedAt: string | null;
+  runAttempt: number | null;
 }
 
 export interface PipelineListItem {
