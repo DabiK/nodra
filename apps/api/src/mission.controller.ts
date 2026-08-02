@@ -6,6 +6,7 @@ import type {
   EnsureMissionObservationSession,
   HumanMissionAction,
   ListMissions,
+  ListMissionRuns,
   MissionListFilter,
   StartMission,
   ShowMission,
@@ -29,6 +30,7 @@ import {
   GET_AGENT_CONFIG,
   GET_MISSION_PROVIDER_SESSION_CONTROL_CAPABILITIES,
   LIST_MISSIONS,
+  LIST_MISSION_RUNS,
   PREVIEW_AGENT_CONFIG,
   READ_MISSION_PROVIDER_SESSION,
   SHOW_MISSION,
@@ -56,6 +58,7 @@ export class MissionController {
     @Inject(CREATE_MISSION) private readonly createMission: CreateMission,
     @Inject(CHANGE_MISSION_STATE) private readonly changeMissionState: ChangeMissionState,
     @Inject(LIST_MISSIONS) private readonly listMissions: ListMissions,
+    @Inject(LIST_MISSION_RUNS) private readonly listMissionRuns: ListMissionRuns,
     @Inject(SHOW_MISSION) private readonly showMission: ShowMission,
     @Inject(START_MISSION) private readonly startMission: StartMission,
     @Inject(ENABLE_AGENT_CONFIG) private readonly enableAgentConfig: EnableAgentConfig,
@@ -94,6 +97,16 @@ export class MissionController {
   @Get(":id")
   show(@Param("id") id: string) {
     return this.showMission.execute(toId(id));
+  }
+
+  /**
+   * Historique des runs d'une mission avec usage (tokens) et coût, du plus
+   * ancien au plus récent, plus le coût total cumulé. Le coût est celui
+   * rapporté par le provider (costMicros, micro-dollars) quand il existe.
+   */
+  @Get(":id/runs")
+  runs(@Param("id") id: string) {
+    return this.listMissionRuns.execute(toId(id));
   }
 
   @Post(":id/ready")

@@ -18,12 +18,15 @@ export type {
   ProviderHealthProbe
 } from "./provider-health-probe.js";
 export { ListMissions } from "./list-missions.js";
+export { ListMissionRuns } from "./list-mission-runs.js";
 export type {
   MissionAuditRecord,
   MissionListFilter,
   MissionOutboxRecord,
   MissionReadModel,
   MissionRelayRecord,
+  MissionRunView,
+  MissionRunsView,
   MissionRepository,
   MissionView,
   RelayMissionView,

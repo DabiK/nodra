@@ -1,12 +1,14 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { ChangeMissionState, CreateMission, GetRelay, ListMissions, ShowMission } from "@nodra/application";
+import { ChangeMissionState, CreateMission, GetRelay, ListMissionRuns, ListMissions, ShowMission } from "@nodra/application";
 import { asId } from "@nodra/domain";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrateDatabase } from "./migrate-database.js";
 import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { projects } from "./schema/core.js";
+import { conversations } from "./schema/conversations.js";
+import { runs } from "./schema/runs.js";
 import { SqliteMissionReadModel } from "./sqlite-mission-read-model.js";
 import { SqliteMissionRepository } from "./sqlite-mission-repository.js";
 import { missions } from "./schema/missions.js";
@@ -26,6 +28,7 @@ describe("SQLite human mission vertical slice", () => {
   let listMissions: ListMissions;
   let showMission: ShowMission;
   let getRelay: GetRelay;
+  let listMissionRuns: ListMissionRuns;
 
   beforeEach(async () => {
     const directory = await mkdtemp(join(tmpdir(), "nodra-sqlite-"));
@@ -38,6 +41,7 @@ describe("SQLite human mission vertical slice", () => {
     listMissions = new ListMissions(readModel);
     showMission = new ShowMission(readModel);
     getRelay = new GetRelay(readModel);
+    listMissionRuns = new ListMissionRuns(readModel);
   });
 
   afterEach(() => database.close());
@@ -237,5 +241,57 @@ describe("SQLite human mission vertical slice", () => {
       context: context("submit-twice", 3)
     })).rejects.toMatchObject({ code: "TRANSITION_FORBIDDEN" });
     expect(await showMission.execute(asId("mission-submit-strict"))).toMatchObject({ state: "VALIDATION", version: 3 });
+  });
+
+  it("lists mission runs with usage and cost, oldest first, and sums known costs", async () => {
+    await createMission.execute({ id: asId("mission-runs"), title: "Runs", context: context("create-runs", 0) });
+    database.orm.insert(conversations).values({
+      id: "conversation-runs",
+      missionId: "mission-runs",
+      managerId: null,
+      providerId: "opencode",
+      providerSessionRef: null,
+      state: "open",
+      createdAt: at(1),
+      deletedAt: null
+    }).run();
+    database.orm.insert(runs).values([
+      {
+        id: "run-runs-1", missionId: "mission-runs", managerId: null, conversationId: "conversation-runs",
+        userAttempt: 1, state: "SUCCEEDED", temporalWorkflowId: "run/run-runs-1", temporalRunId: "temporal-1",
+        providerId: "opencode", modelId: "model-a", reasoningEffort: "provider_default",
+        startedAt: at(1), endedAt: at(2), durationMs: 60_000,
+        inputTokens: 1000, outputTokens: 500, cacheReadTokens: 10, cacheWriteTokens: null,
+        costMicros: 12_345, usageKind: "reported", createdAt: at(1)
+      },
+      {
+        id: "run-runs-2", missionId: "mission-runs", managerId: null, conversationId: "conversation-runs",
+        userAttempt: 2, state: "RUNNING", temporalWorkflowId: "run/run-runs-2", temporalRunId: "temporal-2",
+        providerId: "opencode", modelId: "model-a", reasoningEffort: "provider_default",
+        startedAt: at(3), endedAt: null, durationMs: null,
+        inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null,
+        costMicros: null, usageKind: null, createdAt: at(3)
+      }
+    ]).run();
+
+    const history = await listMissionRuns.execute(asId("mission-runs"));
+    expect(history.totalCostMicros).toBe(12_345);
+    expect(history.runs.map((run) => run.id)).toEqual(["run-runs-1", "run-runs-2"]);
+    expect(history.runs[0]).toMatchObject({
+      attempt: 1, state: "SUCCEEDED", providerId: "opencode", modelId: "model-a",
+      inputTokens: 1000, outputTokens: 500, cacheReadTokens: 10,
+      costMicros: 12_345, usageKind: "reported"
+    });
+    expect(history.runs[1]).toMatchObject({ attempt: 2, state: "RUNNING", costMicros: null });
+  });
+
+  it("returns an empty history for a known mission without runs", async () => {
+    await createMission.execute({ id: asId("mission-no-runs"), title: "No runs", context: context("create-no-runs", 0) });
+    expect(await listMissionRuns.execute(asId("mission-no-runs"))).toEqual({ runs: [], totalCostMicros: null });
+  });
+
+  it("rejects a run history lookup for an unknown mission", async () => {
+    await expect(listMissionRuns.execute(asId("mission-unknown")))
+      .rejects.toMatchObject({ code: "MISSION_NOT_FOUND" });
   });
 });

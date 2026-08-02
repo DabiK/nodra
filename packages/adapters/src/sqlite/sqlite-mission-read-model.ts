@@ -1,6 +1,8 @@
 import type {
   MissionListFilter,
   MissionReadModel,
+  MissionRunView,
+  MissionRunsView,
   MissionView,
   RelayMissionView,
   RelayProjection
@@ -9,6 +11,7 @@ import { asId, type Id } from "@nodra/domain";
 import { asc, eq, isNull } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { missions } from "./schema/missions.js";
+import { runs } from "./schema/runs.js";
 import { relayItems } from "./schema/operations.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
 
@@ -23,6 +26,23 @@ const toView = (row: MissionRow): MissionView => ({
   version: row.version,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt
+});
+
+const toRunView = (row: typeof runs.$inferSelect): MissionRunView => ({
+  id: asId(row.id),
+  attempt: row.userAttempt,
+  state: row.state,
+  providerId: row.providerId,
+  modelId: row.modelId,
+  startedAt: row.startedAt,
+  endedAt: row.endedAt,
+  durationMs: row.durationMs,
+  inputTokens: row.inputTokens,
+  outputTokens: row.outputTokens,
+  cacheReadTokens: row.cacheReadTokens,
+  cacheWriteTokens: row.cacheWriteTokens,
+  costMicros: row.costMicros ?? null,
+  usageKind: row.usageKind
 });
 
 export class SqliteMissionReadModel implements MissionReadModel {
@@ -42,6 +62,28 @@ export class SqliteMissionReadModel implements MissionReadModel {
     try {
       const row = this.database.orm.select().from(missions).where(eq(missions.id, id)).get();
       return row ? toView(row) : null;
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
+  async runs(id: Id): Promise<MissionRunsView> {
+    try {
+      const rows = this.database.orm.select()
+        .from(runs)
+        .where(eq(runs.missionId, id))
+        .orderBy(asc(runs.userAttempt), asc(runs.createdAt))
+        .all();
+      const runViews = rows.map(toRunView);
+      const knownCosts = runViews
+        .map((run) => run.costMicros)
+        .filter((value): value is number => value !== null);
+      return {
+        runs: runViews,
+        totalCostMicros: knownCosts.length > 0
+          ? knownCosts.reduce((sum, value) => sum + value, 0)
+          : null
+      };
     } catch (error) {
       throw translateSqliteError(error);
     }

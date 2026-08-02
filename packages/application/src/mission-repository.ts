@@ -58,6 +58,30 @@ export interface RelayMissionView extends MissionView {
   reasonCode: string;
 }
 
+/** Un run de mission avec son usage (tokens) et son coût. */
+export interface MissionRunView {
+  id: Id;
+  attempt: number;
+  state: string;
+  providerId: string;
+  modelId: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationMs: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  costMicros: number | null;
+  usageKind: string | null;
+}
+
+/** Historique des runs d'une mission (du plus ancien au plus récent) + coût total cumulé. */
+export interface MissionRunsView {
+  runs: MissionRunView[];
+  totalCostMicros: number | null;
+}
+
 export interface RelayProjection {
   ready: RelayMissionView[];
   active: RelayMissionView[];
@@ -69,4 +93,5 @@ export interface MissionReadModel {
   list(filter?: MissionListFilter): Promise<MissionView[]>;
   show(id: Id): Promise<MissionView | null>;
   relay(filter?: MissionListFilter): Promise<RelayProjection>;
+  runs(id: Id): Promise<MissionRunsView>;
 }
