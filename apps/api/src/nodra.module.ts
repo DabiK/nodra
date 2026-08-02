@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { Module, type DynamicModule } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
@@ -138,6 +138,9 @@ import { ProviderSessionController } from "./provider-session.controller.js";
 import { PipelineController } from "./pipeline.controller.js";
 import { LlmController } from "./llm.controller.js";
 import { RunController } from "./run.controller.js";
+import { EventsController } from "./events.controller.js";
+import { SseEventsService } from "./sse-events.service.js";
+import { DatabaseChangeWatcher } from "./database-change-watcher.js";
 import {
   AGENT_CONFIG_REPOSITORY,
   ADVANCE_PIPELINE,
@@ -153,6 +156,7 @@ import {
   CREATE_PIPELINE,
   DATA_ROOT,
   DATABASE,
+  DATABASE_FILE,
   DELETE_WORKSPACE,
   DISPATCH_WORKFLOW_OUTBOX,
   GET_HEALTH,
@@ -230,10 +234,12 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, ProviderSessionController, RunController, PipelineController, LlmController],
+      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, ProviderSessionController, RunController, PipelineController, LlmController, EventsController],
       providers: [
         { provide: REPOSITORY_ROOT, useValue: options.repositoryRoot ?? process.cwd() },
         { provide: DATA_ROOT, useValue: options.dataRoot ?? dirname(options.databaseFile) },
+        { provide: DATABASE_FILE, useValue: resolve(options.databaseFile) },
+        SseEventsService,
         {
           provide: DATABASE,
           useFactory: async () => {
@@ -726,7 +732,8 @@ export class NodraModule {
         { provide: APP_FILTER, useClass: BusinessErrorFilter },
         DatabaseLifecycle,
         RuntimeLifecycle,
-        ProviderProbeLifecycle
+        ProviderProbeLifecycle,
+        DatabaseChangeWatcher
       ]
     };
   }

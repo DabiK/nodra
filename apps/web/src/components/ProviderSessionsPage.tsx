@@ -6,6 +6,7 @@ import { ProviderSessionAttachDialog } from "./ProviderSessionAttachDialog";
 import { ProviderSessionCapabilityBanner } from "./ProviderSessionCapabilityBanner";
 import { ProviderSessionDetail } from "./ProviderSessionDetail";
 import { ProviderSessionList } from "./ProviderSessionList";
+import { useSseRefresh } from "../hooks/useSseRefresh";
 
 const PROVIDER_IDS = ["codex", "opencode"] as const;
 type Filter = "all" | (typeof PROVIDER_IDS)[number];
@@ -68,7 +69,8 @@ export function ProviderSessionsPage({ missions, initialSessionId, onSessionChan
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  // Manual load only: this page intentionally has no timer or stream subscription.
+  // Chargement au montage uniquement ; les rafraîchissements suivants sont
+  // pilotés par le flux SSE (temps réel) et par le bouton "Rafraîchir".
   }, []);
   const refresh = useCallback(async () => {
     if (!selectedId || refreshingRef.current) return;
@@ -76,11 +78,8 @@ export function ProviderSessionsPage({ missions, initialSessionId, onSessionChan
     setRefreshing(true); setError("");
     try { setDetail(await refreshProviderSession(selectedId)); await reloadLists(); } catch (reason) { setError((reason as Error).message); } finally { refreshingRef.current = false; setRefreshing(false); }
   }, [reloadLists, selectedId]);
-  useEffect(() => {
-    if (!selectedId) return;
-    const timer = window.setInterval(() => void refresh(), 10_000);
-    return () => window.clearInterval(timer);
-  }, [refresh, selectedId]);
+  // Temps réel : le flux SSE remplace le polling toutes les 10 s.
+  useSseRefresh(() => void refresh());
   const afterAttach = async (operation: () => Promise<unknown>) => {
     if (!selectedId || submitting) return;
     setSubmitting(true); setAttachError("");

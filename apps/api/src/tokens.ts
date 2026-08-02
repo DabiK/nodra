@@ -70,3 +70,4 @@ export const LIST_MANAGER_CONVERSATIONS = Symbol("LIST_MANAGER_CONVERSATIONS");
 export const START_MANAGER_RUN = Symbol("START_MANAGER_RUN");
 export const REPOSITORY_ROOT = Symbol("REPOSITORY_ROOT");
 export const DATA_ROOT = Symbol("DATA_ROOT");
+export const DATABASE_FILE = Symbol("DATABASE_FILE");

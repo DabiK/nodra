@@ -20,6 +20,7 @@ import { subagentStatusLabel, subagentToolLabel } from "../services/subagent-lab
 import { SubagentExecution } from "./SubagentExecution";
 import { ModelPicker } from "./ModelPicker";
 import { PromptEnhanceDialog } from "./PromptEnhanceDialog";
+import { useSseRefresh } from "../hooks/useSseRefresh";
 
 function capabilityAvailable(state: string | undefined) {
   return Boolean(state && state !== "unavailable");
@@ -265,9 +266,10 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 1500);
-    return () => window.clearInterval(timer);
   }, [refresh]);
+
+  // Temps réel : le flux SSE remplace le polling toutes les 1,5 s.
+  useSseRefresh(() => void refresh());
 
   useEffect(() => {
     const feed = feedRef.current;

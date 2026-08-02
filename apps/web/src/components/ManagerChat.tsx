@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { AgentSessionView, ManagerConversationView, ManagerThreadView, ManagerView } from "../types";
 import { latestManagerThread, listManagerConversations, loadManagerThread, sendManagerMessage, stopManager, deleteManagerThread } from "../services/manager-service";
 import { normalizeAgentConversation, extractRunFailure, type AgentConversationEvent } from "../services/agent-conversation-normalizer";
 import { PixelAvatar } from "./PixelAvatar";
+import { useSseRefresh } from "../hooks/useSseRefresh";
 
 const ACTIVE_RUN = new Set(["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"]);
 
@@ -93,18 +94,24 @@ export function ManagerChat({
     void latestManagerThread(manager.id).then((result) => setThreadId(result.threadId)).catch(() => undefined);
   }, [manager.id, threadId]);
 
+  const threadIdRef = useRef(threadId);
+  threadIdRef.current = threadId;
+
+  const loadThread = useCallback(() => {
+    if (!threadIdRef.current) { setThread(null); return; }
+    const target = threadIdRef.current;
+    void loadManagerThread(manager.id, target)
+      .then((next) => { if (threadIdRef.current === target) setThread(next); })
+      .catch(() => undefined);
+  }, [manager.id]);
+
   useEffect(() => {
     if (!threadId) { setThread(null); return; }
-    let cancelled = false;
-    const tick = () => {
-      void loadManagerThread(manager.id, threadId)
-        .then((next) => { if (!cancelled) setThread(next); })
-        .catch(() => undefined);
-    };
-    tick();
-    const timer = window.setInterval(tick, 1800);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, [manager.id, threadId]);
+    void loadThread();
+  }, [threadId, loadThread]);
+
+  // Temps réel : le flux SSE remplace le polling toutes les 1,8 s.
+  useSseRefresh(loadThread);
 
   const running = useMemo(() => {
     if (manager.activeRunId) return true;

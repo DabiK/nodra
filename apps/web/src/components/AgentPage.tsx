@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MissionView } from "../types";
 import { AppSidebar, type AppPage } from "./AppSidebar";
 import { loadAgentSession } from "../services/agent-session-service";
@@ -7,6 +7,7 @@ import { appShellClassName, loadSidebarCollapsed, saveSidebarCollapsed } from ".
 import { ProviderMissionConversationPage } from "./ProviderMissionConversationPage";
 import { selectActiveSidebarMissions } from "../services/sidebar-missions";
 import { applyTheme, initTheme, saveTheme, type Theme } from "../services/theme-service";
+import { useSseRefresh } from "../hooks/useSseRefresh";
 
 function navigateToApp(page: AppPage) {
   location.assign(page === "tasks" ? "/" : `/?page=${page}`);
@@ -17,19 +18,24 @@ function AgentMissionShell({ missionId }: { missionId: string }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => loadSidebarCollapsed());
   const [theme, setTheme] = useState<Theme>(() => initTheme());
 
-  useEffect(() => {
-    let cancelled = false;
-    const tick = () => {
-      void listMissions()
-        .then((next) => { if (!cancelled) setMissions(next); })
-        .catch(() => undefined);
-    };
-    tick();
-    const timer = window.setInterval(tick, 30_000);
-    const onFocus = () => tick();
-    window.addEventListener("focus", onFocus);
-    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
+  const refreshMissions = useCallback(() => {
+    void listMissions()
+      .then((next) => { if (mountedRef.current) setMissions(next); })
+      .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    refreshMissions();
+    const onFocus = () => refreshMissions();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshMissions]);
+
+  // Temps réel : le flux SSE remplace le polling toutes les 30 s.
+  useSseRefresh(refreshMissions);
 
   const toggleSidebar = () => {
     setSidebarCollapsed((current) => {

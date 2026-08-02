@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { MissionInspector } from "./components/MissionInspector";
 import { ManagerDock } from "./components/ManagerDock";
 import { ManagersPage } from "./components/ManagersPage";
@@ -25,6 +25,7 @@ import { loadViewMode, saveViewMode, type MissionViewMode } from "./services/vie
 import { dragActionId, findDragTransition } from "./services/mission-drag-transitions";
 import { performMissionAction } from "./services/mission-action-service";
 import { applyTheme, initTheme, saveTheme, type Theme } from "./services/theme-service";
+import { useSseRefresh } from "./hooks/useSseRefresh";
 
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -81,19 +82,24 @@ export function App() {
       .catch((reason: Error) => setError(reason.message));
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const tick = () => {
-      void listMissions().then((next) => { if (!cancelled) setMissions(next); }).catch(() => undefined);
-      void listPipelines().then((next) => { if (!cancelled) setPipelines(next); }).catch(() => undefined);
-      void listManagers().then((next) => { if (!cancelled) setManagers(next); }).catch(() => undefined);
-    };
-    tick();
-    const timer = window.setInterval(tick, 2000);
-    const onFocus = () => tick();
-    window.addEventListener("focus", onFocus);
-    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
+  const refreshBoard = useCallback(() => {
+    void listMissions().then((next) => { if (mountedRef.current) setMissions(next); }).catch(() => undefined);
+    void listPipelines().then((next) => { if (mountedRef.current) setPipelines(next); }).catch(() => undefined);
+    void listManagers().then((next) => { if (mountedRef.current) setManagers(next); }).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    refreshBoard();
+    const onFocus = () => refreshBoard();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshBoard]);
+
+  // Temps réel : le flux SSE remplace le polling toutes les 2 s.
+  useSseRefresh(refreshBoard);
 
   const refreshPipelines = () => void listPipelines().then(setPipelines).catch(() => undefined);
   const refreshManagers = () => void listManagers().then(setManagers).catch(() => undefined);
