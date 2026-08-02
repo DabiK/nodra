@@ -22,6 +22,7 @@ import { listPipelines } from "./services/pipeline-service";
 import { probeProvider, selectDefaultModel } from "./services/provider-service";
 import { browseFolders } from "./services/workspace-service";
 import { loadViewMode, saveViewMode, type MissionViewMode } from "./services/view-mode-service";
+import { loadSavedMissionFilters, saveMissionFilters } from "./services/mission-filter-service";
 import { dragActionId, findDragTransition } from "./services/mission-drag-transitions";
 import { performMissionAction } from "./services/mission-action-service";
 import { applyTheme, initTheme, saveTheme, type Theme } from "./services/theme-service";
@@ -48,10 +49,11 @@ export function App() {
   const [managers, setManagers] = useState<ManagerView[]>([]);
   const [providerOptions, setProviderOptions] = useState<ProviderOptionsCatalog | null>(null);
   const [draft, setDraft] = useState<MissionIntakeDraft | null>(null);
-  const [query, setQuery] = useState("");
-  const [stateFilter, setStateFilter] = useState("all");
-  const [kindFilter, setKindFilter] = useState("all");
-  const [sort, setSort] = useState("recent");
+  const [savedFilters] = useState(() => loadSavedMissionFilters());
+  const [query, setQuery] = useState(savedFilters.query);
+  const [stateFilter, setStateFilter] = useState(savedFilters.state);
+  const [kindFilter, setKindFilter] = useState(savedFilters.kind);
+  const [sort, setSort] = useState(savedFilters.sort);
   const [viewMode, setViewMode] = useState<MissionViewMode>(() => loadViewMode());
   const [createExpanded, setCreateExpanded] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
@@ -186,6 +188,11 @@ export function App() {
     () => filterMissions(missions, { query, state: stateFilter, kind: kindFilter, sort }),
     [missions, query, stateFilter, kindFilter, sort]
   );
+
+  // Filtres sauvegardés : le board rouvre avec la même configuration.
+  useEffect(() => {
+    saveMissionFilters({ query, state: stateFilter, kind: kindFilter, sort });
+  }, [query, stateFilter, kindFilter, sort]);
   const stateCounts = useMemo(
     () => missions.reduce<Partial<Record<MissionState, number>>>((counts, mission) => {
       counts[mission.state] = (counts[mission.state] ?? 0) + 1;
