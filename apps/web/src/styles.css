@@ -886,11 +886,50 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 .provider-thread-item header { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font: 8px ui-monospace, monospace; }
 .provider-thread-item header strong { color: var(--green); font: 900 9px Manrope; letter-spacing: .07em; text-transform: uppercase; }
 .provider-thread-item p { margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; font: 500 13px/1.65 "DM Sans", system-ui, sans-serif; }
+.provider-thread-markdown { margin-top: 8px; font: 500 13px/1.65 "DM Sans", system-ui, sans-serif; word-break: break-word; }
+.provider-thread-markdown > :first-child { margin-top: 0; }
+.provider-thread-markdown p { margin: 8px 0 0; white-space: normal; word-break: break-word; }
+.provider-thread-markdown p:first-child { margin-top: 0; }
+.provider-thread-markdown ul, .provider-thread-markdown ol { margin: 8px 0 0; padding-left: 22px; white-space: normal; }
+.provider-thread-markdown li { margin: 3px 0; white-space: normal; }
+.provider-thread-markdown h1, .provider-thread-markdown h2, .provider-thread-markdown h3, .provider-thread-markdown h4 { margin: 12px 0 4px; font-family: Manrope, system-ui, sans-serif; font-weight: 800; }
+.provider-thread-markdown h1 { font-size: 15px; } .provider-thread-markdown h2 { font-size: 14px; } .provider-thread-markdown h3, .provider-thread-markdown h4 { font-size: 13px; }
+.provider-thread-markdown a { color: var(--green); text-decoration: underline; }
+.provider-thread-markdown code { border-radius: 4px; padding: 1px 4px; background: #eceee9; font: 11px ui-monospace, "SF Mono", Menlo, monospace; }
+.provider-thread-markdown pre { margin: 8px 0 0; border-radius: 8px; padding: 10px 12px; background: #17231d; color: #e7ede9; overflow: auto; }
+.provider-thread-markdown pre code { padding: 0; background: none; color: inherit; font-size: 11px; white-space: pre; }
+.provider-thread-markdown blockquote { margin: 8px 0 0; border-left: 3px solid #c7cfc4; padding-left: 10px; color: var(--muted); }
+.provider-thread-markdown hr { margin: 10px 0; border: 0; border-top: 1px solid #e0e4de; }
+.provider-thread-item.user .provider-thread-markdown code { background: rgba(23,35,29,.08); }
+.provider-thread-item.user .provider-thread-markdown pre { background: #2c4a3a; }
 .provider-thread-item > code { display: block; margin-top: 8px; border-radius: 7px; padding: 7px 9px; background: #1f2924; color: #dce5df; font-size: 10px; }
 .provider-thread-item.tool > p.provider-thread-tool-text { margin-top: 8px; border-radius: 6px; padding: 9px 11px; background: #17231d; color: #e7ede9; font: 11px/1.5 ui-monospace, "SF Mono", Menlo, monospace; max-height: 320px; overflow: auto; }
 .provider-thread-item.subagent { width: min(860px, 96%); border-left: 3px solid #6b4ea0; border-radius: 9px; background: #f0ecf8; }
 .provider-thread-item.subagent header strong { color: #6b4ea0; }
 .provider-thread-item.subagent > code { background: #4a3a6e; color: #e9e2f6; }
+.subagent-execution { margin-top: 10px; border: 1px solid #d9cfee; border-radius: 8px; background: #fbf9ff; }
+.subagent-execution summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; cursor: pointer; list-style: none; }
+.subagent-execution summary::-webkit-details-marker { display: none; }
+.subagent-execution summary::before { content: "▸"; color: #6b4ea0; font-size: 10px; }
+.subagent-execution[open] summary::before { content: "▾"; }
+.subagent-execution-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.subagent-execution-title strong { font: 800 10px Manrope; color: #3c2d5e; }
+.subagent-execution-title code { border-radius: 5px; padding: 2px 6px; background: #ece5f8; color: #6b4ea0; font-size: 9px; }
+.subagent-execution-title small { color: #8a7ab0; font: 700 9px Manrope; }
+.subagent-execution-session code { color: #9c8ec2; font-size: 8.5px; }
+.subagent-execution-report, .subagent-execution-transcript { padding: 10px 12px; border-top: 1px dashed #e3dcf3; }
+.subagent-execution h4 { margin: 0 0 8px; color: #6b4ea0; font: 900 9px Manrope; letter-spacing: .08em; text-transform: uppercase; }
+.subagent-execution-report pre { margin: 0; border-radius: 6px; padding: 10px 12px; background: #17231d; color: #e7ede9; font: 11px/1.55 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; }
+.subagent-execution-transcript ol { margin: 0; padding: 0; display: grid; gap: 6px; list-style: none; }
+.subagent-step { border: 1px solid #e8e1f5; border-radius: 7px; padding: 7px 9px; background: #fff; }
+.subagent-step header { display: flex; align-items: center; gap: 8px; }
+.subagent-step header span { color: #6b4ea0; font: 800 9px Manrope; text-transform: uppercase; letter-spacing: .06em; }
+.subagent-step header code { border-radius: 4px; padding: 1px 5px; background: #f0ebf9; color: #4a3a6e; font-size: 9px; }
+.subagent-step header time { margin-left: auto; color: #a89bc9; font-size: 8.5px; }
+.subagent-step p { margin: 5px 0 0; color: #4c4260; font: 10.5px/1.5 Manrope; white-space: pre-wrap; }
+.subagent-step.tool_call, .subagent-step.tool_result { border-left: 3px solid #b39be0; }
+.subagent-step.reasoning { border-left: 3px solid #d8c7f5; opacity: .82; }
+.subagent-execution-empty { margin: 0; padding: 10px 12px; color: #9c8ec2; font: italic 10px Manrope; border-top: 1px dashed #e3dcf3; }
 .provider-thread-sync { justify-self: center; border-radius: 999px; padding: 8px 12px; background: #edf3e8; color: var(--green); font-size: 9px; font-weight: 900; }
 .agent-migration-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #111b16; color: #edf5ee; }
 .agent-migration-page section { width: min(620px, 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 22px; padding: 34px; background: #17231d; box-shadow: 0 24px 70px rgba(0,0,0,.24); }

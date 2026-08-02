@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { MissionProviderSessionCapabilitiesView, MissionView, ProviderSessionDetailView } from "../types";
 import {
   activateMissionProviderSession,
@@ -14,6 +16,7 @@ import { loadAgentSession } from "../services/agent-session-service";
 import { extractRunFailure, type RunFailure } from "../services/agent-conversation-normalizer";
 import { providerSessionSections } from "../services/provider-session-sections";
 import { subagentStatusLabel, subagentToolLabel } from "../services/subagent-labels";
+import { SubagentExecution } from "./SubagentExecution";
 
 function capabilityAvailable(state: string | undefined) {
   return Boolean(state && state !== "unavailable");
@@ -48,11 +51,21 @@ function ProviderItem({ item, providerId }: { item: ProviderSessionDetailView["s
   const subagent = item.kind === "subagent";
   const tool = !message && !subagent && (item.kind === "tool_call" || item.kind === "tool_result");
   const statusLabel = subagent ? subagentStatusLabel(item.text) : null;
+  const body = message ? (
+    <div className="provider-thread-markdown">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{item.text ?? "—"}</ReactMarkdown>
+    </div>
+  ) : statusLabel ? (
+    <span className="subagent-chip">{statusLabel}</span>
+  ) : (
+    <p className={tool ? "provider-thread-tool-text" : undefined}>{item.text ?? "—"}</p>
+  );
   return (
     <article className={`provider-thread-item ${user ? "user" : message ? "assistant" : subagent ? "subagent" : "tool"}`} data-external-item-id={item.externalItemId}>
       <header><strong>{itemLabel(item, providerId)}</strong><span>{item.kind} · {item.externalItemId}</span></header>
       {item.name ? <code>{subagentToolLabel(item.name) ?? item.name}</code> : null}
-      {statusLabel ? <span className="subagent-chip">{statusLabel}</span> : <p className={tool ? "provider-thread-tool-text" : undefined}>{item.text ?? "—"}</p>}
+      {body}
+      {subagent && item.subagent ? <SubagentExecution execution={item.subagent} /> : null}
     </article>
   );
 }

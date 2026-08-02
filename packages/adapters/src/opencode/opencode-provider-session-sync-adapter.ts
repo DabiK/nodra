@@ -287,7 +287,7 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
     return {
       subSessionId,
       status: typeof rawState.status === "string" ? rawState.status : "unknown",
-      model: typeof metadata.model?.modelID === "string" ? metadata.model.modelID : null,
+      model: typeof metadata?.model?.modelID === "string" ? metadata.model.modelID : null,
       startedAt: typeof rawState.time?.start === "number" ? new Date(rawState.time.start).toISOString() : null,
       finishedAt: typeof rawState.time?.end === "number" ? new Date(rawState.time.end).toISOString() : null,
       report: typeof rawState.output === "string" && rawState.output.length > 0
