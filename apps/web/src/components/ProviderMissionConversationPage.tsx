@@ -70,7 +70,7 @@ function ProviderItem({ item, providerId }: { item: ProviderSessionDetailView["s
   );
 }
 
-function ProviderFeed({ detail, busy }: { detail: ProviderSessionDetailView | null; busy: boolean }) {
+function ProviderFeed({ detail, busy, thinking, sentText }: { detail: ProviderSessionDetailView | null; busy: boolean; thinking: boolean; sentText: string | null }) {
   if (!detail) return <div className="conversation-empty">Connexion au fil provider…</div>;
   const { turns, items } = detail.snapshot;
   const providerId = detail.identity.providerId;
@@ -88,6 +88,13 @@ function ProviderFeed({ detail, busy }: { detail: ProviderSessionDetailView | nu
     ))}
     {!turns.length && !items.length ? <div className="conversation-empty">La conversation ne contient encore aucun élément.</div> : null}
     {busy ? <div className="provider-thread-sync" role="status">Synchronisation avec le provider…</div> : null}
+    {sentText ? (
+      <article className="provider-thread-item user provider-thread-pending" role="status" aria-label="Message envoyé">
+        <header><strong>Vous</strong><span className="provider-thread-pending-label"><span className="thinking-dots"><i /><i /><i /></span> envoi en cours…</span></header>
+        <div className="provider-thread-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{sentText}</ReactMarkdown></div>
+      </article>
+    ) : null}
+    {thinking ? <article className="provider-thread-item assistant provider-thread-thinking" role="status" aria-label={`${providerLabel(providerId)} réfléchit…`}><span className="thinking-dots"><i /><i /><i /></span><strong>{providerLabel(providerId)} réfléchit…</strong></article> : null}
   </>;
 }
 
@@ -97,6 +104,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   const [control, setControl] = useState<MissionProviderSessionCapabilitiesView | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState<"send" | "steer" | null>(null);
+  const [sentText, setSentText] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
   const [failure, setFailure] = useState<RunFailure | null>(null);
@@ -193,6 +201,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
     commandRef.current = { kind, text: value, id };
     setBusy(kind);
     setError("");
+    setSentText(value);
     try {
       if (kind === "steer" && activeTurn) await steerMissionProviderTurn(missionId, activeTurn.externalTurnId, value, id);
       else await startMissionProviderTurn(missionId, value, id);
@@ -203,6 +212,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
       setError((reason as Error).message);
     } finally {
       setBusy(null);
+      setSentText(null);
     }
   };
   const submit = (event: FormEvent) => { event.preventDefault(); void execute("send"); };
@@ -229,7 +239,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
             </div>
           )}
           <div className="provider-thread-source"><span>Source de vérité provider</span><code>{detail?.identity.externalSessionRef ?? missionId}</code></div>
-          <div className="conversation-feed-wrap"><div className="agent-conversation provider-thread-feed" ref={feedRef} aria-live="polite"><ProviderFeed detail={detail} busy={busy !== null} /></div></div>
+          <div className="conversation-feed-wrap"><div className="agent-conversation provider-thread-feed" ref={feedRef} aria-live="polite"><ProviderFeed detail={detail} busy={busy !== null} thinking={activeTurn !== null} sentText={sentText} /></div></div>
           <footer className="composer-wrap">
             <form className="agent-composer" onSubmit={submit}>
               <textarea rows={2} maxLength={20000} value={text} onChange={(event) => setText(event.target.value)} placeholder="Écris une instruction au provider…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />

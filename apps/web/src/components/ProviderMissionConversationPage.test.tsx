@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ProviderMissionConversationPage } from "./ProviderMissionConversationPage";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -113,5 +113,84 @@ describe("provider mission conversation", () => {
 
     expect(await screen.findByText("OBSERVATION + ENVOI")).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows a thinking bubble with the provider label while a turn is active", async () => {
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (init?.method === "POST") return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-active" });
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(detail);
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+
+    await screen.findByText("Provider mission");
+    expect(screen.getByRole("status", { name: /OpenCode r\u00e9fl\u00e9chit/ })).toBeTruthy();
+  });
+
+  it("hides the thinking bubble when no turn is active", async () => {
+    const completed = { ...detail, snapshot: { ...detail.snapshot, turns: detail.snapshot.turns.map((turn) => ({ ...turn, state: "completed" })) } };
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (init?.method === "POST") return json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-active" });
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(completed);
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+
+    await screen.findByText("Provider mission");
+    expect(screen.queryByRole("status", { name: /r\u00e9fl\u00e9chit/ })).toBeNull();
+  });
+
+  it("clears the composer and echoes the message in a pending bubble while the turn syncs", async () => {
+    let release: ((value: unknown) => void) | undefined;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (init?.method === "POST") return gate.then(() => json({ ref: detail.snapshot.session.ref, externalTurnId: "turn-new" }));
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(detail);
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+
+    await screen.findByText("Provider mission");
+    const input = screen.getByPlaceholderText("Écris une instruction au provider…") as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "Do the next thing" } });
+    fireEvent.click(screen.getByRole("button", { name: /Envoyer un nouveau tour/ }));
+
+    expect(screen.getByRole("status", { name: "Message envoyé" })).toBeTruthy();
+    expect(within(screen.getByRole("status", { name: "Message envoyé" })).getByText("Do the next thing")).toBeTruthy();
+    expect(screen.getByText(/envoi en cours/)).toBeTruthy();
+    release!(null);
+    await waitFor(() => expect(input.value).toBe(""));
+    await waitFor(() => expect(screen.queryByRole("status", { name: "Message envoyé" })).toBeNull());
+  });
+
+  it("keeps the composer text when sending fails", async () => {
+    const fail = () => Promise.reject(new Error("provider unreachable"));
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (init?.method === "POST") return fail();
+      if (path.endsWith("/capabilities")) return json(control);
+      if (path.endsWith("/provider-session")) return json(detail);
+      return json(mission);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+
+    await screen.findByText("Provider mission");
+    const input = screen.getByPlaceholderText("Écris une instruction au provider…") as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "Do the next thing" } });
+    fireEvent.click(screen.getByRole("button", { name: /Envoyer un nouveau tour/ }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(input.value).toBe("Do the next thing");
+    expect(screen.queryByRole("status", { name: "Message envoyé" })).toBeNull();
   });
 });
