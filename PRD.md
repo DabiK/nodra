@@ -6,7 +6,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
 - [x] #1 — Dark mode (thème sombre) (labels: —)
   > ## Contexte
 
-- [ ] #2 — Streaming SSE temps réel (remplacer le polling) (labels: —)
+- [x] #2 — Streaming SSE temps réel (remplacer le polling) (labels: —)
   > ## Contexte
 
 - [ ] #3 — Recherche et filtres globaux (labels: —)
