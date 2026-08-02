@@ -3,12 +3,6 @@
 Backlog généré depuis les issues GitHub ouvertes. Chaque item est une tâche.
 Coche la case quand la tâche est terminée. Une seule tâche par itération Ralph.
 
-- [x] #1 — Dark mode (thème sombre) (labels: —)
-  > ## Contexte
-
-- [x] #2 — Streaming SSE temps réel (remplacer le polling) (labels: —)
-  > ## Contexte
-
 - [ ] #3 — Recherche et filtres globaux (labels: —)
   > ## Contexte
 
@@ -46,4 +40,19 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > ## Contexte
 
 - [ ] #15 — Responsive / vue tablette (labels: —)
+  > ## Contexte
+
+- [ ] #16 — Rejouer / dupliquer un run (labels: —)
+  > ## Contexte
+
+- [ ] #17 — Filtre 'ma journée' (labels: —)
+  > ## Contexte
+
+- [ ] #18 — Glance horizontal : où en est le run ? (labels: —)
+  > ## Contexte
+
+- [ ] #19 — Quick actions sur cartes mission (labels: —)
+  > ## Contexte
+
+- [ ] #20 — Séquences favorites (templates de pipeline) (labels: —)
   > ## Contexte
