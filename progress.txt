@@ -226,3 +226,36 @@
 
 ### Statut
 - [x] #8 — Export de mission en Markdown
+
+## Itération 8 — 2026-08-03 — Task #9 : Recherche dans les conversations
+
+### Fait (4 commits atomiques)
+1. **Service + hook de recherche** (`feat(web): service et hook de recherche dans les conversations…`)
+   - `conversation-search-service.ts` (pur, + 12 tests) : `SearchableMessage` (id + champs recherchables), `findMatches` — toutes les occurrences par message/champ, insensible à la casse, **littéral** (indexOf, pas de regex : n'importe quelle saisie acceptée) — et `highlightParts` (segments hit/non-hit pour le surlignage).
+   - `useConversationSearch` (hook, + 7 tests) : requête, matches, curseur précédent/suivant avec bouclage, reset du curseur à chaque édition de requête, clamp quand le résultat rétrécit (rafraîchissement SSE), `clear`.
+2. **Barre de recherche partagée + surlignage** (`feat(web): barre de recherche conversation partagée…`)
+   - `ConversationSearchBar` (+ 8 tests) : input `role="searchbox"`, compteur `role="status"` aria-live ("3 / 7", "Aucun résultat"), boutons ↑/↓, Entrée = suivant / Maj+Entrée = précédent / Échap = fermer, `role="search"`.
+   - `HighlightedText` (+ 4 tests) : occurrences enveloppées dans `mark.conversation-search-hit`.
+   - CSS : `.conversation-search-bar/-input/-count/-nav/-toggle`, `mark.conversation-search-hit`, `.conversation-search-current` (liseré vert sur le message de l'occurrence active) + overrides dark.
+3. **Fil provider** (`feat(web): recherche dans le fil provider…`)
+   - `ProviderMissionConversationPage` : bouton « ⌕ Rechercher » dans l'en-tête, barre entre la source et le feed ; champs recherchables = `item.text` (messages, tool calls/result) + `item.name` (sous-agents) ; pendant une recherche, les messages avec occurrence rendent leur texte en clair surligné (le markdown React reprend dès la fermeture) ; auto-scroll bas de feed suspendu pendant la recherche, défilement vers l'occurrence active (`scrollIntoView` centré, ciblage par `data-external-item-id` sans sélecteur interpolé) ; bulles pending/thinking exclues.
+   - + 3 tests dans `ProviderMissionConversationPage.test.tsx` (surlignage + compteur + navigation Entrée/Échap, tool result + nom de sous-agent, aucun résultat).
+4. **Chat manager** (`feat(web): recherche dans le chat manager…`)
+   - `ManagerChat` : bouton ⌕ dans l'en-tête, même barre ; champs recherchables par kind d'événement normalisé — tool : titre + commande + sortie, sinon texte (user/assistant/system/reasoning/error) ; surlignage dans les bulles (texte en clair pendant la recherche), titres/commandes/sorties de tool, erreurs et événements système ; `data-search-id` par événement ; mêmes gardes de défilement.
+   - Nouveau `ManagerChat.test.tsx` (4 tests : rendu du fil, recherche + navigation + bouclage, surlignage d'une sortie de tool call, aucun résultat) — premier fichier de test pour ce composant.
+
+### Vérifications
+- `npm run typecheck` (racine) : OK
+- `npx vitest run apps/web` : 38 fichiers / 268 tests OK (227 → 268 ; +5 fichiers de test, +3 tests provider)
+- ESLint sur tous les fichiers touchés : propre
+- Note : le build web (`npm run build -w @nodra/web`) reste bloqué par l'erreur pré-existante `ProviderMissionConversationPage.test.tsx:11` (TS2698, commit `4fa8361`) documentée à l'itération 7 — toujours hors périmètre.
+
+### Décisions / notes / limites
+- **Côté client uniquement** : la recherche s'applique aux messages déjà chargés (option explicitement offerte par l'issue : « côté client sur les messages déjà chargés, puis côté serveur si besoin »). Les deux fils se rechargent en entier via SSE/polling, donc l'index couvre tout l'historique visible ; un endpoint serveur de recherche n'a pas été nécessaire.
+- **Rendu pendant la recherche** : pour un surlignage exact (offsets sûrs, y compris avec markdown), les messages qui contiennent une occurrence passent en texte clair surligné le temps de la recherche ; le rendu markdown revient dès que la requête est vidée ou la barre fermée.
+- **`mark` natif** : surlignage via `<mark>` (sémantique, aria), stylé `.conversation-search-hit` ; l'occurrence active porte `.conversation-search-current` sur le conteneur du message.
+- Le composant de compteur expose un `aria-label="Occurrences"` pour lever l'ambiguïté avec les autres `role="status"` du fil provider (bulles pending/sync).
+- Limite : les événements chiffrés en JSON (ex. payloads bruts) ne sont pas indexés — seuls les champs affichés (texte, titres, commandes, sorties) le sont, cohérent avec l'UI.
+
+### Statut
+- [x] #9 — Recherche dans les conversations

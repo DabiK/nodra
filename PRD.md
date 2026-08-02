@@ -46,7 +46,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #9 — Recherche dans les conversations (labels: —)
+- [x] #9 — Recherche dans les conversations (labels: —)
 
   **Issue #9 — détail complet**
   > ## Contexte
@@ -58,9 +58,9 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - Support : texte, résultats de tool calls, événements
   >
   > ## Acceptance
-  > - [ ] Recherche + surlignage dans le fil
-  > - [ ] Navigation entre occurrences
-  > - [ ] Indication du nombre de résultats
+  > - [x] Recherche + surlignage dans le fil
+  > - [x] Navigation entre occurrences
+  > - [x] Indication du nombre de résultats
   >
   > ## Méthode d'implémentation
   > - Cartographier le code avec des **subagents explore** avant d'implémenter
