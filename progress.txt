@@ -162,3 +162,32 @@
 
 ### Statut
 - [x] #6 — Budget / coût visible par run et mission
+
+## Itération 6 — 2026-08-02 — Task #7 : Mini-cartes de run actif sur le board
+
+### Fait (2 commits atomiques)
+1. **Type web étendu** (`feat(web): type MissionView étendu (runState, runStartedAt, lastAssistantMessage)`)
+   - `apps/web/src/types.ts` : `MissionView` gagne `runState`, `runStartedAt`, `lastAssistantMessage` (tous `string | null`) — le backend les sert déjà depuis le commit `c0432c2` (batch, pas de N+1), le web ne les déclarait pas encore.
+   - Fixtures des 8 fichiers de tests qui construisent des `MissionView` mises à jour (3 champs null par défaut).
+2. **Mini-cartes live** (`feat(web): mini-cartes live sur le board (réfléchit… + dernier message des runs actifs)`)
+   - `MissionRelay.tsx` : sur une carte dont la mission est ACTIVE et dont le dernier run travaille encore (`ACTIVE_RUN_STATES` = QUEUED/STARTING/RUNNING/WAITING_APPROVAL/CANCELLING, miroir du read model API), le hint statique est remplacé par un bloc live `role="status"` :
+     - `.thinking-dots` + libellé d'activité lisible par état ("en file d'attente", "démarre…", "réfléchit…", "attend une approbation", "annulation…") ;
+     - le dernier message assistant (début de message, tronqué par ellipsis CSS, `title` = message complet au survol).
+   - Aucun nouvel appel réseau : les données arrivent dans `GET /api/missions`, déjà rafraîchi en live par le flux SSE existant (`useSseRefresh` → `refreshBoard`), y compris sur les écritures SQLite du worker (`database-change-watcher`).
+   - `styles.css` : `.relay-task-live` + variante dark (`.relay-task-live b` → `var(--lime)`).
+   - Tests : 8 nouveaux dans `MissionRelay.test.tsx` (dots + message sur RUNNING, sans message encore, WAITING_APPROVAL, message long exposé via title, run terminé → hint statique, pas de run → hint statique, non-ACTIVE → pas de live, mission humaine avec run actif).
+
+### Vérifications
+- `npm run typecheck` : OK
+- `npm run build -w @nodra/web` : OK
+- `npx vitest run apps/web` : 31 fichiers / 213 tests OK (205 → 213)
+- ESLint sur les fichiers touchés : propre
+
+### Décisions / notes / limites
+- **Pas de polling additionnel** : l'issue #2 (SSE) est livrée et déclenche déjà le refresh du board à chaque écriture en base (HTTP ou worker) — l'acceptance « aucun impact perf notable du polling additionnel » est satisfaite par design (aucun polling ajouté).
+- **Contenu du live** : état du run + dernier message assistant du run actif (le champ API `lastAssistantMessage` n'est rempli que si le run est encore actif ; un run terminé sur une mission pas encore transitionnée retombe sur le hint statique « Travaille maintenant », le board se met à jour dès la transition).
+- **États de run** : la liste des états actifs est dupliquée côté web (miroir du read model API) pour la condition d'affichage ; le libellé français de repli « réfléchit… » couvre un éventuel état inconnu futur.
+- `role="status"` (aria-live polite) sur le bloc live, cohérent avec la bulle « réfléchit… » de `ProviderMissionConversationPage`.
+
+### Statut
+- [x] #7 — Mini-cartes de run actif sur le board

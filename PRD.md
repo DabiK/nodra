@@ -3,7 +3,7 @@
 Backlog généré depuis les issues GitHub ouvertes. Chaque item est une tâche.
 Coche la case quand la tâche est terminée. Une seule tâche par itération Ralph.
 
-- [ ] #7 — Mini-cartes de run actif sur le board (labels: —)
+- [x] #7 — Mini-cartes de run actif sur le board (labels: —)
 
   **Issue #7 — détail complet**
   > ## Contexte
