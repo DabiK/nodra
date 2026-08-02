@@ -63,8 +63,8 @@ export function describeAuditEvent(event: MissionAuditView): string {
   const label = AUDIT_EVENT_LABELS[event.eventType] ?? event.eventType;
   const from = event.payload?.fromState;
   const to = event.payload?.toState;
-  if (typeof from === "string" && typeof to === "string") {
-    return `${label} (${from} → ${to})`;
+  if (typeof to === "string") {
+    return `${label} (${from ?? "null"} → ${to})`;
   }
   return label;
 }

@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { MissionRunsView, MissionView } from "../types";
 import { MissionInspector } from "./MissionInspector";
 import { loadMissionRuns } from "../services/mission-service";
+import { loadMissionAudit } from "../services/mission-audit-service";
+import type { MissionAuditView } from "../services/mission-audit-service";
 
 vi.mock("../services/mission-service", () => ({
   loadMissionInspector: vi.fn().mockResolvedValue({
@@ -25,6 +27,9 @@ vi.mock("../services/mission-service", () => ({
 }));
 vi.mock("../services/mission-result-service", () => ({
   loadMissionResult: vi.fn().mockRejectedValue(new Error("mock: pas de run"))
+}));
+vi.mock("../services/mission-audit-service", () => ({
+  loadMissionAudit: vi.fn().mockRejectedValue(new Error("mock: pas d'audit"))
 }));
 vi.mock("../services/mission-notes-service", () => ({
   loadMissionNotes: vi.fn().mockReturnValue(""),
@@ -191,5 +196,97 @@ describe("MissionInspector export markdown", () => {
   it("n'affiche pas le bouton Exporter tant que la fiche n'est pas chargée", () => {
     renderInspector();
     expect(screen.queryByRole("button", { name: /Exporter/ })).toBeNull();
+  });
+});
+
+describe("MissionInspector audit timeline panel", () => {
+  const audit: MissionAuditView[] = [
+    {
+      id: "audit/1",
+      commandId: "cmd-1",
+      eventType: "MISSION_CREATED",
+      actor: "user",
+      payload: { schemaVersion: 1, fromState: null, toState: "DRAFT" },
+      occurredAt: "2026-08-02T08:00:00.000Z"
+    },
+    {
+      id: "audit/2",
+      commandId: "cmd-2",
+      eventType: "MISSION_PREPARED",
+      actor: "user",
+      payload: { schemaVersion: 1, fromState: "DRAFT", toState: "READY" },
+      occurredAt: "2026-08-02T08:30:00.000Z"
+    },
+    {
+      id: "audit/3",
+      commandId: "cmd-3",
+      eventType: "DELIVERY_DECIDED",
+      actor: "user",
+      payload: { schemaVersion: 1, decision: "accept", missionId: "m1" },
+      occurredAt: "2026-08-02T09:00:00.000Z"
+    },
+    {
+      id: "audit/4",
+      commandId: "cmd-4",
+      eventType: "GATE_EVALUATED",
+      actor: "manager",
+      payload: { schemaVersion: 1, state: "passed" },
+      occurredAt: "2026-08-02T09:10:00.000Z"
+    }
+  ];
+
+  it("masque le panneau tant que l'historique d'audit n'est pas chargé", () => {
+    renderInspector();
+    expect(screen.queryByLabelText("Historique de la mission")).toBeNull();
+  });
+
+  it("affiche la timeline avec libellés, acteur et horodatage", async () => {
+    vi.mocked(loadMissionAudit).mockResolvedValueOnce(audit);
+    renderInspector();
+
+    const panel = await screen.findByLabelText("Historique de la mission");
+    expect(panel.textContent).toContain("4 événements");
+    expect(panel.textContent).toContain("Création (null → DRAFT)");
+    expect(panel.textContent).toContain("Mise en file (DRAFT → READY)");
+    expect(panel.textContent).toContain("Décision de delivery — acceptée");
+    expect(panel.textContent).toContain("Gate évaluée — passée");
+    const rows = panel.querySelectorAll(".mission-audit-list li");
+    expect(rows).toHaveLength(4);
+    // Acteur et horodatage affichés.
+    expect(panel.textContent).toContain("Utilisateur");
+    expect(panel.textContent).toContain("Manager");
+    expect(panel.textContent).toMatch(/\d{2} [a-zéû]+ · \d{2}:\d{2}/);
+  });
+
+  it("filtre la timeline par catégorie d'événement", async () => {
+    vi.mocked(loadMissionAudit).mockResolvedValueOnce(audit);
+    renderInspector();
+    const panel = await screen.findByLabelText("Historique de la mission");
+
+    fireEvent.click(within(panel).getByRole("button", { name: /Gates/ }));
+    const rows = panel.querySelectorAll(".mission-audit-list li");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain("Gate évaluée — passée");
+
+    fireEvent.click(within(panel).getByRole("button", { name: /Transitions/ }));
+    expect(panel.querySelectorAll(".mission-audit-list li")).toHaveLength(2);
+
+    fireEvent.click(within(panel).getByRole("button", { name: /Tout/ }));
+    expect(panel.querySelectorAll(".mission-audit-list li")).toHaveLength(4);
+  });
+
+  it("affiche l'état vide quand la mission n'a aucun événement d'audit", async () => {
+    vi.mocked(loadMissionAudit).mockResolvedValueOnce([]);
+    renderInspector();
+    const panel = await screen.findByLabelText("Historique de la mission");
+    expect(panel.textContent).toContain("Aucun événement d'audit");
+  });
+
+  it("affiche un message dédié quand un filtre ne correspond à rien", async () => {
+    vi.mocked(loadMissionAudit).mockResolvedValueOnce(audit);
+    renderInspector();
+    const panel = await screen.findByLabelText("Historique de la mission");
+    fireEvent.click(within(panel).getByRole("button", { name: /Provider/ }));
+    expect(panel.querySelector(".mission-audit-none")?.textContent).toContain("Aucun événement de ce type");
   });
 });

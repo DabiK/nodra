@@ -87,7 +87,7 @@ describe("countAuditCategories", () => {
 
 describe("describeAuditEvent", () => {
   it("décrit une transition avec le libellé et le changement d'état", () => {
-    expect(describeAuditEvent(event())).toBe("Mise en file (DRAFT → READY)");
+    expect(describeAuditEvent(event({}))).toBe("Mise en file (DRAFT → READY)");
   });
 
   it("décrit une décision de delivery acceptée", () => {

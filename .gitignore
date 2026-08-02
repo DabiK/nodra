@@ -9,3 +9,6 @@ data/
 *.db-wal
 *.tsbuildinfo
 .DS_Store
+
+# sentinel Ralph
+.ralph/

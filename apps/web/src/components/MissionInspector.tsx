@@ -9,6 +9,17 @@ import { branchNameFromTitle, validateWorkspaceMode } from "../services/workspac
 import { createPrerequisitePipeline } from "../services/pipeline-service";
 import { loadMissionResult, type MissionResultView } from "../services/mission-result-service";
 import { loadMissionNotes, saveMissionNotes } from "../services/mission-notes-service";
+import { loadMissionAudit, type MissionAuditView } from "../services/mission-audit-service";
+import {
+  AUDIT_FILTERS,
+  auditActorLabel,
+  auditEventCategory,
+  countAuditCategories,
+  describeAuditEvent,
+  filterAuditEvents,
+  formatAuditTime,
+  type AuditCategory
+} from "../services/mission-audit-view-service";
 import { performMissionAction } from "../services/mission-action-service";
 import { getMissionUiPolicy, type MissionUiAction, type MissionUiPolicy } from "../services/mission-ui-policy";
 import { showWorkspace } from "../services/worktree-service";
@@ -54,6 +65,7 @@ export function MissionInspector({
   const [data, setData] = useState<MissionInspectorData | null>(null);
   const [result, setResult] = useState<MissionResultView | null>(null);
   const [runs, setRuns] = useState<MissionRunsView | null>(null);
+  const [audit, setAudit] = useState<MissionAuditView[] | null>(null);
   const [form, setForm] = useState<InspectorForm | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -103,6 +115,17 @@ export function MissionInspector({
       .catch(() => { if (!cancelled) setRuns(null); });
     return () => { cancelled = true; };
   }, [missionId, data?.mission.state]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadMissionAudit(missionId)
+      .then((next) => { if (!cancelled) setAudit(next); })
+      .catch(() => { if (!cancelled) setAudit(null); });
+    return () => { cancelled = true; };
+    // L'historique est immuable et rechargé explicitement après chaque action
+    // (applyAction) : dépendre de l'état de la mission double-fetcherait l'audit
+    // à l'ouverture (state undefined → READY) et démonterait le panneau.
+  }, [missionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,15 +237,17 @@ export function MissionInspector({
         latestRunId: result?.latestRunId ?? null,
         declaredResult: result?.assistantMessage ?? undefined
       });
-      const [reloaded, reloadedResult, reloadedRuns] = await Promise.all([
+      const [reloaded, reloadedResult, reloadedRuns, reloadedAudit] = await Promise.all([
         loadMissionInspector(missionId),
         loadMissionResult(missionId),
-        loadMissionRuns(missionId).catch(() => null)
+        loadMissionRuns(missionId).catch(() => null),
+        loadMissionAudit(missionId).catch(() => null)
       ]);
       setData(reloaded);
       setForm(formFrom(reloaded, providerOptions));
       setResult(reloadedResult);
       setRuns(reloadedRuns);
+      setAudit(reloadedAudit);
       setNotice(`${action.label} · action appliquée`);
     } catch (reason) {
       setError((reason as Error).message);
@@ -244,7 +269,7 @@ export function MissionInspector({
         </header>
 
         {step === "inspect" ? (
-          <InspectStep data={data} result={result} runs={runs} policy={policy} />
+          <InspectStep data={data} result={result} runs={runs} audit={audit} policy={policy} />
         ) : (
           <form id="mission-inspector-form" className="mission-configurator" onSubmit={save}>
             {!data?.config || !form ? (
@@ -398,15 +423,84 @@ function MissionBudgetPanel({ runs }: { runs: MissionRunsView | null }) {
   );
 }
 
+function MissionAuditPanel({ missionId, audit }: { missionId: string; audit: MissionAuditView[] | null }) {
+  const [filter, setFilter] = useState<"all" | AuditCategory>("all");
+  if (!audit) return null;
+  const counts = countAuditCategories(audit);
+  const visible = filterAuditEvents(audit, filter);
+  return (
+    <section className="mission-audit-panel" aria-label="Historique de la mission">
+      <header>
+        <div>
+          <span className="eyebrow">HISTORIQUE</span>
+          <strong>Timeline d'audit</strong>
+        </div>
+        {audit.length > 0 && (
+          <span className="mission-audit-total" title={`${audit.length} événement(s) d'audit`}>
+            {audit.length} événement{audit.length > 1 ? "s" : ""}
+          </span>
+        )}
+      </header>
+      {audit.length === 0 ? (
+        <p className="empty">Aucun événement d'audit pour le moment — la timeline se remplira au fil des transitions et décisions.</p>
+      ) : (
+        <>
+          <div className="mission-audit-chips" role="group" aria-label="Filtrer l'historique par type d'événement">
+            {AUDIT_FILTERS.map((option) => {
+              const count = option.key === "all" ? audit.length : counts[option.key];
+              return (
+                <button
+                  type="button"
+                  className={`view-chip${filter === option.key ? " active" : ""}`}
+                  onClick={() => setFilter(option.key)}
+                  key={option.key}
+                >
+                  {option.label}
+                  {count > 0 && <small>{count}</small>}
+                </button>
+              );
+            })}
+          </div>
+          <ol className="mission-audit-list">
+            {visible.map((event) => {
+              const category = auditEventCategory(event.eventType);
+              return (
+                <li key={event.id} className={`audit-cat-${category}`}>
+                  <span className={`audit-cat-badge ${category}`} title={event.eventType}>{category}</span>
+                  <span className="mission-audit-row-body">
+                    <strong>{describeAuditEvent(event)}</strong>
+                    <span className="mission-audit-row-meta">
+                      <span>{auditActorLabel(event.actor)}</span>
+                      <time dateTime={event.occurredAt}>{formatAuditTime(event.occurredAt)}</time>
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
+            {visible.length === 0 && (
+              <li className="mission-audit-none">Aucun événement de ce type pour le moment.</li>
+            )}
+          </ol>
+        </>
+      )}
+      <small className="mission-audit-refresh" title={missionId}>
+        Historique complet des transitions, décisions, runs et gates de la mission.
+      </small>
+    </section>
+  );
+}
+
 function InspectStep({
   data,
   result,
   runs,
+  audit,
   policy
 }: {
   data: MissionInspectorData | null;
   result: MissionResultView | null;
   runs: MissionRunsView | null;
+  audit: MissionAuditView[] | null;
   policy: MissionUiPolicy | null;
 }) {
   return (
@@ -447,6 +541,7 @@ function InspectStep({
         </div>
         {data?.mission && <MissionNotesPanel missionId={data.mission.id} />}
         {data?.mission && <MissionBudgetPanel runs={runs} />}
+        {data?.mission && <MissionAuditPanel missionId={data.mission.id} audit={audit} />}
         {policy?.showResultPanel && (
           <section className="mission-result-panel" aria-label="Résultat produit">
             <header>

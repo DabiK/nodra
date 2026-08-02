@@ -151,6 +151,36 @@ nav .nav-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .mission-budget-cost.unknown { color: var(--muted); font-weight: 600; }
 .mission-budget-usage-kind { color: var(--muted); font-size: 9px; }
 
+.mission-audit-panel { display: grid; gap: 8px; margin-top: 14px; }
+.mission-audit-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mission-audit-panel .eyebrow { color: var(--green); font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+.mission-audit-panel header strong { display: block; margin-top: 2px; font: 800 14px Manrope; }
+.mission-audit-total { border-radius: 10px; padding: 5px 10px; background: var(--green-soft); color: var(--green); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.mission-audit-chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 2px 0 4px; scrollbar-width: thin; }
+.mission-audit-chips .view-chip { min-height: 26px; padding: 0 9px; }
+.mission-audit-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.mission-audit-list li { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 9px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; background: #fbfcf9; }
+.mission-audit-list li.audit-cat-transition { border-left: 3px solid #3a6cbf; }
+.mission-audit-list li.audit-cat-delivery { border-left: 3px solid #9bb231; }
+.mission-audit-list li.audit-cat-run { border-left: 3px solid var(--green); }
+.mission-audit-list li.audit-cat-gate { border-left: 3px solid #b06ab3; }
+.mission-audit-list li.audit-cat-config { border-left: 3px solid #d1a02a; }
+.mission-audit-list li.audit-cat-provider { border-left: 3px solid #2f9e9e; }
+.mission-audit-list li.audit-cat-other { border-left: 3px solid #8a958f; }
+.audit-cat-badge { justify-self: start; border-radius: 6px; padding: 3px 5px; background: #eef0ea; color: #758079; font: 800 8px monospace; letter-spacing: .04em; text-align: center; text-transform: lowercase; }
+.audit-cat-badge.transition { background: #e5eefb; color: #2f5fa8; }
+.audit-cat-badge.delivery { background: #eef3d4; color: #799116; }
+.audit-cat-badge.run { background: var(--green-soft); color: var(--green); }
+.audit-cat-badge.gate { background: #f1e4f2; color: #8c4a8f; }
+.audit-cat-badge.config { background: #f6ecd6; color: #a97c16; }
+.audit-cat-badge.provider { background: #ddf0f0; color: #1d7d7d; }
+.mission-audit-row-body { min-width: 0; display: grid; gap: 2px; }
+.mission-audit-row-body strong { overflow: hidden; font: 800 10px Manrope; text-overflow: ellipsis; white-space: nowrap; }
+.mission-audit-row-meta { display: flex; align-items: center; gap: 8px; color: #7c8a81; font: 9px ui-monospace, monospace; }
+.mission-audit-row-meta time { color: #7c8a81; }
+.mission-audit-none { color: var(--muted); font-size: 11px; font-weight: 600; text-align: center; }
+.mission-audit-refresh { color: var(--muted); font-size: 9px; line-height: 1.4; }
+
 .task-view-chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 0 14px 12px 48px; scrollbar-width: thin; }
 .view-chip, .configure-chip, .folder-chip { flex: none; display: flex; align-items: center; gap: 6px; min-height: 30px; border: 1px solid #e1e3dc; border-radius: 18px; padding: 0 11px; background: #f3f2ed; color: #6f7b74; font-size: 10px; font-weight: 800; }
 .view-chip:hover, .configure-chip:hover, .folder-chip:hover { border-color: #b7c9bf; color: var(--green); }
@@ -1226,6 +1256,16 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
   .mission-budget-run-head code { background: #232d26; color: #8fa393; }
   .mission-budget-total { background: rgba(76, 167, 131, 0.16); }
   .mission-budget-total.unknown { background: rgba(136, 145, 140, 0.14); }
+  .mission-audit-total { background: rgba(76, 167, 131, 0.16); }
+  .mission-audit-list li { background: #161e18; border-color: var(--line); }
+  .audit-cat-badge { background: #232d26; color: #8fa393; }
+  .audit-cat-badge.transition { background: #1d2b41; color: #8fb3e8; }
+  .audit-cat-badge.delivery { background: #2c3318; color: #b4c766; }
+  .audit-cat-badge.run { background: rgba(76, 167, 131, 0.16); color: var(--lime); }
+  .audit-cat-badge.gate { background: #331f35; color: #c98ecc; }
+  .audit-cat-badge.config { background: #362d15; color: #d9b45a; }
+  .audit-cat-badge.provider { background: #16302f; color: #5ec4c4; }
+  .mission-audit-row-meta { color: #7c8a81; }
   .timeline-cost { background: rgba(76, 167, 131, 0.16); color: var(--lime); }
   .manager-run-usage { background: rgba(76, 167, 131, 0.16); color: var(--lime); }
   .kind-switch { background: #1a221c; }
