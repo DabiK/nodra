@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ProviderMissionConversationPage } from "./ProviderMissionConversationPage";
+
+// La suppression d'écho SSE est testée en isolation (events-service.test.ts) :
+// ici on la neutralise pour vérifier que la garde côté composant empêche
+// elle-même la boucle (POST → event → refresh → POST…).
+vi.mock("../services/events-service", async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, suppressServerEventsFor: vi.fn() };
+});
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -115,6 +123,47 @@ describe("provider mission conversation", () => {
     await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/ensure-observation") && init?.method === "POST")).toBe(true));
     expect(await screen.findByText(/Lance d'abord la mission/)).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("does not re-POST ensure-observation on SSE echoes (no infinite polling loop)", async () => {
+    const missing = () => Promise.resolve(new Response(JSON.stringify({ message: "Mission mission/provider/1 has no active provider session", code: "MISSION_PROVIDER_SESSION_NOT_FOUND" }), { status: 404, headers: { "content-type": "application/json" } }));
+    let ensureCalls = 0;
+    const fetchMock = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(url);
+      if (path.endsWith("/activate") && init?.method === "POST") return missing();
+      if (path.endsWith("/provider-session")) return missing();
+      if (path.endsWith("/ensure-observation") && init?.method === "POST") { ensureCalls += 1; return json({ ...mission, state: "READY", version: 1 }); }
+      if (path.endsWith("/capabilities")) return missing();
+      return json({ ...mission, state: "READY", version: 1 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const listeners: Array<(message: MessageEvent<string>) => void> = [];
+    class FakeEventSource {
+      constructor(_url: string) { /* registre partagé */ }
+      addEventListener(_type: string, callback: (message: MessageEvent<string>) => void): void {
+        listeners.push(callback);
+      }
+      close(): void { /* no-op */ }
+    }
+    vi.stubGlobal("EventSource", FakeEventSource);
+
+    render(<ProviderMissionConversationPage missionId={mission.id} />);
+    await waitFor(() => expect(ensureCalls).toBe(1));
+    expect(await screen.findByText(/Lance d'abord la mission/)).toBeTruthy();
+
+    const dispatch = () => {
+      const event = new MessageEvent("message", { data: JSON.stringify({ type: "data_changed", source: "database" }) });
+      for (const listener of listeners) listener(event);
+    };
+    await act(async () => {
+      dispatch();
+      dispatch();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    // Les échos SSE n'ont pas re-déclenché le POST : la boucle est cassée.
+    expect(ensureCalls).toBe(1);
   });
 
   it("falls back to an observation session for an ACTIVE mission without a provider session link", async () => {

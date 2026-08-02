@@ -8,6 +8,18 @@ export function serverEventsSupported(): boolean {
 }
 
 /**
+ * Fenêtre de silence (ms) pendant laquelle les événements SSE entrants sont
+ * ignorés. Utilisée par les composants juste avant une mutation HTTP : le
+ * backend publie un `data_changed` pour toute mutation (y compris la leur),
+ * et sans cette suppression l'événement écho re-déclencherait le
+ * rafraîchissement → boucle infinie (POST → event → refresh → POST…).
+ */
+let suppressionUntil = 0;
+export function suppressServerEventsFor(ms: number): void {
+  suppressionUntil = Date.now() + ms;
+}
+
+/**
  * Ouvre le flux SSE temps réel (`/api/events/stream`) et appelle `onEvent`
  * pour chaque événement reçu. Le backend envoie :
  *  - `hello` à chaque connexion (resynchronisation, notamment après une
@@ -23,6 +35,7 @@ export function subscribeToServerEvents(onEvent: (event: ServerEvent) => void): 
   if (!serverEventsSupported()) return () => undefined;
   const source = new EventSource("/api/events/stream");
   source.addEventListener("message", (message) => {
+    if (Date.now() < suppressionUntil) return;
     try {
       const payload = JSON.parse((message as MessageEvent<string>).data) as ServerEvent;
       if (payload && typeof payload.type === "string") onEvent(payload);

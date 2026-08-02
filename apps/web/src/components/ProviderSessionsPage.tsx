@@ -7,6 +7,7 @@ import { ProviderSessionCapabilityBanner } from "./ProviderSessionCapabilityBann
 import { ProviderSessionDetail } from "./ProviderSessionDetail";
 import { ProviderSessionList } from "./ProviderSessionList";
 import { useSseRefresh } from "../hooks/useSseRefresh";
+import { suppressServerEventsFor } from "../services/events-service";
 
 const PROVIDER_IDS = ["codex", "opencode"] as const;
 type Filter = "all" | (typeof PROVIDER_IDS)[number];
@@ -76,7 +77,12 @@ export function ProviderSessionsPage({ missions, initialSessionId, onSessionChan
     if (!selectedId || refreshingRef.current) return;
     refreshingRef.current = true;
     setRefreshing(true); setError("");
-    try { setDetail(await refreshProviderSession(selectedId)); await reloadLists(); } catch (reason) { setError((reason as Error).message); } finally { refreshingRef.current = false; setRefreshing(false); }
+    try {
+      // Le POST /refresh publie un data_changed sur le SSE ; on supprime
+      // l'écho pour ne pas re-déclencher refresh en boucle infinie.
+      suppressServerEventsFor(2500);
+      setDetail(await refreshProviderSession(selectedId)); await reloadLists();
+    } catch (reason) { setError((reason as Error).message); } finally { refreshingRef.current = false; setRefreshing(false); }
   }, [reloadLists, selectedId]);
   // Temps réel : le flux SSE remplace le polling toutes les 10 s.
   useSseRefresh(() => void refresh());

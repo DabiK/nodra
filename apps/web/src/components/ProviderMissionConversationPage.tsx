@@ -21,6 +21,10 @@ import { SubagentExecution } from "./SubagentExecution";
 import { ModelPicker } from "./ModelPicker";
 import { PromptEnhanceDialog } from "./PromptEnhanceDialog";
 import { useSseRefresh } from "../hooks/useSseRefresh";
+import { suppressServerEventsFor } from "../services/events-service";
+
+/** Fenêtre de silence SSE après une mutation locale (évite l'écho en boucle). */
+const SSE_SUPPRESSION_MS = 2500;
 
 function capabilityAvailable(state: string | undefined) {
   return Boolean(state && state !== "unavailable");
@@ -165,6 +169,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
   const [enhanceOpen, setEnhanceOpen] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const activationRef = useRef(false);
+  const ensureRef = useRef(false);
   const catalogRef = useRef(false);
   const commandRef = useRef<{ kind: "send" | "steer"; text: string; id: string } | null>(null);
 
@@ -206,6 +211,7 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
       if (nextMission.state === "READY" && !activationRef.current) {
         activationRef.current = true;
         try {
+          suppressServerEventsFor(SSE_SUPPRESSION_MS);
           await activateMissionProviderSession(missionId, nextMission.version, commandId());
           nextMission = await showMission(missionId);
         } catch {
@@ -219,7 +225,24 @@ export function ProviderMissionConversationPage({ missionId }: { missionId: stri
       } catch (reason) {
         const message = (reason as Error).message;
         if (message.includes("has no active provider session")) {
+          // Tentative unique par chargement : le POST publie un data_changed
+          // sur le SSE ; le répéter à chaque événement créerait une boucle
+          // infinie (POST → event → refresh → POST…).
+          if (ensureRef.current) {
+            setMission(nextMission);
+            setDetail(null);
+            setControl(null);
+            setFailure(null);
+            setConnected(false);
+            setError("");
+            setPending(nextMission.state === "READY" || nextMission.state === "DRAFT"
+              ? "Lance d'abord la mission depuis la liste pour démarrer le thread provider."
+              : "En attente du démarrage du thread provider…");
+            return;
+          }
+          ensureRef.current = true;
           try {
+            suppressServerEventsFor(SSE_SUPPRESSION_MS);
             await ensureMissionObservationSession(missionId, commandId());
             nextDetail = await loadMissionProviderSession(missionId);
           } catch {
