@@ -16,7 +16,7 @@ export interface MissionExportInput {
   evidence: EvidenceView[];
 }
 
-/** Libellés lisibles des événements d'audit de mission connus. */
+/** Libellés lisibles des événements d'audit liés à une mission (mission, runs, gates). */
 const AUDIT_EVENT_LABELS: Record<string, string> = {
   MISSION_CREATED: "Création",
   MISSION_PREPARED: "Mise en file",
@@ -27,7 +27,20 @@ const AUDIT_EVENT_LABELS: Record<string, string> = {
   MISSION_SUBMITTED_FOR_VALIDATION: "Soumission en validation",
   MISSION_ACCEPTED: "Acceptation de la delivery",
   MISSION_CLOSED: "Clôture",
-  MISSION_ABANDONED: "Abandon"
+  MISSION_ABANDONED: "Abandon",
+  MISSION_AGENT_ENABLED: "Config agent activée",
+  MISSION_AGENT_CONFIG_UPDATED: "Config agent mise à jour",
+  MISSION_START_REQUESTED: "Démarrage demandé",
+  PROVIDER_SESSION_MISSION_ACTIVATED: "Session provider activée",
+  READY_AGENT_MISSION_CREATED_FROM_PROVIDER_SESSION: "Mission créée depuis une session",
+  DELIVERY_DECLARED: "Delivery déclarée",
+  DELIVERY_DECIDED: "Décision de delivery",
+  RUN_TERMINAL_RECORDED: "Fin de run",
+  RUN_TERMINAL_MISSION_TRANSITION_SKIPPED: "Transition de fin de run ignorée",
+  EVIDENCE_RECORDED: "Preuve enregistrée",
+  GATE_DEFINED: "Gate définie",
+  GATE_EVALUATED: "Gate évaluée",
+  GATE_EVIDENCE_STALE: "Preuve de gate périmée"
 };
 
 /** Échappe une cellule de tableau GFM (barres verticales + retours à la ligne). */
