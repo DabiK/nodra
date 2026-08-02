@@ -222,7 +222,11 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
         role,
         kind,
         order,
-        text: kind === "subagent" ? (text ?? this.subagentText(entry.parts)) : text,
+        text: kind === "subagent"
+          ? (text ?? this.subagentText(entry.parts))
+          : kind === "reasoning"
+            ? (text ?? this.reasoningText(entry.parts))
+            : text,
         name: kind === "subagent"
           ? this.subagentName(entry.parts)
           : role === "assistant" ? this.toolName(entry.parts) : null,
@@ -254,6 +258,7 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
   private mapKind(parts: Part[], role: ProviderSessionItemRole, text: string | null): ProviderSessionItemKind {
     if (role === "tool") return "tool_result";
     if (role === "assistant") {
+      if (this.taskPart(parts) !== null) return "subagent";
       if (parts.some((part) => part.type === "agent" || part.type === "subtask")) return "subagent";
       if (text !== null) return "message";
       if (parts.some((part) => part.type === "reasoning")) return "reasoning";
@@ -263,7 +268,15 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
     return "message";
   }
 
+  private taskPart(parts: Part[]): Extract<Part, { type: "tool" }> | null {
+    const tool = parts.find(
+      (part): part is Extract<Part, { type: "tool" }> => part.type === "tool" && part.tool === "task"
+    );
+    return tool ?? null;
+  }
+
   private subagentName(parts: Part[]): string | null {
+    if (this.taskPart(parts) !== null) return "task";
     const subtask = parts.find((part) => part.type === "subtask");
     if (subtask && subtask.agent.length > 0) return subtask.agent;
     const agent = parts.find((part) => part.type === "agent");
@@ -271,9 +284,23 @@ export class OpenCodeProviderSessionSyncAdapter implements ProviderSessionSyncPo
   }
 
   private subagentText(parts: Part[]): string | null {
+    const task = this.taskPart(parts);
+    if (task !== null) {
+      const input = task.state.input;
+      const description = typeof input.description === "string" && input.description.length > 0
+        ? input.description
+        : null;
+      const prompt = typeof input.prompt === "string" && input.prompt.length > 0 ? input.prompt : null;
+      return description ?? prompt;
+    }
     const subtask = parts.find((part) => part.type === "subtask");
     if (!subtask) return null;
     return subtask.prompt.length > 0 ? subtask.prompt : (subtask.description.length > 0 ? subtask.description : null);
+  }
+
+  private reasoningText(parts: Part[]): string | null {
+    const reasoning = parts.find((part) => part.type === "reasoning");
+    return reasoning && reasoning.text.length > 0 ? reasoning.text : null;
   }
 
   private messageText(parts: Part[]): string | null {

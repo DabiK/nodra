@@ -839,6 +839,8 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 .provider-session-item header { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font: 10px ui-monospace, monospace; }.provider-session-item.from-user header { color: #bbc8bf; }
 .provider-session-item-author { display: inline-flex; align-items: center; gap: 6px; font: 800 10px Manrope; }.provider-session-item-author i { width: 17px; height: 17px; display: grid; place-items: center; border-radius: 6px; background: var(--green-soft); color: var(--green); font: 800 9px ui-monospace, monospace; font-style: normal; }.provider-session-item.from-user .provider-session-item-author i { background: #40574a; color: var(--lime); }.provider-session-item.is-tool .provider-session-item-author i { width: auto; padding: 0 4px; border-radius: 4px; }
 .provider-session-item strong { display: block; margin-top: 8px; color: #405048; font: 800 11px Manrope; }.provider-session-item p { margin: 7px 0 0; font: 12px/1.6 ui-monospace, "SF Mono", monospace; white-space: pre-wrap; word-break: break-word; }.provider-session-item.from-user p { color: #f6f7f2; }
+.provider-session-item.is-subagent { width: 100%; border-left: 3px solid #6b4ea0; border-radius: 9px; background: #f0ecf8; }.provider-session-item.is-subagent strong { color: #6b4ea0; }.provider-session-item.is-subagent .provider-session-item-author i { background: #e9e1f7; color: #6b4ea0; }
+.subagent-chip { display: inline-block; margin-top: 8px; border-radius: 999px; padding: 4px 9px; background: #e9e1f7; color: #6b4ea0; font: 800 9px Manrope; letter-spacing: .09em; text-transform: uppercase; }
 .provider-session-dialog-backdrop { position: fixed; z-index: 70; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(21, 31, 25, .38); }
 .provider-session-dialog { display: grid; gap: 14px; width: min(460px, 100%); padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: 0 20px 60px rgba(20,30,25,.3); }
 .provider-session-dialog header, .provider-session-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -886,6 +888,9 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 .provider-thread-item p { margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; font: 500 13px/1.65 "DM Sans", system-ui, sans-serif; }
 .provider-thread-item > code { display: block; margin-top: 8px; border-radius: 7px; padding: 7px 9px; background: #1f2924; color: #dce5df; font-size: 10px; }
 .provider-thread-item.tool > p.provider-thread-tool-text { margin-top: 8px; border-radius: 6px; padding: 9px 11px; background: #17231d; color: #e7ede9; font: 11px/1.5 ui-monospace, "SF Mono", Menlo, monospace; max-height: 320px; overflow: auto; }
+.provider-thread-item.subagent { width: min(860px, 96%); border-left: 3px solid #6b4ea0; border-radius: 9px; background: #f0ecf8; }
+.provider-thread-item.subagent header strong { color: #6b4ea0; }
+.provider-thread-item.subagent > code { background: #4a3a6e; color: #e9e2f6; }
 .provider-thread-sync { justify-self: center; border-radius: 999px; padding: 8px 12px; background: #edf3e8; color: var(--green); font-size: 9px; font-weight: 900; }
 .agent-migration-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #111b16; color: #edf5ee; }
 .agent-migration-page section { width: min(620px, 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 22px; padding: 34px; background: #17231d; box-shadow: 0 24px 70px rgba(0,0,0,.24); }

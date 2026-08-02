@@ -68,6 +68,41 @@ const toolPart = (tool: string, messageID = "m"): Record<string, unknown> => ({
   state: { status: "completed" }
 });
 
+const agentPart = (name: string, messageID = "m"): Record<string, unknown> => ({
+  id: `agent-${messageID}`,
+  sessionID: "session-1",
+  messageID,
+  type: "agent",
+  name
+});
+
+const subtaskPart = (agent: string, prompt: string, description: string, messageID = "m"): Record<string, unknown> => ({
+  id: `subtask-${messageID}`,
+  sessionID: "session-1",
+  messageID,
+  type: "subtask",
+  agent,
+  prompt,
+  description
+});
+
+const taskToolPart = (messageID = "m"): Record<string, unknown> => ({
+  id: `task-tool-${messageID}`,
+  sessionID: "session-1",
+  messageID,
+  type: "tool",
+  callID: `call-${messageID}`,
+  tool: "task",
+  state: {
+    status: "completed",
+    input: {
+      description: "Créer toto.txt avec histoire",
+      prompt: "Create a file named toto.txt with a story inside"
+    },
+    output: "<task id=\"ses_sub\">\n<task_result>\nCreated: toto.txt\n</task_result>\n</task>"
+  }
+});
+
 const entry = (info: Record<string, unknown>, parts: unknown[] = []): Record<string, unknown> => ({
   info: { sessionID: "session-1", ...info },
   parts
@@ -185,7 +220,13 @@ describe("OpenCodeProviderSessionSyncAdapter", () => {
         entry({ id: "m2", role: "assistant", parentID: "m1", time: { created: 3, completed: 30 } },
           [textPart("hi ", "m2"), textPart("there", "m2")]),
         entry({ id: "m1", role: "user", time: { created: 2 } }, [textPart("hello", "m1")]),
-        entry({ id: "m0", role: "assistant", time: { created: 1 } }, [textPart("preamble", "m0")])
+        entry({ id: "m0", role: "assistant", time: { created: 1 } }, [textPart("preamble", "m0")]),
+        entry({ id: "m6", role: "assistant", parentID: "m1", time: { created: 7, completed: 70 } },
+          [agentPart("prelude", "m6"), subtaskPart("nested/codex", "Refactor the module", "delegated refactor", "m6"), textPart("Visible summary", "m6")]),
+        entry({ id: "m7", role: "assistant", parentID: "m1", time: { created: 8, completed: 80 } },
+          [agentPart("orphan", "m7"), subtaskPart("delegate", "Do the delegated work", "delegation description", "m7")]),
+        entry({ id: "m8", role: "assistant", parentID: "m1", time: { created: 9, completed: 90 } },
+          [reasoningPart("delegating to a subagent", "m8"), taskToolPart("m8")])
       ]
     });
 
@@ -218,7 +259,7 @@ describe("OpenCodeProviderSessionSyncAdapter", () => {
         order: 0,
         state: "completed",
         sourceStartedAt: "1970-01-01T00:00:00.002Z",
-        sourceCompletedAt: "1970-01-01T00:00:00.060Z",
+        sourceCompletedAt: "1970-01-01T00:00:00.090Z",
         receivedAt
       }
     ]);
@@ -227,8 +268,11 @@ describe("OpenCodeProviderSessionSyncAdapter", () => {
       { externalItemId: "m1", externalTurnId: "m1", role: "user", kind: "message", order: 1, text: "hello", name: null, sourceAt: "1970-01-01T00:00:00.002Z", receivedAt },
       { externalItemId: "m2", externalTurnId: "m1", role: "assistant", kind: "message", order: 2, text: "hi there", name: null, sourceAt: "1970-01-01T00:00:00.003Z", receivedAt },
       { externalItemId: "m3", externalTurnId: "m1", role: "tool", kind: "tool_result", order: 3, text: null, name: null, sourceAt: "1970-01-01T00:00:00.004Z", receivedAt },
-      { externalItemId: "m4", externalTurnId: "m1", role: "assistant", kind: "reasoning", order: 4, text: null, name: null, sourceAt: "1970-01-01T00:00:00.005Z", receivedAt },
-      { externalItemId: "m5", externalTurnId: "m1", role: "assistant", kind: "tool_call", order: 5, text: null, name: "bash", sourceAt: "1970-01-01T00:00:00.006Z", receivedAt }
+      { externalItemId: "m4", externalTurnId: "m1", role: "assistant", kind: "reasoning", order: 4, text: "thinking about it", name: null, sourceAt: "1970-01-01T00:00:00.005Z", receivedAt },
+      { externalItemId: "m5", externalTurnId: "m1", role: "assistant", kind: "tool_call", order: 5, text: null, name: "bash", sourceAt: "1970-01-01T00:00:00.006Z", receivedAt },
+      { externalItemId: "m6", externalTurnId: "m1", role: "assistant", kind: "subagent", order: 6, text: "Visible summary", name: "nested/codex", sourceAt: "1970-01-01T00:00:00.007Z", receivedAt },
+      { externalItemId: "m7", externalTurnId: "m1", role: "assistant", kind: "subagent", order: 7, text: "Do the delegated work", name: "delegate", sourceAt: "1970-01-01T00:00:00.008Z", receivedAt },
+      { externalItemId: "m8", externalTurnId: "m1", role: "assistant", kind: "subagent", order: 8, text: "Créer toto.txt avec histoire", name: "task", sourceAt: "1970-01-01T00:00:00.009Z", receivedAt }
     ]);
     expect(snapshot.cursor).toBeNull();
   });

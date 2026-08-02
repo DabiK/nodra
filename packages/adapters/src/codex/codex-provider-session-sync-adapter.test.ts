@@ -168,7 +168,9 @@ describe("CodexProviderSessionSyncAdapter", () => {
         { externalItemId: "item_agent", externalTurnId: "turn_1", role: "assistant", kind: "message", order: 2, text: "Done with [REDACTED]", name: null, sourceAt: null, receivedAt },
         { externalItemId: "item_tool", externalTurnId: "turn_1", role: "tool", kind: "tool_result", order: 3, text: "ok password=[REDACTED]", name: "npm test --token=[REDACTED]", sourceAt: null, receivedAt },
         { externalItemId: "item_future", externalTurnId: "turn_1", role: "unknown", kind: "unknown", order: 4, text: null, name: null, sourceAt: null, receivedAt },
-        { externalItemId: "item_mcp", externalTurnId: "turn_2", role: "assistant", kind: "tool_call", order: 5, text: null, name: "fixture/lookup", sourceAt: null, receivedAt }
+        { externalItemId: "item_subagent_started", externalTurnId: "turn_1", role: "assistant", kind: "subagent", order: 5, text: "started", name: "nested/codex", sourceAt: null, receivedAt },
+        { externalItemId: "item_collab_spawn", externalTurnId: "turn_1", role: "assistant", kind: "subagent", order: 6, text: "Refactor the module", name: "spawnAgent", sourceAt: null, receivedAt },
+        { externalItemId: "item_mcp", externalTurnId: "turn_2", role: "assistant", kind: "tool_call", order: 7, text: null, name: "fixture/lookup", sourceAt: null, receivedAt }
       ],
       cursor: null
     });

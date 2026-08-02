@@ -6,6 +6,7 @@ export function subagentStatusLabel(text: string | null): string | null {
 }
 export function subagentToolLabel(name: string | null): string | null {
   if (name === "spawnAgent") return "Lancer un sous-agent";
+  if (name === "task") return "Déléguer à un sous-agent";
   if (name === "sendInput") return "Envoyer une entrée";
   if (name === "resumeAgent") return "Reprendre le sous-agent";
   if (name === "wait") return "Attendre le sous-agent";
