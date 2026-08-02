@@ -25,8 +25,12 @@ import { loadViewMode, saveViewMode, type MissionViewMode } from "./services/vie
 import { loadSavedMissionFilters, saveMissionFilters } from "./services/mission-filter-service";
 import { dragActionId, findDragTransition } from "./services/mission-drag-transitions";
 import { performMissionAction } from "./services/mission-action-service";
+import { loadMissionResult } from "./services/mission-result-service";
+import { advancePipelineRun, startPipeline } from "./services/pipeline-service";
+import { buildPaletteCommands, type PaletteCommand } from "./services/palette-service";
 import { applyTheme, initTheme, saveTheme, type Theme } from "./services/theme-service";
 import { useSseRefresh } from "./hooks/useSseRefresh";
+import { CommandPalette } from "./components/CommandPalette";
 
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -72,6 +76,26 @@ export function App() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteStatus, setPaletteStatus] = useState("");
+
+  // Raccourcis globaux : ⌘K / Ctrl+K ouvre la palette, Esc ferme.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteStatus("");
+        setPaletteOpen((open) => !open);
+        return;
+      }
+      if (event.key === "Escape") {
+        setPaletteOpen(false);
+        return;
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     void loadServerConfig().catch(() => undefined);
@@ -285,6 +309,73 @@ export function App() {
   const selectMission = (missionId: string) => {
     setInspectedMissionId(missionId);
     navigate("tasks");
+  };
+
+  const paletteCommands = useMemo(
+    () => buildPaletteCommands({ page, missions, pipelines }),
+    [page, missions, pipelines]
+  );
+
+  const runPaletteCommand = async (command: PaletteCommand) => {
+    setPaletteStatus("");
+    switch (command.action.kind) {
+      case "navigate":
+        navigate(command.action.page);
+        setPaletteOpen(false);
+        break;
+      case "create-mission":
+        setCreateExpanded(true);
+        setPaletteOpen(false);
+        requestAnimationFrame(() => {
+          document.getElementById("create")?.scrollIntoView({ behavior: "smooth" });
+          document.querySelector<HTMLInputElement>("#create input")?.focus();
+        });
+        break;
+      case "start-pipeline": {
+        const { pipelineId } = command.action;
+        try {
+          await startPipeline(pipelineId);
+          refreshPipelines();
+          const name = pipelines.find((pipeline) => pipeline.id === pipelineId)?.name ?? "pipeline";
+          setPaletteStatus(`✓ Run démarré · ${name}`);
+        } catch (reason) {
+          setPaletteStatus(`✕ ${(reason as Error).message}`);
+        }
+        break;
+      }
+      case "advance-pipeline": {
+        const { runId } = command.action;
+        try {
+          await advancePipelineRun(runId);
+          refreshPipelines();
+          setPaletteStatus("✓ Run avancé d'une étape");
+        } catch (reason) {
+          setPaletteStatus(`✕ ${(reason as Error).message}`);
+        }
+        break;
+      }
+      case "accept-delivery": {
+        const { missionId } = command.action;
+        const mission = missions.find((item) => item.id === missionId);
+        if (!mission) return;
+        try {
+          const result = await loadMissionResult(mission.id);
+          const actionId = result?.delivery ? "accept-result" : "validate";
+          await performMissionAction({ actionId, mission, latestRunId: result?.latestRunId ?? null });
+          setMissions(await listMissions());
+          setPaletteStatus(`✓ Delivery acceptée · ${mission.title}`);
+        } catch (reason) {
+          setPaletteStatus(`✕ ${(reason as Error).message}`);
+        }
+        break;
+      }
+      case "open-mission": {
+        const { missionId } = command.action;
+        selectMission(missionId);
+        setPaletteOpen(false);
+        break;
+      }
+    }
   };
 
   return (
@@ -501,6 +592,14 @@ export function App() {
             onSaved={() => void listMissions().then(setMissions)}
           />
         )}
+
+        <CommandPalette
+          open={paletteOpen}
+          commands={paletteCommands}
+          status={paletteStatus}
+          onClose={() => setPaletteOpen(false)}
+          onSelect={(command) => void runPaletteCommand(command)}
+        />
 
         <ManagerDock
           managers={managers}
