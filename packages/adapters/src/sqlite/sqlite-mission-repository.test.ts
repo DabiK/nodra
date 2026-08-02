@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrateDatabase } from "./migrate-database.js";
 import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { projects } from "./schema/core.js";
-import { conversations } from "./schema/conversations.js";
+import { conversations, conversationItems } from "./schema/conversations.js";
 import { runs } from "./schema/runs.js";
 import { SqliteMissionReadModel } from "./sqlite-mission-read-model.js";
 import { SqliteMissionRepository } from "./sqlite-mission-repository.js";
@@ -288,6 +288,75 @@ describe("SQLite human mission vertical slice", () => {
   it("returns an empty history for a known mission without runs", async () => {
     await createMission.execute({ id: asId("mission-no-runs"), title: "No runs", context: context("create-no-runs", 0) });
     expect(await listMissionRuns.execute(asId("mission-no-runs"))).toEqual({ runs: [], totalCostMicros: null });
+  });
+
+  it("exposes the latest run and last assistant message on mission views (live mini-cartes)", async () => {
+    await createMission.execute({ id: asId("mission-live"), title: "Live", context: context("create-live", 0) });
+    await createMission.execute({ id: asId("mission-done"), title: "Done", context: context("create-done", 0) });
+    await createMission.execute({ id: asId("mission-empty"), title: "Empty", context: context("create-empty", 0) });
+
+    for (const [conversationId, missionId, attempt, state, startedAt, endedAt] of [
+      ["conversation-live-1", "mission-live", 1, "SUCCEEDED", at(1), at(2)],
+      ["conversation-live-2", "mission-live", 2, "RUNNING", at(3), null],
+      ["conversation-done-1", "mission-done", 1, "SUCCEEDED", at(1), at(2)]
+    ] as const) {
+      database.orm.insert(conversations).values({
+        id: conversationId,
+        missionId,
+        managerId: null,
+        providerId: "opencode",
+        providerSessionRef: null,
+        state: "open",
+        createdAt: startedAt ?? at(1),
+        deletedAt: null
+      }).run();
+      database.orm.insert(runs).values({
+        id: `run-${conversationId}`, missionId, managerId: null, conversationId,
+        userAttempt: attempt, state, temporalWorkflowId: `run/${conversationId}`, temporalRunId: null,
+        providerId: "opencode", modelId: "model-a", reasoningEffort: "provider_default",
+        startedAt, endedAt, durationMs: endedAt ? 60_000 : null,
+        inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null,
+        costMicros: null, usageKind: null, createdAt: startedAt ?? at(1)
+      }).run();
+    }
+
+    // Deux messages assistant dans la conversation du run actif : le plus récent doit gagner.
+    database.orm.insert(conversationItems).values([
+      {
+        id: "item-live-1", conversationId: "conversation-live-1", ordinal: 0, kind: "assistant",
+        deliveryState: "sent", body: "Premier essai terminé.", createdAt: at(2)
+      },
+      {
+        id: "item-live-2", conversationId: "conversation-live-2", ordinal: 0, kind: "assistant",
+        deliveryState: "sent", body: "Je commence.", createdAt: at(3)
+      },
+      {
+        id: "item-live-3", conversationId: "conversation-live-2", ordinal: 1, kind: "assistant",
+        deliveryState: "sent", body: "Je m'en occupe.", createdAt: at(4)
+      },
+      {
+        id: "item-done-1", conversationId: "conversation-done-1", ordinal: 0, kind: "assistant",
+        deliveryState: "sent", body: "Terminé.", createdAt: at(2)
+      }
+    ]).run();
+
+    const views = await listMissions.execute();
+    const live = views.find((mission) => mission.id === "mission-live");
+    expect(live).toMatchObject({
+      runState: "RUNNING",
+      runStartedAt: at(3),
+      lastAssistantMessage: "Je m'en occupe."
+    });
+    const done = views.find((mission) => mission.id === "mission-done");
+    expect(done).toMatchObject({ runState: "SUCCEEDED", runStartedAt: at(1), lastAssistantMessage: null });
+    const empty = views.find((mission) => mission.id === "mission-empty");
+    expect(empty).toMatchObject({ runState: null, runStartedAt: null, lastAssistantMessage: null });
+
+    expect(await showMission.execute(asId("mission-live"))).toMatchObject({
+      runState: "RUNNING",
+      runStartedAt: at(3),
+      lastAssistantMessage: "Je m'en occupe."
+    });
   });
 
   it("rejects a run history lookup for an unknown mission", async () => {
