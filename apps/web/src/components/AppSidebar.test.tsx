@@ -102,4 +102,28 @@ describe("AppSidebar", () => {
     renderSidebar(true);
     expect(screen.getByRole("searchbox", { name: "Rechercher dans les missions" })).toBeTruthy();
   });
+
+  it("exposes the keyboard shortcuts help button and forwards clicks", () => {
+    const onHelp = vi.fn();
+    render(
+      <AppSidebar
+        page="tasks"
+        collapsed={false}
+        theme="light"
+        activePipelineCount={0}
+        hasActiveManager={false}
+        missions={[]}
+        query=""
+        onQueryChange={vi.fn()}
+        onToggle={vi.fn()}
+        onNavigate={vi.fn()}
+        onSelectMission={vi.fn()}
+        onThemeToggle={vi.fn()}
+        onHelp={onHelp}
+      />
+    );
+    const help = screen.getByRole("button", { name: "Aide et raccourcis clavier" });
+    fireEvent.click(help);
+    expect(onHelp).toHaveBeenCalledTimes(1);
+  });
 });

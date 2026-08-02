@@ -31,6 +31,7 @@ import { buildPaletteCommands, type PaletteCommand } from "./services/palette-se
 import { applyTheme, initTheme, saveTheme, type Theme } from "./services/theme-service";
 import { useSseRefresh } from "./hooks/useSseRefresh";
 import { CommandPalette } from "./components/CommandPalette";
+import { ShortcutsHelp } from "./components/ShortcutsHelp";
 
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -45,6 +46,14 @@ function formatDate(value: string) {
 
 function updateDraft(draft: MissionIntakeDraft, patch: Partial<MissionIntakeDraft>) {
   return { ...draft, ...patch };
+}
+
+function isTypingTarget(target: EventTarget | null) {
+  const element = target as HTMLElement | null;
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  const tag = element.tagName?.toLowerCase();
+  return tag === "input" || tag === "textarea" || tag === "select";
 }
 
 export function App() {
@@ -77,20 +86,27 @@ export function App() {
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [paletteStatus, setPaletteStatus] = useState("");
 
-  // Raccourcis globaux : ⌘K / Ctrl+K ouvre la palette, Esc ferme.
+  // Raccourcis globaux : ⌘K / Ctrl+K ouvre la palette, « ? » ouvre l'aide, Esc ferme.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        setHelpOpen(false);
         setPaletteStatus("");
         setPaletteOpen((open) => !open);
         return;
       }
       if (event.key === "Escape") {
+        setHelpOpen(false);
         setPaletteOpen(false);
         return;
+      }
+      if (event.key === "?" && !isTypingTarget(event.target)) {
+        setPaletteOpen(false);
+        setHelpOpen((open) => !open);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -393,6 +409,7 @@ export function App() {
         onNavigate={navigate}
         onSelectMission={selectMission}
         onThemeToggle={toggleTheme}
+        onHelp={() => setHelpOpen((open) => !open)}
       />
 
       <section className="workspace">
@@ -600,6 +617,8 @@ export function App() {
           onClose={() => setPaletteOpen(false)}
           onSelect={(command) => void runPaletteCommand(command)}
         />
+
+        <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
 
         <ManagerDock
           managers={managers}

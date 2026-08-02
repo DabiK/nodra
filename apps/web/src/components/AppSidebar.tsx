@@ -25,7 +25,8 @@ export function AppSidebar({
   onToggle,
   onNavigate,
   onSelectMission,
-  onThemeToggle
+  onThemeToggle,
+  onHelp
 }: {
   page: AppPage;
   collapsed: boolean;
@@ -39,6 +40,7 @@ export function AppSidebar({
   onNavigate(page: AppPage): void;
   onSelectMission(missionId: string): void;
   onThemeToggle(): void;
+  onHelp?(): void;
 }) {
   const go = (target: AppPage) => (event: { preventDefault(): void }) => {
     event.preventDefault();
@@ -127,6 +129,16 @@ export function AppSidebar({
         >
           <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
           <span className="theme-toggle-label">{theme === "dark" ? "Mode clair" : "Mode sombre"}</span>
+        </button>
+        <button
+          type="button"
+          className="help-button"
+          aria-label="Aide et raccourcis clavier"
+          title="Raccourcis clavier (?)"
+          onClick={onHelp}
+        >
+          <span aria-hidden="true">?</span>
+          <span className="help-button-label">Raccourcis</span>
         </button>
       </div>
     </aside>
