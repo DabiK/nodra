@@ -26,3 +26,33 @@
 
 ### Statut
 - [x] #1 — Dark mode (thème sombre)
+
+## Itération 2 — 2026-08-02 — Task #3 : Recherche et filtres globaux
+
+### Fait
+- Recherche full-text côté client sur les données déjà chargées (option explicitement offerte par l'issue) :
+  `mission-filters.ts` matche désormais **titre, id, statut (nom brut + libellés français "en cours / prête / bloquée / en validation / terminée / abandonnée"), type (agent/humain) et notes**.
+- Notes : nouveau helper `searchMissionNotes(query)` dans `mission-notes-service.ts` — parcourt les clés `nodra.mission.notes.*` du localStorage, cohérent avec `saveMissionNotes`.
+- Barre de recherche dans la **barre latérale** (visible sur la page tasks, cachée en mode replié par CSS, masquée sur la page agent) — input ⌕ partagé avec le filtre du panneau missions.
+- **Filtres sauvegardés entre rechargements** : nouveau service `mission-filter-service.ts` (pattern `view-mode-service`), clé `nodra.tasks.filters` — {query, state, kind, sort} restaurés à l'init du board et persistés à chaque changement.
+- Placeholder du champ de recherche du panneau mis à jour : "Rechercher par titre, id, notes, statut…".
+- Tests : nouveau `mission-filters.test.ts` (10 tests : titre, id, libellé FR, statut brut, type, notes, insensible à la casse, combinaisons état+type+requête), nouveau `mission-filter-service.test.ts` (4 tests), `AppSidebar.test.tsx` étendu (3 tests sidebar search).
+
+### Commits (atomiques, comme suggéré par l'issue)
+1. `feat(web): recherche full-text missions (titre, id, statut, type, notes)`
+2. `feat(web): barre de recherche missions dans la barre latérale`
+3. `feat(web): filtres missions sauvegardés entre rechargements`
+
+### Vérifications
+- `npm run typecheck` (racine) : OK
+- `npm run build -w @nodra/web` : OK
+- `npx vitest run apps/web` : 24 fichiers / 126 tests OK
+- ESLint sur les fichiers touchés : propre
+
+### Décisions / notes / limites
+- **Filtre workspace non implémenté** : `MissionView` (payload du board) ne contient ni workspaceId ni chemin — le mapping mission→workspace exigerait un agent-config par mission (N+1). L'issue autorisait la recherche client sur les données déjà chargées ; la limite est documentée ici. Suivi possible : endpoint `GET /api/missions?q=` (LIKE) côté serveur avec jointure agent_config/workspaces.
+- **Résultat déclaré non indexé** : il vit dans les delivery/audit côté serveur (pas dans le payload board ni le localStorage) ; l'indexer exigerait un chargement N+1 par mission. Suivi possible : colonne dénormalisée ou FTS SQLite côté serveur.
+- La recherche est instantanée (filtre via `useMemo` sur l'état déjà réactif) ; l'écriture localStorage à chaque frappe est volontairement immédiate (payload minuscule), cohérent avec `view-mode-service`.
+
+### Statut
+- [x] #3 — Recherche et filtres globaux (avec 2 limites documentées : workspace et résultat déclaré, liées aux données non chargées sur le board — voir notes)

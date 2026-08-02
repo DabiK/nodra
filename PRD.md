@@ -3,7 +3,7 @@
 Backlog généré depuis les issues GitHub ouvertes. Chaque item est une tâche.
 Coche la case quand la tâche est terminée. Une seule tâche par itération Ralph.
 
-- [ ] #3 — Recherche et filtres globaux (labels: —)
+- [x] #3 — Recherche et filtres globaux (labels: —)
   > ## Contexte
 
 - [ ] #4 — Vue pipeline en timeline chronologique (labels: —)
