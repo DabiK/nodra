@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { AgentSessionView, ManagerConversationView, ManagerThreadView, ManagerView } from "../types";
 import { latestManagerThread, listManagerConversations, loadManagerThread, sendManagerMessage, stopManager, deleteManagerThread } from "../services/manager-service";
 import { normalizeAgentConversation, type AgentConversationEvent } from "../services/agent-conversation-normalizer";
@@ -51,7 +53,16 @@ function ManagerEvent({ event, manager }: { event: AgentConversationEvent; manag
   return (
     <div className={`manager-bubble ${event.kind === "user" ? "from-user" : "from-agent"}`}>
       {event.kind !== "user" && <PixelAvatar id={manager.id} title={manager.name} mini />}
-      <div className="manager-bubble-body">{event.text}</div>
+      <div className="manager-bubble-body">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+          }}
+        >
+          {event.text}
+        </ReactMarkdown>
+      </div>
     </div>
   );
 }

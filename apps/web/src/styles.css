@@ -651,6 +651,25 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 .manager-bubble.from-agent .manager-bubble-body { background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
 .manager-bubble-body.thinking { display: flex; align-items: center; gap: 8px; color: var(--muted); font-style: italic; }
 .manager-bubble-body.error { background: #f7e3e1; border-color: #e6bcb6; color: #97362e; }
+/* Markdown inside bubbles */
+.manager-bubble-body p { margin: 0 0 8px; white-space: normal; }
+.manager-bubble-body p:last-child { margin-bottom: 0; }
+.manager-bubble-body ul, .manager-bubble-body ol { margin: 0 0 8px; padding-left: 20px; white-space: normal; }
+.manager-bubble-body li { margin: 2px 0; }
+.manager-bubble-body h1, .manager-bubble-body h2, .manager-bubble-body h3 { margin: 10px 0 6px; font: 800 15px/1.3 Manrope; white-space: normal; }
+.manager-bubble-body h1 { font-size: 16px; }
+.manager-bubble-body h3 { font-size: 14px; }
+.manager-bubble-body h1:first-child, .manager-bubble-body h2:first-child, .manager-bubble-body h3:first-child { margin-top: 0; }
+.manager-bubble-body code { font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; background: rgba(31,107,79,.08); border: 1px solid rgba(31,107,79,.14); border-radius: 4px; padding: 1px 4px; }
+.manager-bubble-body pre { margin: 8px 0; padding: 9px 11px; background: #17231d; color: #e7ede9; border-radius: 8px; overflow: auto; max-height: 320px; white-space: pre; }
+.manager-bubble-body pre code { background: transparent; border: 0; padding: 0; color: inherit; font-size: 12px; }
+.manager-bubble-body a { color: var(--green); text-decoration: underline; text-underline-offset: 2px; }
+.manager-bubble.from-user .manager-bubble-body a { color: var(--lime); }
+.manager-bubble-body blockquote { margin: 0 0 8px; padding: 2px 12px; border-left: 3px solid var(--green); color: var(--muted); white-space: normal; }
+.manager-bubble.from-user .manager-bubble-body blockquote { color: #b9c3bb; }
+.manager-bubble-body table { margin: 8px 0; border-collapse: collapse; font-size: 12px; white-space: normal; }
+.manager-bubble-body th, .manager-bubble-body td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
+.manager-bubble-body th { background: var(--green-soft); }
 .thinking-dots { display: inline-flex; gap: 3px; }
 .manager-tool { align-self: stretch; margin: 2px 0; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 8px; background: #fbfbf7; }
 .manager-tool-title { font: 800 11px Manrope; letter-spacing: .02em; color: #45514a; }
