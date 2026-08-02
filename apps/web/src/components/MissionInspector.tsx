@@ -14,6 +14,7 @@ import { getMissionUiPolicy, type MissionUiAction, type MissionUiPolicy } from "
 import { showWorkspace } from "../services/worktree-service";
 import { WorkspaceModePicker } from "./WorkspaceModePicker";
 import { WorktreeResolutionDialog } from "./WorktreeResolutionDialog";
+import { MissionExportDialog } from "./MissionExportDialog";
 import { PixelAvatar } from "./PixelAvatar";
 import { ModelPicker } from "./ModelPicker";
 
@@ -60,6 +61,7 @@ export function MissionInspector({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [worktree, setWorktree] = useState<{ id: string; branchName: string | null } | null>(null);
   const [showWorktreeDialog, setShowWorktreeDialog] = useState(false);
+  const [showExport, setShowExport] = useState(false);
 
   // Raccourci clavier : Escape ferme la fiche. Ignoré pendant la saisie et
   // quand un sous-dialog (model picker, worktree) est ouvert — ces derniers
@@ -272,6 +274,11 @@ export function MissionInspector({
               🌿 Résoudre le terrain de travail
             </button>
           )}
+          {step === "inspect" && data?.mission && (
+            <button className="secondary-button" type="button" onClick={() => setShowExport(true)}>
+              ⤓ Exporter
+            </button>
+          )}
           {step === "inspect" && policy?.actions.map((action) => (
             <button
               className={`${action.primary ? "primary-button" : "secondary-button"} ${action.danger ? "danger-action" : ""}`}
@@ -296,6 +303,15 @@ export function MissionInspector({
             setShowWorktreeDialog(false);
             if (resolved) { onSaved(); setNotice("Terrain de travail résolu"); void loadMissionInspector(missionId).then(setData).catch(() => undefined); }
           }}
+        />
+      )}
+      {showExport && data?.mission && (
+        <MissionExportDialog
+          mission={data.mission}
+          config={data.config}
+          result={result}
+          runs={runs}
+          onClose={() => setShowExport(false)}
         />
       )}
     </div>

@@ -27,7 +27,7 @@ vi.mock("../services/mission-result-service", () => ({
   loadMissionResult: vi.fn().mockRejectedValue(new Error("mock: pas de run"))
 }));
 vi.mock("../services/mission-notes-service", () => ({
-  loadMissionNotes: vi.fn().mockResolvedValue(""),
+  loadMissionNotes: vi.fn().mockReturnValue(""),
   saveMissionNotes: vi.fn()
 }));
 vi.mock("../services/worktree-service", () => ({
@@ -38,6 +38,14 @@ vi.mock("./WorktreeResolutionDialog", () => ({
 }));
 vi.mock("./ModelPicker", () => ({
   ModelPicker: () => null
+}));
+vi.mock("./MissionExportDialog", () => ({
+  MissionExportDialog: ({ mission, onClose }: { mission: MissionView; onClose(): void }) => (
+    <div data-testid="export-dialog">
+      <span>EXPORT {mission.title}</span>
+      <button type="button" onClick={onClose}>Fermer export</button>
+    </div>
+  )
 }));
 
 afterEach(cleanup);
@@ -160,5 +168,28 @@ describe("MissionInspector budget panel", () => {
 
     const panel = await screen.findByLabelText("Budget et usage de la mission");
     expect(panel.textContent).toContain("Aucun run à ce jour");
+  });
+});
+
+describe("MissionInspector export markdown", () => {
+  it("ouvre le dialog d'export depuis le bouton Exporter de la fiche", async () => {
+    renderInspector();
+    const button = await screen.findByRole("button", { name: /Exporter/ });
+    fireEvent.click(button);
+    expect(await screen.findByTestId("export-dialog")).toBeTruthy();
+    expect(screen.getByText("EXPORT Mission test")).toBeTruthy();
+  });
+
+  it("ferme le dialog d'export sans fermer la fiche", async () => {
+    const onClose = renderInspector();
+    fireEvent.click(await screen.findByRole("button", { name: /Exporter/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Fermer export" }));
+    expect(screen.queryByTestId("export-dialog")).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("n'affiche pas le bouton Exporter tant que la fiche n'est pas chargée", () => {
+    renderInspector();
+    expect(screen.queryByRole("button", { name: /Exporter/ })).toBeNull();
   });
 });
