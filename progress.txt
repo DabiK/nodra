@@ -56,3 +56,33 @@
 
 ### Statut
 - [x] #3 — Recherche et filtres globaux (avec 2 limites documentées : workspace et résultat déclaré, liées aux données non chargées sur le board — voir notes)
+
+## Itération 3 — 2026-08-02 — Task #4 : Vue pipeline en timeline chronologique
+
+### Fait
+- **Données durées (backend)** : les vues pipeline exposent désormais les timestamps du dernier run de mission par nœud — `runStartedAt`, `runEndedAt`, `runAttempt` (userAttempt) sur `PipelineListNodeView` (liste) et `PipelineRunView` (showRun). Dérivés des run records (`run` table : `startedAt`/`endedAt` remplis par les events provider), via un helper batch `latestRunByMission` (une requête par liste, pas de N+1).
+- **Service frontend** `pipeline-timeline-service.ts` (+ 15 tests) : `nodeDurationMs`, `pipelineTotalDurationMs` (bornes du run sinon somme des durées connues), `formatDuration` ("45 s", "1 min 05 s", "2 h 12 min"), `sortTimelineNodes` (chronologique, étapes jamais exécutées en fin), `runTimeRange`, et vue persistée `loadPipelineViewMode`/`savePipelineViewMode` (`nodra.pipelines.view`, pattern `view-mode-service`).
+- **Composant** `PipelineTimeline` dans `PipelineFlux.tsx` : timeline verticale chronologique style GitHub Actions — une rangée par étape (badge statut, titre cliquable → fiche mission, nodeKey · Agent/Humain, plage horaire, durée, chip "essai N" si tentative > 1, gate manuelle), triée par début de run, + pied de page (X/N étapes exécutées, durée totale, début/fin du run).
+- **Toggle Graph / Timeline** dans la tête de la carte pipeline (`PipelineCard`), persistant entre rechargements ; les actions Démarrer/Avancer restent disponibles dans les deux vues.
+- **États bloqués/échecs au premier coup d'œil** : `nodeStatus` distingue désormais `failed` ("✕ ÉCHEC") de `blocked` ("◇ BLOQUÉ") et gère `ABANDONED` ("✕ ABANDON") ; rangées teintées (fond + liseré rouge pour failed/blocked, vert lime pour running) en light et dark.
+- Tests composant `PipelineFlux.test.tsx` (7 tests : toggle + persistance, ordre chronologique, durées, badges échec/blocage, essais multiples, ouverture fiche, actions conservées).
+
+### Commits (atomiques, comme suggéré par l'issue)
+1. `feat(api): expose run timestamps par nœud dans les vues pipeline`
+2. `feat(web): service timeline pipeline (durées, tri chronologique, vue persistée)`
+3. `feat(web): timeline chronologique pipeline avec toggle graph/timeline`
+
+### Vérifications
+- `npm run typecheck` : OK
+- `npm run build -w @nodra/web` : OK
+- `npx vitest run apps/web packages/application packages/domain packages/adapters` : 70 fichiers / 371 tests OK (hors `temporal-envelope.integration`)
+- ESLint sur les fichiers touchés : propre
+- Suite complète : 6 échecs **pré-existants et environnementaux** vérifiés (le test `architecture-boundaries` échoue aussi sans mes changements via git stash ; health/i6/i14 : version du binaire Codex non certifiée sur cette machine ; temporal-envelope.integration : serveur Temporal non démarré). Aucun lié aux pipelines.
+
+### Décisions / notes / limites
+- La durée d'une étape = durée du **dernier run de la mission** (retry inclus, l'attempt numéroté). Un nœud en cours (runStartedAt sans runEndedAt) n'a pas encore de durée — le total est alors la somme des étapes terminées.
+- `pipeline_node_run` n'a toujours pas de timestamps en base : la dérivation via les run records de mission est la source de vérité (comme suggéré par l'issue). Si un jour on veut la durée d'occupation d'un nœud (incluant les gates humaines), il faudrait un champ sur `pipeline_node_run`.
+- Le graph SVG reste la vue par défaut ; la timeline est mémorisée si l'utilisateur bascule.
+
+### Statut
+- [x] #4 — Vue pipeline en timeline chronologique

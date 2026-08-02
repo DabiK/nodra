@@ -6,7 +6,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
 - [x] #3 — Recherche et filtres globaux (labels: —)
   > ## Contexte
 
-- [ ] #4 — Vue pipeline en timeline chronologique (labels: —)
+- [x] #4 — Vue pipeline en timeline chronologique (labels: —)
   > ## Contexte
 
 - [ ] #5 — Palette de commandes Cmd+K et raccourcis clavier (labels: —)
