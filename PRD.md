@@ -47,3 +47,12 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
 
 - [ ] #21 — Compatibilité Windows des nouvelles features (labels: —)
   > ## Contexte
+
+- [ ] #22 — Comparateur de missions / runs (labels: —)
+  > ## Contexte
+
+- [ ] #23 — Tags libres sur missions (labels: —)
+  > ## Contexte
+
+- [ ] #24 — Historique des conversations entre managers (labels: —)
+  > ## Contexte
