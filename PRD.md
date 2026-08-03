@@ -180,7 +180,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques (états vides → templates → bannière)
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #15 — Responsive / vue tablette (labels: —)
+- [x] #15 — Responsive / vue tablette (labels: —)
 
   **Issue #15 — détail complet**
   > ## Contexte

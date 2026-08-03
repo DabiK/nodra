@@ -449,3 +449,35 @@ Le relay (`relay_item`) matérialisait déjà exactement les 4 sources du hub (q
 
 ### Statut
 - [x] #14 — États vides et onboarding
+
+## Itération 13 — 2026-08-03 — Task #15 : Responsive / vue tablette
+
+### Contexte
+L'UI était desktop-only : aucun breakpoint 768px, sidebar statique (voire barre horizontale à ≤900px), board kanban et graph SVG non adaptés aux petits écrans. Le mode liste (`view-mode-service`) et la timeline pipeline (issue #4) existaient déjà mais étaient uniquement manuels.
+
+### Fait (3 commits atomiques)
+1. **Hook + fallbacks** (`feat(web): responsive tablette — hook useMediaQuery, fallback liste du board et timeline des pipelines à ≤768px`)
+   - Nouveau hook `useMediaQuery` (`apps/web/src/hooks/use-media-query.ts`, + 5 tests) : suit une requête média via `matchMedia` avec listener `change` (resize/rotation live), retourne `false` quand `matchMedia` est absent (jsdom, navigateurs anciens → comportement desktop par défaut). Breakpoint exporté `TABLET_BREAKPOINT = "(max-width: 768px)"`.
+   - **Board → liste automatique** : `App.tsx` calcule `effectiveViewMode = isNarrow ? "list" : viewMode` — sous 768px le rendu liste (qui existait) remplace le kanban ; le choix manuel persisté reste intact pour le desktop.
+   - **Graph SVG → timeline automatique** : `PipelineCard` calcule `effectiveView = isNarrow ? "timeline" : view` — le graph (largeur minimum 560px) bascule sur la timeline chronologique de l'issue #4 ; le mode persisté (`nodra.pipelines.view`) n'est pas écrasé.
+   - Chips « Tableau/Liste » (`.view-chip.view-mode`) et toggle « Graph/Timeline » masqués à ≤768px (fallbacks forcés).
+2. **Sidebar drawer plein écran** (même commit 1 + polish commit 2) : à ≤768px la sidebar (`.sidebar`) devient un drawer coulissant `transform: translateX(-102%) → 0` (fixed, `width: min(300px, 84vw)`, z-70), avec bouton burger (`☰`, fixed top-left, z-30, `aria-expanded`/`aria-controls`, `display:none` hors media query) et backdrop (z-65, clic ferme). Fermeture : clic backdrop, Échap, navigation (tout `navigate`), et passage au-dessus du breakpoint. Câblé dans `App.tsx` ET `AgentPage.tsx` (page agent/chat). Le repli desktop « 68px » est désactivé en drawer (`grid-template-columns: 1fr` y compris `.app-shell.sidebar-collapsed` — corrige au passage un edge case où la colonne 68px persistait ≤900px avec l'état replié).
+3. **Audit CSS ≤768px** (`feat(web): polish responsive…` + `style(web): focus-visible…`) : bloc `@media (max-width: 768px)` en fin de media queries — workspace padding resserré (16px), hero-row/`h1`/focus-score adaptés, wrap des bannières welcome/overdue et des têtes workflow/pipeline, dock manager ancré (panel `min(340px, 100vw - 24px)`), focus-visible burger. Variantes dark pour `.sidebar-burger`/`.sidebar-backdrop`.
+
+### Vérifications
+- `npm run typecheck` : OK
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
+- Web : 48 fichiers / 358 tests OK (352 → 358 : +5 hook, +1 PipelineFlux fallback narrow)
+- Suite complète `npm test` : 676 OK ; 6 échecs pré-existants environnementaux vérifiés (architecture-boundaries, health/i6/i14 → Temporal/Codex, temporal-envelope ×2 → serveur Temporal non démarré) — aucun lié aux changements
+- ESLint sur tous les fichiers touchés : propre (8 erreurs pré-existantes hors périmètre inchangées, documentées itération 1)
+- Flaky pré-existant confirmé inchangé : `ProviderMissionConversationPage.test.tsx` (timeout waitFor ~1/25 passes complètes, passe en isolation — attrapé et identifié, non lié)
+
+### Décisions / notes / limites
+- **Approche JS (matchMedia) plutôt que CSS pur pour les fallbacks** : la vue liste et la timeline ne sont rendues que dans leur branche respective — un basculement CSS-only aurait exigé de dupliquer les deux rendus dans le DOM. Le hook force le mode effectif sans toucher aux préférences persistées.
+- **Drawer ≠ repli desktop** : deux mécanismes distincts. `sidebarCollapsed` (68px) ne s'applique qu'au-dessus de 768px ; `sidebarOpen` pilote le drawer. Les tests `AppSidebar` restent inchangés (les labels restent dans le DOM, cachés par CSS).
+- **Perf** : aucun polling ni appel réseau ajouté — le hook matchMedia est gratuit.
+- **Limite** : le breakpoint est un point unique 768px (issu de l'issue) ; les media queries existantes 900/800/700px restent en place (elles ciblent des composants précis). Unifier à un seul système de breakpoints serait un chantier plus large.
+- **AgentPage** : même drawer que l'app principale (burger + backdrop + Esc) pour garder le chat utilisable en mobile.
+
+### Statut
+- [x] #15 — Responsive / vue tablette
