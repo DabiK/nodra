@@ -763,6 +763,7 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 
   /* Têtes de carte et dock manager : pas de débordement ni d'empilement cassé. */
   .workflow-head, .pipeline-page-head { flex-wrap: wrap; }
+  .welcome-banner, .overdue-banner { flex-wrap: wrap; }
   .manager-dock { right: 12px; bottom: 12px; }
   .manager-dock-panel { width: min(340px, calc(100vw - 24px)); }
 }

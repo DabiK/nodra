@@ -509,7 +509,7 @@ export function App() {
         onToggle={toggleSidebar}
         onNavigate={navigate}
         onSelectMission={selectMission}
-        onOpenActivity={() => setActivityOpen((open) => !open)}
+        onOpenActivity={() => { setSidebarOpen(false); setActivityOpen((open) => !open); }}
         onThemeToggle={toggleTheme}
         onHelp={() => setHelpOpen((open) => !open)}
       />
