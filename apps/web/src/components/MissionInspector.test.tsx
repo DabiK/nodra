@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import type { MissionRunsView, MissionView } from "../types";
+import type { AgentConfigView, MissionRunsView, MissionView } from "../types";
 import { MissionInspector } from "./MissionInspector";
-import { loadMissionRuns } from "../services/mission-service";
+import { loadMissionInspector, loadMissionRuns } from "../services/mission-service";
 import { loadMissionAudit } from "../services/mission-audit-service";
 import type { MissionAuditView } from "../services/mission-audit-service";
+import { loadWorkspaceDiff } from "../services/mission-diff-service";
+import type { WorkspaceDiffView } from "../services/mission-diff-service";
 
 vi.mock("../services/mission-service", () => ({
   loadMissionInspector: vi.fn().mockResolvedValue({
@@ -31,12 +33,21 @@ vi.mock("../services/mission-result-service", () => ({
 vi.mock("../services/mission-audit-service", () => ({
   loadMissionAudit: vi.fn().mockRejectedValue(new Error("mock: pas d'audit"))
 }));
+vi.mock("../services/mission-diff-service", () => ({
+  loadWorkspaceDiff: vi.fn().mockRejectedValue(new Error("mock: pas de workspace")),
+  DIFF_FILE_STATUS_LABELS: {
+    added: { code: "A", label: "Ajouté" },
+    modified: { code: "M", label: "Modifié" },
+    deleted: { code: "D", label: "Supprimé" },
+    renamed: { code: "R", label: "Renommé" }
+  }
+}));
 vi.mock("../services/mission-notes-service", () => ({
   loadMissionNotes: vi.fn().mockReturnValue(""),
   saveMissionNotes: vi.fn()
 }));
 vi.mock("../services/worktree-service", () => ({
-  showWorkspace: vi.fn()
+  showWorkspace: vi.fn().mockRejectedValue(new Error("mock: pas de workspace"))
 }));
 vi.mock("./WorktreeResolutionDialog", () => ({
   WorktreeResolutionDialog: () => null
@@ -288,5 +299,110 @@ describe("MissionInspector audit timeline panel", () => {
     const panel = await screen.findByLabelText("Historique de la mission");
     fireEvent.click(within(panel).getByRole("button", { name: /Provider/ }));
     expect(panel.querySelector(".mission-audit-none")?.textContent).toContain("Aucun événement de ce type");
+  });
+});
+
+describe("MissionInspector diff git panel", () => {
+  const config: AgentConfigView = {
+    missionId: "m1",
+    version: 3,
+    providerId: "opencode",
+    modelId: "model-a",
+    reasoningEffort: "provider_default",
+    providerOptions: { schemaVersion: 1, value: {} },
+    missionPrompt: "Fais la mission.",
+    permissionPreset: "workspace",
+    workspaceId: "ws-1",
+    autoCommitAuthorized: false,
+    integrationTargetRef: null,
+    updatedAt: "2026-08-02T09:00:00Z"
+  };
+  const diff: WorkspaceDiffView = {
+    base: "abc123",
+    head: null,
+    files: [
+      {
+        path: "src/main.ts",
+        oldPath: null,
+        status: "modified",
+        additions: 3,
+        deletions: 1,
+        content: "diff --git a/src/main.ts b/src/main.ts\n@@ -1,2 +1,4 @@\n-ancien\n+nouveau\n+nouvelle ligne"
+      },
+      {
+        path: "new-file.txt",
+        oldPath: null,
+        status: "added",
+        additions: 2,
+        deletions: 0,
+        content: "diff --git a/new-file.txt b/new-file.txt\nnew file mode 100644\n+hello"
+      },
+      {
+        path: "old-name.ts",
+        oldPath: "renamed.ts",
+        status: "renamed",
+        additions: 0,
+        deletions: 0,
+        content: "diff --git a/renamed.ts b/old-name.ts"
+      }
+    ]
+  };
+
+  function renderWithWorkspace() {
+    vi.mocked(loadMissionInspector).mockResolvedValueOnce({
+      mission,
+      config,
+      providerSession: null
+    });
+    renderInspector();
+  }
+
+  it("masque le panneau tant que le diff n'est pas chargé", () => {
+    renderInspector();
+    expect(screen.queryByLabelText("Fichiers modifiés du workspace")).toBeNull();
+  });
+
+  it("affiche la liste des fichiers avec statut, compteurs et total", async () => {
+    vi.mocked(loadWorkspaceDiff).mockResolvedValueOnce(diff);
+    renderWithWorkspace();
+
+    const panel = await screen.findByLabelText("Fichiers modifiés du workspace");
+    expect(panel.textContent).toContain("3 fichiers");
+    const rows = panel.querySelectorAll(".mission-diff-files li");
+    expect(rows).toHaveLength(3);
+    expect(rows[0]!.textContent).toContain("src/main.ts");
+    expect(rows[0]!.textContent).toContain("Modifié");
+    expect(rows[0]!.textContent).toContain("+3");
+    expect(rows[0]!.textContent).toContain("−1");
+    expect(rows[1]!.textContent).toContain("new-file.txt");
+    expect(rows[1]!.textContent).toContain("Ajouté");
+    expect(rows[2]!.textContent).toContain("renamed.ts → old-name.ts");
+    expect(rows[2]!.textContent).toContain("Renommé");
+  });
+
+  it("affiche le diff unifié du fichier au clic sur sa ligne", async () => {
+    vi.mocked(loadWorkspaceDiff).mockResolvedValueOnce(diff);
+    renderWithWorkspace();
+
+    const panel = await screen.findByLabelText("Fichiers modifiés du workspace");
+    expect(screen.queryByLabelText("Diff de src/main.ts")).toBeNull();
+    fireEvent.click(within(panel).getByRole("button", { name: /src\/main\.ts/ }));
+
+    const content = await screen.findByLabelText("Diff de src/main.ts");
+    expect(content.textContent).toContain("@@ -1,2 +1,4 @@");
+    expect(content.textContent).toContain("-ancien");
+    expect(content.textContent).toContain("+nouvelle ligne");
+
+    // Un second clic replie le diff.
+    fireEvent.click(within(panel).getByRole("button", { name: /src\/main\.ts/ }));
+    expect(screen.queryByLabelText("Diff de src/main.ts")).toBeNull();
+  });
+
+  it("affiche l'état vide quand aucun fichier n'a changé", async () => {
+    vi.mocked(loadWorkspaceDiff).mockResolvedValueOnce({ base: "abc123", head: null, files: [] });
+    renderWithWorkspace();
+
+    const panel = await screen.findByLabelText("Fichiers modifiés du workspace");
+    expect(panel.textContent).toContain("Aucune modification depuis le snapshot initial");
   });
 });

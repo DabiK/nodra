@@ -11,6 +11,11 @@ import { loadMissionResult, type MissionResultView } from "../services/mission-r
 import { loadMissionNotes, saveMissionNotes } from "../services/mission-notes-service";
 import { loadMissionAudit, type MissionAuditView } from "../services/mission-audit-service";
 import {
+  DIFF_FILE_STATUS_LABELS,
+  loadWorkspaceDiff,
+  type WorkspaceDiffView
+} from "../services/mission-diff-service";
+import {
   AUDIT_FILTERS,
   auditActorLabel,
   auditEventCategory,
@@ -423,6 +428,76 @@ function MissionBudgetPanel({ runs }: { runs: MissionRunsView | null }) {
   );
 }
 
+function MissionDiffPanel({ workspaceId }: { workspaceId: string }) {
+  const [diff, setDiff] = useState<WorkspaceDiffView | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadWorkspaceDiff(workspaceId)
+      .then((next) => { if (!cancelled) setDiff(next); })
+      .catch(() => { if (!cancelled) setDiff(null); });
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+
+  if (!diff) return null;
+  return (
+    <section className="mission-diff-panel" aria-label="Fichiers modifiés du workspace">
+      <header>
+        <div>
+          <span className="eyebrow">DIFF GIT</span>
+          <strong>Fichiers modifiés</strong>
+        </div>
+        {diff.files.length > 0 && (
+          <span className="mission-diff-total" title={`${diff.files.length} fichier(s) modifié(s) depuis le snapshot initial`}>
+            {diff.files.length} fichier{diff.files.length > 1 ? "s" : ""}
+          </span>
+        )}
+      </header>
+      {diff.files.length === 0 ? (
+        <p className="empty">Aucune modification depuis le snapshot initial du workspace.</p>
+      ) : (
+        <ol className="mission-diff-files">
+          {diff.files.map((file) => {
+            const status = DIFF_FILE_STATUS_LABELS[file.status];
+            const isOpen = expanded === file.path;
+            return (
+              <li key={`${file.oldPath ?? ""}/${file.path}`} className={`diff-status-${file.status}${isOpen ? " open" : ""}`}>
+                <button
+                  type="button"
+                  className="mission-diff-file"
+                  onClick={() => setExpanded(isOpen ? null : file.path)}
+                  aria-expanded={isOpen}
+                >
+                  <span className={`diff-status-badge ${file.status}`} title={status.label}>
+                    {status.code}
+                  </span>
+                  <span className="mission-diff-file-path">
+                    {file.status === "renamed" && file.oldPath
+                      ? <><code>{file.oldPath}</code> → <code>{file.path}</code></>
+                      : <code>{file.path}</code>}
+                    <small>{status.label}</small>
+                  </span>
+                  {(file.additions !== null || file.deletions !== null) && (
+                    <span className="mission-diff-counts">
+                      {file.additions !== null && <b className="adds">+{file.additions}</b>}
+                      {file.deletions !== null && <b className="dels">−{file.deletions}</b>}
+                    </span>
+                  )}
+                </button>
+                {isOpen && <pre className="mission-diff-content" role="region" aria-label={`Diff de ${file.path}`}>{file.content || "Diff indisponible pour ce fichier."}</pre>}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      <small className="mission-diff-refs" title={`base: ${diff.base ?? "—"} · head: ${diff.head ?? "arbre de travail"}`}>
+        Snapshot initial → état actuel du workspace.
+      </small>
+    </section>
+  );
+}
+
 function MissionAuditPanel({ missionId, audit }: { missionId: string; audit: MissionAuditView[] | null }) {
   const [filter, setFilter] = useState<"all" | AuditCategory>("all");
   if (!audit) return null;
@@ -542,6 +617,7 @@ function InspectStep({
         {data?.mission && <MissionNotesPanel missionId={data.mission.id} />}
         {data?.mission && <MissionBudgetPanel runs={runs} />}
         {data?.mission && <MissionAuditPanel missionId={data.mission.id} audit={audit} />}
+        {data?.config?.workspaceId && <MissionDiffPanel workspaceId={data.config.workspaceId} />}
         {policy?.showResultPanel && (
           <section className="mission-result-panel" aria-label="Résultat produit">
             <header>

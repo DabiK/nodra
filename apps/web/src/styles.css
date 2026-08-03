@@ -181,6 +181,34 @@ nav .nav-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .mission-audit-none { color: var(--muted); font-size: 11px; font-weight: 600; text-align: center; }
 .mission-audit-refresh { color: var(--muted); font-size: 9px; line-height: 1.4; }
 
+/* Panneau Diff Git (fichiers modifiés du workspace, issue #12) */
+.mission-diff-panel { display: grid; gap: 8px; margin-top: 14px; }
+.mission-diff-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mission-diff-panel .eyebrow { color: var(--green); font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+.mission-diff-panel header strong { display: block; margin-top: 2px; font: 800 14px Manrope; }
+.mission-diff-total { border-radius: 10px; padding: 5px 10px; background: var(--green-soft); color: var(--green); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.mission-diff-files { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.mission-diff-files li { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fbfcf9; }
+.mission-diff-files li.diff-status-added { border-left: 3px solid var(--green); }
+.mission-diff-files li.diff-status-modified { border-left: 3px solid #3a6cbf; }
+.mission-diff-files li.diff-status-deleted { border-left: 3px solid #d65a5a; }
+.mission-diff-files li.diff-status-renamed { border-left: 3px solid #b06ab3; }
+.mission-diff-file { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 9px; align-items: center; width: 100%; padding: 7px 10px; background: none; border: none; cursor: pointer; color: inherit; text-align: left; }
+.mission-diff-file:hover { background: #f2f5ef; }
+.diff-status-badge { justify-self: start; border-radius: 6px; padding: 3px 5px; background: #eef0ea; color: #758079; font: 800 8px monospace; letter-spacing: .04em; text-align: center; }
+.diff-status-badge.added { background: var(--green-soft); color: var(--green); }
+.diff-status-badge.modified { background: #e5eefb; color: #2f5fa8; }
+.diff-status-badge.deleted { background: #fbe6e6; color: #b04141; }
+.diff-status-badge.renamed { background: #f1e4f2; color: #8c4a8f; }
+.mission-diff-file-path { min-width: 0; display: grid; gap: 2px; }
+.mission-diff-file-path code { overflow: hidden; font: 10px ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.mission-diff-file-path small { color: #7c8a81; font-size: 9px; font-weight: 600; }
+.mission-diff-counts { display: flex; align-items: center; gap: 6px; font: 800 9px ui-monospace, monospace; white-space: nowrap; }
+.mission-diff-counts .adds { color: var(--green); }
+.mission-diff-counts .dels { color: #d65a5a; }
+.mission-diff-content { margin: 0; padding: 9px 10px; border-top: 1px dashed var(--line); background: #0f1712; color: #cfe3d8; font: 9.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; max-height: 280px; overflow-y: auto; white-space: pre; }
+.mission-diff-refs { color: var(--muted); font-size: 9px; line-height: 1.4; }
+
 .task-view-chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 0 14px 12px 48px; scrollbar-width: thin; }
 .view-chip, .configure-chip, .folder-chip { flex: none; display: flex; align-items: center; gap: 6px; min-height: 30px; border: 1px solid #e1e3dc; border-radius: 18px; padding: 0 11px; background: #f3f2ed; color: #6f7b74; font-size: 10px; font-weight: 800; }
 .view-chip:hover, .configure-chip:hover, .folder-chip:hover { border-color: #b7c9bf; color: var(--green); }
@@ -1266,6 +1294,16 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
   .audit-cat-badge.config { background: #362d15; color: #d9b45a; }
   .audit-cat-badge.provider { background: #16302f; color: #5ec4c4; }
   .mission-audit-row-meta { color: #7c8a81; }
+  .mission-diff-total { background: rgba(76, 167, 131, 0.16); }
+  .mission-diff-files li { background: #161e18; border-color: var(--line); }
+  .mission-diff-file:hover { background: #1b241d; }
+  .mission-diff-file-path small { color: #7c8a81; }
+  .diff-status-badge { background: #232d26; color: #8fa393; }
+  .diff-status-badge.added { background: rgba(76, 167, 131, 0.16); color: var(--lime); }
+  .diff-status-badge.modified { background: #1d2b41; color: #8fb3e8; }
+  .diff-status-badge.deleted { background: #3a1f1f; color: #e08b8b; }
+  .diff-status-badge.renamed { background: #331f35; color: #c98ecc; }
+  .mission-diff-content { background: #0b100d; color: #b9d4c6; border-top-color: #2b362d; }
   .timeline-cost { background: rgba(76, 167, 131, 0.16); color: var(--lime); }
   .manager-run-usage { background: rgba(76, 167, 131, 0.16); color: var(--lime); }
   .kind-switch { background: #1a221c; }
