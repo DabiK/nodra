@@ -103,7 +103,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques (modèle → endpoints → UI)
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #24 — Historique des conversations entre managers (labels: —)
+- [x] #24 — Historique des conversations entre managers (labels: —)
 
   **Issue #24 — détail complet**
   > ## Contexte
@@ -115,9 +115,9 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - Lien vers la conversation d'origine à chaque message
   >
   > ## Acceptance
-  > - [ ] Timeline agrégée accessible depuis l'écran Managers
-  > - [ ] Filtres manager/mission/recherche
-  > - [ ] Navigation 1 clic vers la conversation source
+  > - [x] Timeline agrégée accessible depuis l'écran Managers
+  > - [x] Filtres manager/mission/recherche
+  > - [x] Navigation 1 clic vers la conversation source
   >
   > ## Méthode d'implémentation
   > - Cartographier le code avec des **subagents explore** avant d'implémenter (manager conversations, endpoints existants)

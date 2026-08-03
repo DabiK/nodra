@@ -1,5 +1,43 @@
 # Journal d'avancement — DabiK/nodra
 
+## Itération 24 — 2026-08-03 — Task #24 : Historique des conversations entre managers
+
+### Contexte
+Les conversations manager (`conversation` avec `managerId`, messages dans `conversation_item`) n'étaient lisibles que scoped par manager (`/api/managers/:id/conversations`, `/threads/:threadId`) : aucun endpoint agrégé cross-managers, aucun filtre global. La table `manager_supervision` (piste pour lier une conversation à une mission) n'est jamais écrite par le code applicatif — le seul lien mission↔message exploitable est la **mention de l'id mission dans le corps** du message.
+
+### Fait (3 commits atomiques, comme suggéré par l'issue : endpoint agrégé → composant → filtres)
+1. **Endpoint agrégé** (`feat(api): timeline agrégée des conversations manager (GET /api/managers/timeline)`)
+   - `ManagerTimelineItemView` (id, conversationId, managerId, managerName, managerState, kind, body, createdAt) + `ManagerTimelineFilter` + `ManagerTimelineView` (items + `truncated`) sur `ManagerReadModel` ; méthode `timeline(filter)` dans `SqliteManagerReadModel` : `conversation_item` JOIN `conversation` JOIN `manager`, **exclusion des conversations supprimées et des fils de mission** (`managerId IS NOT NULL`), tri chronologique DESC, limite (défaut 200, max 500) avec détection de troncature (limit+1).
+   - Filtres : `managerId`, `missionId` (mention `%id%` dans le body — les conversations manager ne portent pas de mission_id), `query` (LIKE avec `ESCAPE '\'` — les `%`/`_`/`\` de la saisie sont échappés, pas d'usage de `like()` drizzle qui n'accepte pas de config escape en 0.45), `since`/`until` (bornes ISO sur `createdAt`), `limit`.
+   - Use case `ListManagerTimeline` (1 classe par fichier, aucun import adapters — contraintes architecture respectées) : `MANAGER_NOT_FOUND` si `managerId` inconnu. Token `LIST_MANAGER_TIMELINE` + câblage `nodra.module.ts`. Route déclarée **avant** `@Get(":id")` dans `manager.controller.ts` pour que « timeline » ne soit pas capturé comme un id.
+   - Tests : `list-manager-timeline.test.ts` (3 : délégation, passage du filtre, 404) + `sqlite-manager-read-model.timeline.test.ts` (8 : vide, agrégation + tri DESC, exclusion deleted/mission, filtre manager, filtre mission, LIKE échappé `100%_final`, période, limite + troncature).
+2. **Service web** (`feat(web): service timeline manager agrégée (chargement, requête, périodes)`)
+   - `manager-timeline-service.ts` : types miroirs dans `types.ts`, `loadManagerTimeline`, `buildTimelineQuery`, `TIMELINE_PERIODS` (Tout/24 h/7 j/30 j), `timelineSince`, `TIMELINE_KIND_LABELS` (Brief/Réponse/Outil/Système/Indication/Résultat). + 5 tests.
+3. **Panneau Historique** (`feat(web): historique cross-managers — timeline, filtres et navigation 1 clic (#24)`)
+   - `ManagerTimelinePanel` (drawer droit, pattern ActivityHub) : timeline DESC groupée par jour (`Aujourd'hui`/`Hier`/date FR), item = avatar manager + nom + état (dot) + libellé de kind + corps tronqué (title complet) + temps relatif (`formatActivityTime`), clic → conversation source. Filtres : manager, **mission mentionnée** (liste des missions du board, triées par titre), période, recherche (débouncée 200 ms, LIKE serveur). Chargement à l'ouverture + à chaque filtre, **live via `useSseRefresh`**, `role="dialog"` aria-modal, fermeture Esc/fond/×, état vide + erreur `role="alert"` + note de troncature. Helpers purs `dayKey`/`dayLabel`/`groupTimelineByDay`/`truncateTimelineBody`.
+   - `ManagersPage` : bouton « ⧉ Historique » dans le manifesto (prop `missions` fournie par `App.tsx`), panel rendu dans la grille **et** dans le chat ; clic item → `setSelectedId(managerId)` + `setTimelineThread(threadId)`.
+   - `ManagerChat` : prop `initialThreadId` (thread ciblé au montage) + **reset du thread au changement de manager** (`useEffect` sur `manager.id` → `currentThreadId`) — corrige au passage un edge case pré-existant où changer de manager gardait l'ancien `threadId` (le chat tentait de charger le thread du manager précédent).
+   - CSS : bloc `.manager-timeline-*` + `.manager-manifesto-actions` + variantes dark.
+   - Tests : `ManagerTimelinePanel.test.tsx` (14 : rendu fermé, chargement + groupement, clic → onOpenThread, 4 filtres, état vide, Esc, backdrop, erreur 500, helpers purs) + `ManagerChat.test.tsx` +1 (initialThreadId charge le thread ciblé).
+
+### Vérifications
+- `npm run typecheck` : OK.
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif).
+- Web : 60 fichiers / 503 tests OK (483 → 503, +20 : 5 service, 14 panel, 1 chat).
+- Adapters + application : 11/11 nouveaux tests OK ; apps/api : le module Nest démarre avec le nouveau provider (27 tests OK).
+- `npm test` (suite complète) : 843 OK ; 6 échecs pré-existants/environnementaux inchangés (architecture-boundaries — fichiers `.d.ts` pré-existants du dist non tracké daté du 27/07, list-managers.d.ts 3 classes ; health → Temporal non démarré ; i6/i14 → binaire Codex non certifié ; temporal-envelope ×2 → serveur Temporal non démarré), aucun lié à #24.
+- ESLint sur tous les fichiers touchés : propre (8 erreurs pré-existantes hors périmètre inchangées).
+
+### Décisions / notes / limites
+- **Filtre mission = mention de l'id dans le corps** : les conversations manager sont exclusivement manager (`ck_conversation_subject` : mission XOR manager) et `manager_supervision` n'est écrite par aucun code — le seul lien structuré est la mention du missionId (`mission/…`) dans les messages (les managers pilotent le CLI par id). Le filtre est honnêtement documenté « Mission mentionnée » dans l'UI.
+- **Recherche côté serveur (LIKE)** : contrairement aux recherches de fils (#9, client), la timeline agrège tous les managers — le LIKE SQLite sur `body` est le seul moyen sans N+1 ; échappement `ESCAPE '\'` pour une recherche littérale.
+- **Tout le contenu est montré** (kinds user/assistant/tool/system/steer/result) : c'est une timeline d'audit, pas un chat — le kind est étiqueté pour filtrer visuellement.
+- **Limite 200 par défaut** avec signal `truncated` (« N plus récents ») ; pas de pagination — les conversations sont triées par `createdAt` DESC et l'historique complet reste accessible par manager dans son chat.
+- **Live sans polling** : `useSseRefresh` recharge la timeline quand le drawer est ouvert (même mécanique que le board).
+
+### Statut
+- [x] #24 — Historique des conversations entre managers
+
 ## Itération 23 — 2026-08-03 — Task #23 : Tags libres sur missions
 
 ### Fait (5 commits atomiques, comme suggéré par l'issue : modèle → endpoints → UI)
