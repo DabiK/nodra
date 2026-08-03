@@ -376,3 +376,40 @@ La boucle de review a rejeté l'itération #11 (timeline d'audit) : typecheck ro
 
 ### Statut
 - [x] #12 — Diff Git avant validation
+
+## Itération 11 — 2026-08-03 — Task #13 : Notifications et hub d'activité
+
+### Contexte
+Le relay (`relay_item`) matérialisait déjà exactement les 4 sources du hub (queues `blocked` + `decision_required`, reasonCodes `mission_decision_required`, `agent_result_requires_validation`, `delivery_pending`, `approval_pending`, `pipeline_waiting_human_validation`, `pipeline_transition_requires_human`), mais : pas de lecture agrégeant les items pipeline, pas de marquage lu (le champ `state` existait dans le schéma sans endpoint), et le web ne consommait pas `GET /api/relay`.
+
+### Fait (2 commits atomiques)
+1. **Backend** (`feat(api): hub d'activité — GET /api/activity + POST /api/activity/:id/read`)
+   - Port `ActivityRepository` (`packages/application/src/activity-repository.ts`) : `ActivityView` (items triés du plus récent au plus ancien + `unreadCount`), sujet mission (id/titre/kind/state/updatedAt) ou pipeline (pipelineId/nom), `markRead` → booléen.
+   - Use cases `ListActivity` + `MarkActivityRead` (erreur `ACTIVITY_ITEM_NOT_FOUND` si item inconnu). Aucun import adapters (contrainte architecture respectée).
+   - Impl `SqliteActivityRepository` : `relay_item` LEFT JOIN missions / pipeline_runs / pipelines, WHERE queue ∈ (blocked, decision_required) AND state ≠ resolved, ORDER BY createdAt DESC. `markRead` : state → read + readAt, refuse d'écraser un item résolu.
+   - Endpoint `GET /api/activity` + `POST /api/activity/:relayId/read` (`activity.controller.ts`, tokens `LIST_ACTIVITY`/`MARK_ACTIVITY_READ`, câblage `nodra.module.ts`).
+   - Tests : `sqlite-activity-repository.test.ts` (6 tests : hub vide, tri + sujets mission avec blocage réel via transition métier + relay direct pour VALIDATION, items pipeline inclus + resolved exclus, marquage lu (count → 0, readAt persisté en base), item inconnu → ACTIVITY_ITEM_NOT_FOUND, resolved non écrasé).
+2. **Web** (`feat(web): hub d'activité — badge sidebar + liste des décisions humaines (#13)`)
+   - `activity-service.ts` : `loadActivity()` → GET /api/activity, `markActivityRead(relayId)` → POST (types miroirs de la vue serveur). + 2 tests.
+   - `AppSidebar` : entrée « Activité » (◉) avec badge `.count` = items non lus, props `activityCount` + `onOpenActivity` (fournies aussi par `AgentPage` à vide). + 3 tests (badge visible/masqué, clic → onOpenActivity).
+   - `ActivityHub` : drawer droit (pattern FolderDrawer), sections « Décision requise · N » et « Bloquées · N », par item : icône par reasonCode, titre (mission ou pipeline), libellé FR (`REASON_LABELS`), état + temps relatif (`formatActivityTime` : "à l'instant / il y a X min / il y a X h / date"), liseré et bouton « Lu » si non lu, « ✓ Tout marquer lu » ; clic item → fiche mission (`selectMission`) ou page pipelines (`openPipeline`) puis fermeture du hub ; Esc et fond ferment. + 11 tests.
+   - `App.tsx` : état `activity`/`activityOpen`, `refreshBoard` recharge aussi l'activité (même mécanique live SSE — aucun polling ajouté), Esc ferme le hub, handlers mark read / mark all (rafraîchissement immédiat après mutation).
+   - CSS : bloc `.activity-*` (drawer, items, badges) + overrides dark.
+
+### Vérifications
+- `npm run typecheck` (racine) : OK
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
+- Web : 43 fichiers / 336 tests OK (315 → 336, +21)
+- packages/application + adapters + domain : 47 fichiers OK hors `temporal-envelope.integration` (2 échecs environnementaux pré-existants — serveur Temporal non démarré)
+- apps/api : 7 fichiers OK ; 3 échecs pré-existants documentés (health → binaire Codex non certifié, i6 + i14 → idem) — le module Nest démarre avec le nouveau controller
+- ESLint sur tous les fichiers touchés : propre
+
+### Décisions / notes / limites
+- **Source de vérité = relay** : plutôt que de dériver les notifications depuis `missions`/`pipelines` côté client (aurait montré des items périmés : une mission VALIDATION dont la delivery est déjà décidée, une approbation en attente invisible dans le board), le hub lit la queue d'attention du domaine qui se résout automatiquement aux transitions. Live sans polling : SSE → `refreshBoard` → `loadActivity`.
+- **Marquage lu** : sémantique « lu = vu dans le hub » — un item redevient `unread` à la prochaine écriture de relay du sujet (nouvelle transition), comportement voulu du schéma existant (`onConflictDoUpdate` remet `state: unread`).
+- **Approvals** : couvertes par `approval_pending` (sujet mission, écrit par `sqlite-approval-repository`). Les approbations de sujet run/manager (ex. gate override) ne créent pas d'item relay — hors périmètre du hub, cohérent avec l'existant.
+- **Fermeture** : l'item « fermé » = marqué lu ; la résolution automatique (mission quittant VALIDATION/BLOCKED, pipeline complété → `resolved`) le retire de la liste au refresh.
+- **Notifications système (Notification API)** : option non implémentée (l'issue la marquait optionnelle) — le hub couvre l'acceptation « badge + liste + navigation + lu ».
+
+### Statut
+- [x] #13 — Notifications et hub d'activité

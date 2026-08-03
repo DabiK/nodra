@@ -134,7 +134,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques (endpoint diff → composant → intégration fiche mission)
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #13 — Notifications et hub d'activité (labels: —)
+- [x] #13 — Notifications et hub d'activité (labels: —)
 
   **Issue #13 — détail complet**
   > ## Contexte
