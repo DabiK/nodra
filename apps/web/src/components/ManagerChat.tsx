@@ -89,20 +89,34 @@ function ManagerEvent({ event, manager, query, isSearchHit, isCurrentMatch }: {
 export function ManagerChat({
   manager,
   onBack,
-  onChanged
+  onChanged,
+  initialThreadId = null
 }: {
   manager: ManagerView;
   onBack(): void;
   onChanged(): void;
+  /** Thread à ouvrir au montage (navigation 1 clic depuis la timeline #24). */
+  initialThreadId?: string | null;
 }) {
   const [conversations, setConversations] = useState<ManagerConversationView[]>([]);
-  const [threadId, setThreadId] = useState<string | null>(manager.currentThreadId);
+  const [threadId, setThreadId] = useState<string | null>(initialThreadId ?? manager.currentThreadId);
   const [thread, setThread] = useState<ManagerThreadView | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Changement de manager : repartir de son thread courant (le state threadId
+  // est initialisé une seule fois par montage).
+  useEffect(() => {
+    setThreadId(manager.currentThreadId);
+  }, [manager.id]);
+
+  // Navigation timeline : un thread ciblé prime sur le thread courant.
+  useEffect(() => {
+    if (initialThreadId) setThreadId(initialThreadId);
+  }, [initialThreadId]);
 
   useEffect(() => {
     void listManagerConversations(manager.id).then(setConversations).catch(() => undefined);

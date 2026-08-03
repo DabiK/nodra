@@ -616,7 +616,7 @@ export function App() {
                 <small>managers</small>
               </div>
             </header>
-            <ManagersPage managers={managers} providerOptions={providerOptions} onChanged={refreshManagers} initialManagerId={managerFocusId} />
+            <ManagersPage managers={managers} providerOptions={providerOptions} onChanged={refreshManagers} initialManagerId={managerFocusId} missions={missions} />
           </>
         ) : (
           <>

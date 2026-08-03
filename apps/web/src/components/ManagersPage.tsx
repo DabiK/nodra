@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { ManagerView, ProviderOptionsCatalog, ProviderPermissionPreset, ProviderReasoningEffort } from "../types";
+import type { ManagerView, MissionView, ProviderOptionsCatalog, ProviderPermissionPreset, ProviderReasoningEffort } from "../types";
 import { archiveManager, createManager, updateManager } from "../services/manager-service";
 import { serverConfig } from "../services/config-service";
 import { ManagerChat } from "./ManagerChat";
+import { ManagerTimelinePanel } from "./ManagerTimelinePanel";
 import { PixelAvatar } from "./PixelAvatar";
 import { ModelPicker } from "./ModelPicker";
 
@@ -30,15 +31,20 @@ export function ManagersPage({
   managers,
   providerOptions,
   onChanged,
-  initialManagerId = null
+  initialManagerId = null,
+  missions = []
 }: {
   managers: ManagerView[];
   providerOptions: ProviderOptionsCatalog | null;
   onChanged(): void;
   /** Ouvre directement le chat de ce manager au montage (navigation glance). */
   initialManagerId?: string | null;
+  /** Missions du board, pour le filtre « mission mentionnée » de l'historique (#24). */
+  missions?: MissionView[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(initialManagerId);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [timelineThread, setTimelineThread] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState("");
@@ -56,8 +62,26 @@ export function ManagersPage({
   const providers = providerOptions?.providers ?? [];
   const modelsFor = (providerId: string) => providers.find((provider) => provider.id === providerId)?.models.filter((model) => !model.hidden) ?? [];
 
+  // Clic d'un message de l'historique : ouvre le chat du manager sur CE thread.
+  const openTimelineThread = (managerId: string, threadId: string) => {
+    setTimelineThread(threadId);
+    setSelectedId(managerId);
+    setTimelineOpen(false);
+  };
+
   if (selected) {
-    return <ManagerChat manager={selected} onBack={() => setSelectedId(null)} onChanged={onChanged} />;
+    return (
+      <>
+        <ManagerChat manager={selected} initialThreadId={timelineThread} onBack={() => setSelectedId(null)} onChanged={onChanged} />
+        <ManagerTimelinePanel
+          open={timelineOpen}
+          managers={managers}
+          missions={missions}
+          onClose={() => setTimelineOpen(false)}
+          onOpenThread={openTimelineThread}
+        />
+      </>
+    );
   }
 
   const submitCreate = async (event: FormEvent) => {
@@ -128,9 +152,14 @@ export function ManagersPage({
           <h2>Des chefs d'équipe qui tiennent le fil.</h2>
           <p>Un manager est un agent méta: une identité durable, une instruction système, et un accès au CLI DevFlow pour créer et orchestrer des missions. Ouvre autant de conversations que nécessaire.</p>
         </div>
-        <button className="primary-button" onClick={() => setCreating((value) => !value)}>
-          {creating ? "Fermer" : "+ Nouveau manager"}
-        </button>
+        <div className="manager-manifesto-actions">
+          <button className="ghost-button" onClick={() => setTimelineOpen(true)} title="Timeline chronologique de tous les messages des managers">
+            ⧉ Historique
+          </button>
+          <button className="primary-button" onClick={() => setCreating((value) => !value)}>
+            {creating ? "Fermer" : "+ Nouveau manager"}
+          </button>
+        </div>
       </section>
 
       {error && <p className="manager-error" role="alert">{error}</p>}
@@ -230,6 +259,14 @@ export function ManagersPage({
           </button>
         )}
       </div>
+
+      <ManagerTimelinePanel
+        open={timelineOpen}
+        managers={managers}
+        missions={missions}
+        onClose={() => setTimelineOpen(false)}
+        onOpenThread={openTimelineThread}
+      />
     </div>
   );
 }

@@ -206,4 +206,20 @@ describe("ManagerChat", () => {
     expect(await screen.findByRole("heading", { name: "Nouvelle conversation" })).toBeTruthy();
     expect(screen.queryByText(/risque de perte de contexte/)).toBeNull();
   });
+
+  it("opens the thread targeted by the timeline (issue #24)", async () => {
+    const targetedThread: ManagerThreadView = { ...thread, threadId: "t2", conversation: { id: "t2", providerSessionRef: null, state: "idle" } };
+    const fetchMock = vi.fn((url: RequestInfo | URL) => {
+      const path = String(url);
+      if (path.endsWith("/conversations")) return json([conversation]);
+      if (path.endsWith("/threads/t2")) return json(targetedThread);
+      if (path.endsWith("/threads/t1")) return json(thread);
+      return json(null);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ManagerChat manager={manager} onBack={vi.fn()} onChanged={vi.fn()} initialThreadId="t2" />);
+
+    expect(await screen.findByText("La release est prête")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith("/api/managers/manager/1/threads/t2", expect.anything());
+  });
 });
