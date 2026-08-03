@@ -327,6 +327,30 @@ label input:focus, label textarea:focus, label select:focus, input:focus, select
 .relay-empty.board-empty { justify-content: center; }
 .relay-overflow { margin: 0; padding: 8px 13px 11px; color: var(--muted); font-size: 10px; font-weight: 700; }
 
+/* Run glance (issue #18) — barre horizontale des runs actifs au-dessus du board */
+.run-glance { margin: 22px 0 0; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: 0 7px 25px rgba(33,49,41,.06); padding: 14px 14px 15px; }
+.run-glance-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+.run-glance-head .eyebrow { color: var(--green); font-size: 9px; font-weight: 900; letter-spacing: .1em; }
+.run-glance-head h2 { margin: 3px 0 0; font: 800 15px Manrope; letter-spacing: -.02em; }
+.run-glance-head small { color: var(--muted); font-size: 10px; }
+.run-glance-track { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.run-glance-item { display: grid; grid-template-columns: auto auto 1fr auto; grid-template-areas: "dot kind title open" "dot detail detail detail" "dot meta meta meta"; align-items: center; column-gap: 9px; row-gap: 3px; flex: none; width: 300px; max-width: 86vw; min-width: 0; text-align: left; border: 1px solid #e4e5de; border-radius: 12px; padding: 10px 11px; background: white; cursor: pointer; transition: border-color .15s, transform .1s, box-shadow .15s; }
+.run-glance-item:hover { border-color: var(--green); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(33,49,41,.08); }
+.run-glance-dot { grid-area: dot; width: 9px; height: 9px; border-radius: 50%; background: #c3cbc4; }
+.run-glance-item.tone-running .run-glance-dot { background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); animation: relay-live 1.2s ease-in-out infinite; }
+.run-glance-item.tone-blocked .run-glance-dot { background: var(--red); box-shadow: 0 0 0 4px rgba(201,84,70,.16); }
+.run-glance-item.tone-manager .run-glance-dot { background: #3a6cbf; box-shadow: 0 0 0 4px rgba(58,108,191,.14); }
+.run-glance-kind { grid-area: kind; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.run-glance-title { grid-area: title; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 12.5px Manrope; color: var(--ink); }
+.run-glance-open { grid-area: open; color: #b6beb7; font-size: 12px; font-style: normal; }
+.run-glance-item:hover .run-glance-open { color: var(--green); }
+.run-glance-detail { grid-area: detail; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #5f6c65; font-size: 11px; }
+.run-glance-item.tone-running .run-glance-detail { color: var(--green); }
+.run-glance-item.tone-blocked .run-glance-detail { color: #a43c33; }
+.run-glance-meta { grid-area: meta; display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 10px; }
+.run-glance-meta time { flex: none; }
+.run-glance-state { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+
 /* Pipeline grouping inside lanes */
 .relay-pipeline-group { display: grid; gap: 6px; min-width: 0; padding: 7px; border: 1px solid #cfd9cc; border-radius: 12px; background: #f4f7f1; }
 .relay-pipeline-tag { display: inline-flex; align-items: center; gap: 6px; color: var(--pipeline-accent, #4c6f57); font-size: 10px; font-weight: 900; letter-spacing: .03em; }
@@ -1489,6 +1513,16 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
   .relay-task.in-pipeline { box-shadow: 0 5px 14px rgba(0, 0, 0, 0.25); }
   .relay-config-button { border-color: #2b362d; background: #1b241d; color: var(--muted); }
   .relay-config-button.active { border-color: var(--green); color: var(--green); }
+
+  /* run glance (issue #18) */
+  .run-glance { box-shadow: 0 7px 25px rgba(0, 0, 0, 0.3); }
+  .run-glance-item { border-color: #2b362d; background: #1b241d; }
+  .run-glance-item:hover { border-color: var(--green); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3); }
+  .run-glance-detail { color: var(--muted); }
+  .run-glance-item.tone-running .run-glance-detail { color: var(--lime); }
+  .run-glance-item.tone-blocked .run-glance-detail { color: #e8958b; }
+  .run-glance-meta { color: var(--muted); }
+  .run-glance-open { color: #4a564e; }
 
   /* pipeline flux + legacy graph */
   .pipeline-card, .workflow-card { background: #1a221c; }
