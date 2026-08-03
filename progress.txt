@@ -553,3 +553,45 @@ Le board listait tout. Le planning local (`nodra.mission.schedule` + bannière �
 
 ### Statut
 - [x] #17 — Filtre 'ma journée'
+
+## Itération 16 — 2026-08-03 — Task #18 : Glance horizontal : où en est le run ?
+
+### Contexte
+La tâche était déjà amorcée dans le working tree (WIP non commité : `RunGlance.tsx`, `run-glance-service.ts`, tests, modifications App.tsx/ManagersPage.tsx/styles.css). Cette itération l'a validée, complétée, corrigée et livrée — et a débloqué au passage deux bugs d'environnement/pattern qui figeaient tout le live de l'app.
+
+### Fait (5 commits atomiques)
+1. `feat(web): service d'agrégation Glance des runs actifs (missions, pipelines, managers)`
+   - `run-glance-service.ts` (pur) : `ACTIVE_RUN_STATES` (QUEUED/STARTING/RUNNING/WAITING_APPROVAL/CANCELLING), `RUN_STATE_LIVE_LABEL`, type `RunGlanceItem` (kind, id, titre, détail de dernière action, `startedAt`, libellé d'état, tone), sélecteurs par source — mission ACTIVE avec run actif (détail = dernier message assistant sinon libellé d'état), pipeline en run queued/active/blocked (détail = nœud actif `nodeKey · missionTitle` sinon « avancement du run… »), manager actif (détail = dernier retour) — tri par ancienneté de début puis titre, `formatGlanceElapsed` (temps écoulé compact, `now` injectable). + 20 tests.
+2. `feat(web): barre Glance des runs actifs — composant, temps écoulé live et styles`
+   - `RunGlance` : section `aria-label="Runs actifs"`, tête « GLANCE · N runs actifs », track horizontal d'items cliquables (dot de statut animé pour running, liseré rouge blocked, bleu manager), détail tronqué exposé au survol, temps écoulé rafraîchi par tic local 30 s (le SSE rafraîchit les données, pas l'horloge), `aria-label` par item. Masqué si aucun run actif. + 9 tests.
+   - CSS `.run-glance-*` light + variantes dark.
+3. `feat(web): câblage Glance dans le board — 1 clic vers la conversation mission, pipeline ou chat manager`
+   - `App.tsx` : `glanceItems = buildRunGlance({missions, pipelines, managers})` (données du board déjà rafraîchies par SSE — **aucun polling additionnel**), rendu entre l'intake et le board ; `openGlanceItem` : mission → `/agent.html?missionId=…`, pipeline → page pipelines focus, manager → `setManagerFocusId` + page managers. Edge cases corrigés : `navigateFromSidebar` (navigation sidebar ≠ clic glance : efface `managerFocusId` pour ne pas rouvrir le dernier chat) ; `ManagersPage` : `initialManagerId` + `useEffect` de sync (un clic glance sur un manager ouvre son chat même si la page est déjà affichée avec un autre chat).
+4. `fix(web): api() en no-store — un 304 du cache (ok=false, body vide) cassait tous les rafraîchissements live (SSE)`
+   - **Bug trouvé en smoke test** : le serveur API renvoie des ETag (Express) ; quand le cache HTTP du navigateur revalide, `fetch` reçoit un **304** — `ok=false` avec body VIDE → `api()` jetait → `.catch(() => undefined)` → tous les GET servis par cache (pipelines, managers, activity, et missions quand l'ETag ne bouge pas) ne se rafraîchissaient **jamais** : le SSE/refreshBoard était mort silencieusement, l'app ne montrait aucune donnée live. Correctif : `cache: "no-store"` sur tous les fetchs de `api()` (données dynamiques, le cache HTTP n'apporte rien). + 5 tests (`api.test.ts` : parsing, no-store, options/headers préservés, erreurs non-ok).
+5. `fix(web): mountedRef réarmé au setup d'effet — un remount (Fast Refresh/HMR) gelait refreshBoard pour toujours`
+   - **Bug latent trouvé pendant le smoke test** : `mountedRef = useRef(true)` + `useEffect(() => () => { mountedRef.current = false }, [])` — si le composant est remonté (StrictMode dev, Fast Refresh du HMR après un hot update), la ref est préservée à `false` (le cleanup a tourné, le setup ne la réarme jamais) → la garde `if (mountedRef.current)` bloquait TOUS les setState de `refreshBoard` pour toujours (vérifié dans la fibre React : ref à false, missions figées, pipelines/managers/activity vides malgré des fetchs 200). Correctif : le setup de l'effet réarme `mountedRef.current = true` avant le cleanup.
+
+### Vérifications
+- `npm run typecheck` : OK
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
+- Web : 53 fichiers / 426 tests OK (+5 api, +29 glance : 20 service + 9 composant)
+- Suite complète `npm test` : 744 OK ; **6 échecs pré-existants environnementaux inchangés** (architecture-boundaries, health/i6/i14 → Temporal/Codex, temporal-envelope ×2 → serveur Temporal non démarré) — aucun lié aux changements
+- ESLint sur tous les fichiers touchés : propre
+- **Smoke test navigateur complet** (stack dev 5174) :
+  - La barre affiche les 7 pipelines en run actif (détail du nœud actif, temps écoulé « il y a 7 j / 17 h… », état « en cours ») ;
+  - Pendant un run réel lancé via l'API, l'item MISSION est apparu **en live** dans la barre (« réfléchit… » / « à l'instant ») via le SSE → refreshBoard → buildRunGlance ;
+  - Clic pipeline → page Pipelines avec la carte focus ; clic mission → `/agent.html?missionId=…` (conversation) ;
+  - Au passage, tout le live de l'app s'est dégelé (badges sidebar « Pipelines 7 », « Activité 2 », dock « 2 managers ») — effets des 2 fixes.
+
+### Décisions / notes / limites
+- **Diagnostic en deux temps** (les deux étaient nécessaires pour le live) : (1) 304 du cache → `api()` jetait — sans `no-store`, même avec la ref réparée, les refresh restaient muets ; (2) ref `mountedRef` figée à false après remount — sans sa réparation, les fetchs 200 étaient ignorés. Chacun a été prouvé dans le navigateur (réponses réseau 304/200 + lecture de la fibre React) avant d'être corrigé.
+- **Manager d'une mission** : le modèle ne lie jamais un manager à une mission (contrainte `ck_run_subject` : un run est mission **ou** manager). La barre couvre les 3 sources de l'issue (mission, pipeline, manager) ; le « manager d'une mission » n'existe pas — non implémentable.
+- **« État de connexion »** : couvert par le libellé d'état du run (en file d'attente / démarre / réfléchit / attend une approbation / annulation / en cours / bloqué / en orchestration) + le point animé ; la page de conversation (`ProviderMissionConversationPage`) reste l'endroit du statut SSE fin (« connected ») — la barre montre l'état du run, pas le transport.
+- **Aucun polling additionnel** : `buildRunGlance` est dérivé des données du board déjà rafraîchies par SSE ; seul un tic local de 30 s met à jour les temps écoulés (sans tic, l'horloge serait figée entre deux événements).
+- **Tri** : le plus ancien d'abord (les runs qui tournent le plus longtemps remontent), puis par titre — stable entre refreshs.
+- **Limite** : la barre est rendue sur la page Tâches uniquement (comme demandé par l'issue « en haut du board ») ; elle est masquée si aucun run actif (aucun bruit visuel).
+- Tests unitaires ajoutés pendant le smoke : `api.test.ts` (5) verrouille le comportement no-store ; les fixes `mountedRef`/navigation sont dans App.tsx/ManagersPage (composants non couverts par des tests App — pattern du repo : composants isolés).
+
+### Statut
+- [x] #18 — Glance horizontal : où en est le run ?

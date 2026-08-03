@@ -247,7 +247,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #18 — Glance horizontal : où en est le run ? (labels: —)
+- [x] #18 — Glance horizontal : où en est le run ? (labels: —)
 
   **Issue #18 — détail complet**
   > ## Contexte
