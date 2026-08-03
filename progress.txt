@@ -561,7 +561,7 @@ La tâche était déjà amorcée dans le working tree (WIP non commité : `RunGl
 
 ### Fait (5 commits atomiques)
 1. `feat(web): service d'agrégation Glance des runs actifs (missions, pipelines, managers)`
-   - `run-glance-service.ts` (pur) : `ACTIVE_RUN_STATES` (QUEUED/STARTING/RUNNING/WAITING_APPROVAL/CANCELLING), `RUN_STATE_LIVE_LABEL`, type `RunGlanceItem` (kind, id, titre, détail de dernière action, `startedAt`, libellé d'état, tone), sélecteurs par source — mission ACTIVE avec run actif (détail = dernier message assistant sinon libellé d'état), pipeline en run queued/active/blocked (détail = nœud actif `nodeKey · missionTitle` sinon « avancement du run… »), manager actif (détail = dernier retour) — tri par ancienneté de début puis titre, `formatGlanceElapsed` (temps écoulé compact, `now` injectable). + 20 tests.
+   - `run-glance-service.ts` (pur) : `ACTIVE_RUN_STATES` (QUEUED/STARTING/RUNNING/WAITING_APPROVAL/CANCELLING), `RUN_STATE_LIVE_LABEL`, type `RunGlanceItem` (kind, id, titre, détail de dernière action, `startedAt`, libellé d'état, tone), sélecteurs par source — mission ACTIVE avec run actif (détail = dernier message assistant sinon libellé d'état), pipeline en run queued/active/blocked (détail = nœud actif `nodeKey · missionTitle` sinon « avancement du run… »), manager actif (détail = dernier retour) — tri par ancienneté de début puis titre, `formatGlanceElapsed` (temps écoulé compact, `now` injectable). + 16 tests.
 2. `feat(web): barre Glance des runs actifs — composant, temps écoulé live et styles`
    - `RunGlance` : section `aria-label="Runs actifs"`, tête « GLANCE · N runs actifs », track horizontal d'items cliquables (dot de statut animé pour running, liseré rouge blocked, bleu manager), détail tronqué exposé au survol, temps écoulé rafraîchi par tic local 30 s (le SSE rafraîchit les données, pas l'horloge), `aria-label` par item. Masqué si aucun run actif. + 9 tests.
    - CSS `.run-glance-*` light + variantes dark.
@@ -575,7 +575,7 @@ La tâche était déjà amorcée dans le working tree (WIP non commité : `RunGl
 ### Vérifications
 - `npm run typecheck` : OK
 - `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
-- Web : 53 fichiers / 426 tests OK (+5 api, +29 glance : 20 service + 9 composant)
+- Web : 53 fichiers / 426 tests OK (+5 api, +25 glance : 16 service + 9 composant)
 - Suite complète `npm test` : 744 OK ; **6 échecs pré-existants environnementaux inchangés** (architecture-boundaries, health/i6/i14 → Temporal/Codex, temporal-envelope ×2 → serveur Temporal non démarré) — aucun lié aux changements
 - ESLint sur tous les fichiers touchés : propre
 - **Smoke test navigateur complet** (stack dev 5174) :
