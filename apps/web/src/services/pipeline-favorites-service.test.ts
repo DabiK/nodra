@@ -25,7 +25,10 @@ describe("pipeline-favorites-service", () => {
   it("captures node configuration without retaining mission IDs", async () => {
     vi.mocked(loadMissionInspector).mockResolvedValueOnce({ mission: { executionKind: "agent", projectId: null }, config: favorite.nodes[0].source } as never)
       .mockResolvedValueOnce({ mission: { executionKind: "human", projectId: null }, config: null } as never);
-    const saved = await savePipelineFavorite({ id: "pipeline", name: "Revue", nodes: [{ ...({ missionId: "old-a", missionTitle: "Analyse", nodeKey: "a", transitionMode: "human" } as never) }, { ...({ missionId: "old-b", missionTitle: "Livraison", nodeKey: "b", transitionMode: "auto" } as never) }], edges: favorite.edges } as never);
+    const saved = await savePipelineFavorite({ id: "pipeline", name: "Revue", nodes: [
+      { missionId: "old-a", missionTitle: "Analyse", nodeKey: "a", transitionMode: "human" },
+      { missionId: "old-b", missionTitle: "Livraison", nodeKey: "b", transitionMode: "auto" }
+    ], edges: favorite.edges } as never);
     expect(saved.nodes[0]).not.toHaveProperty("missionId");
     expect(loadPipelineFavorites()).toHaveLength(1);
   });
