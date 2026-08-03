@@ -67,6 +67,11 @@ function isTypingTarget(target: EventTarget | null) {
 
 export function App() {
   const [missions, setMissions] = useState<MissionView[]>([]);
+  // Le premier chargement de missions est async : `missions` démarre à `[]`.
+  // Tant que le premier fetch n'a pas abouti, on ne peut pas distinguer un
+  // board réellement vide d'un board pas encore chargé — l'état vide ne doit
+  // s'afficher qu'après ce premier chargement (issue #27).
+  const [boardLoaded, setBoardLoaded] = useState(false);
   const [pipelines, setPipelines] = useState<PipelineListItem[]>([]);
   const [managers, setManagers] = useState<ManagerView[]>([]);
   const [providerOptions, setProviderOptions] = useState<ProviderOptionsCatalog | null>(null);
@@ -151,6 +156,7 @@ export function App() {
     void loadMissionIntake()
       .then((result) => {
         setMissions(result.missions);
+        setBoardLoaded(true);
         setProviderOptions(result.providerOptions);
         setDraft(result.draft);
       })
@@ -166,7 +172,7 @@ export function App() {
   }, []);
 
   const refreshBoard = useCallback(() => {
-    void listMissions().then((next) => { if (mountedRef.current) setMissions(next); }).catch(() => undefined);
+    void listMissions().then((next) => { if (mountedRef.current) { setMissions(next); setBoardLoaded(true); } }).catch(() => undefined);
     void listPipelines().then((next) => { if (mountedRef.current) setPipelines(next); }).catch(() => undefined);
     void listManagers().then((next) => { if (mountedRef.current) setManagers(next); }).catch(() => undefined);
     void loadActivity().then((next) => { if (mountedRef.current) setActivity(next); }).catch(() => undefined);
@@ -720,7 +726,7 @@ export function App() {
         />
 
         {effectiveViewMode === "board" ? (
-          missions.length === 0 ? (
+          boardLoaded && missions.length === 0 ? (
             <BoardEmptyState
               templates={MISSION_TEMPLATES}
               busyTemplateId={templateBusyId}
