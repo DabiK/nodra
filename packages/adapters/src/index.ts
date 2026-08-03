@@ -51,6 +51,7 @@ export { SqliteApprovalRepository } from "./sqlite/sqlite-approval-repository.js
 export { SqliteDeliveryRepository } from "./sqlite/sqlite-delivery-repository.js";
 export { SqliteConfirmationRepository } from "./sqlite/sqlite-confirmation-repository.js";
 export { SqliteActivityRepository } from "./sqlite/sqlite-activity-repository.js";
+export { SqliteTagRepository } from "./sqlite/sqlite-tag-repository.js";
 export { LocalWorkspaceAdapter } from "./git/local-workspace-adapter.js";
 export { SqliteWorkspaceRepository } from "./sqlite/sqlite-workspace-repository.js";
 export { SqliteWorkspaceDeletionReservation } from "./sqlite/sqlite-workspace-deletion-reservation.js";

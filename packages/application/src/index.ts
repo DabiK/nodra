@@ -7,6 +7,19 @@ export {
 } from "./change-mission-state.js";
 export { CreateMission, type CreateMissionInput } from "./create-mission.js";
 export { GetRelay } from "./get-relay.js";
+export { ListTags } from "./list-tags.js";
+export { CreateTag } from "./create-tag.js";
+export { UpdateTag } from "./update-tag.js";
+export { DeleteTag } from "./delete-tag.js";
+export { ListMissionTags } from "./list-mission-tags.js";
+export { SetMissionTags } from "./set-mission-tags.js";
+export type {
+  CreateTagInput,
+  MissionTagView,
+  SetMissionTagsInput,
+  TagRepository,
+  UpdateTagInput
+} from "./tag-repository.js";
 export { ListActivity } from "./list-activity.js";
 export { MarkActivityRead } from "./mark-activity-read.js";
 export type {

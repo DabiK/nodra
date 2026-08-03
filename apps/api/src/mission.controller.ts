@@ -8,7 +8,9 @@ import type {
   ListMissions,
   ListMissionAudit,
   ListMissionRuns,
+  ListMissionTags,
   MissionListFilter,
+  SetMissionTags,
   StartMission,
   ShowMission,
   EnableAgentConfig,
@@ -33,8 +35,10 @@ import {
   LIST_MISSIONS,
   LIST_MISSION_AUDIT,
   LIST_MISSION_RUNS,
+  LIST_MISSION_TAGS,
   PREVIEW_AGENT_CONFIG,
   READ_MISSION_PROVIDER_SESSION,
+  SET_MISSION_TAGS,
   SHOW_MISSION,
   START_MISSION,
   START_PROVIDER_SESSION_TURN,
@@ -53,6 +57,7 @@ import { ActivateProviderSessionMissionDto } from "./dto/activate-provider-sessi
 import { StartProviderSessionTurnDto } from "./dto/start-provider-session-turn.dto.js";
 import { SteerProviderSessionTurnDto } from "./dto/steer-provider-session-turn.dto.js";
 import { EnsureMissionObservationSessionDto } from "./dto/ensure-mission-observation-session.dto.js";
+import { SetMissionTagsDto } from "./dto/set-mission-tags.dto.js";
 
 @Controller("api/missions")
 export class MissionController {
@@ -62,6 +67,8 @@ export class MissionController {
     @Inject(LIST_MISSIONS) private readonly listMissions: ListMissions,
     @Inject(LIST_MISSION_RUNS) private readonly listMissionRuns: ListMissionRuns,
     @Inject(LIST_MISSION_AUDIT) private readonly listMissionAudit: ListMissionAudit,
+    @Inject(LIST_MISSION_TAGS) private readonly listMissionTags: ListMissionTags,
+    @Inject(SET_MISSION_TAGS) private readonly setMissionTags: SetMissionTags,
     @Inject(SHOW_MISSION) private readonly showMission: ShowMission,
     @Inject(START_MISSION) private readonly startMission: StartMission,
     @Inject(ENABLE_AGENT_CONFIG) private readonly enableAgentConfig: EnableAgentConfig,
@@ -119,6 +126,24 @@ export class MissionController {
   @Get(":id/audit")
   audit(@Param("id") id: string) {
     return this.listMissionAudit.execute(toId(id));
+  }
+
+  /** Tags libres attachés à la mission, triés par libellé (issue #23). */
+  @Get(":id/tags")
+  tags(@Param("id") id: string) {
+    return this.listMissionTags.execute(toId(id));
+  }
+
+  /** Remplace l'ensemble des tags de la mission (issue #23). */
+  @Put(":id/tags")
+  @HttpCode(200)
+  async setTags(@Param("id") id: string, @Body() body: SetMissionTagsDto) {
+    await this.setMissionTags.execute({
+      missionId: toId(id),
+      tagIds: body.tagIds.map((tagId) => toId(tagId)),
+      context: this.context()
+    });
+    return { ok: true };
   }
 
   @Post(":id/ready")

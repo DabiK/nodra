@@ -21,6 +21,7 @@ const statusFor = (code: string): number => {
     code === "COMMAND_ID_CONFLICT" ||
     code === "MISSION_ALREADY_EXISTS" || code === "EVIDENCE_STALE" || code === "APPROVAL_ALREADY_DECIDED" ||
     code === "DELIVERY_ALREADY_DECIDED" || code === "EVIDENCE_ID_CONFLICT" || code === "GATES_NOT_SATISFIED" ||
+    code === "TAG_ALREADY_EXISTS" ||
     code === "APPROVAL_TARGET_MISMATCH" || code === "APPROVAL_KIND_MISMATCH" || code === "APPROVAL_ALREADY_CONSUMED" ||
     code === "BLOB_DIGEST_MISMATCH"
   ) return 409;

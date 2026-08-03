@@ -40,6 +40,7 @@ import {
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
   SqliteWorkspaceDeletionReservation,
+  SqliteTagRepository,
   SqliteWorkflowOutboxStore,
   SqliteWorkflowReconciliationStore
 } from "@nodra/adapters";
@@ -75,7 +76,13 @@ import {
   ListMissions,
   ListMissionRuns,
   ListMissionAudit,
+  ListMissionTags,
   ListActivity,
+  ListTags,
+  CreateTag,
+  UpdateTag,
+  DeleteTag,
+  SetMissionTags,
   ListManagerConversations,
   ListProviderSessions,
   ListManagers,
@@ -137,6 +144,7 @@ import { ManagerController } from "./manager.controller.js";
 import { ConfigController } from "./config.controller.js";
 import { RelayController } from "./relay.controller.js";
 import { ActivityController } from "./activity.controller.js";
+import { TagController } from "./tag.controller.js";
 import { RuntimeController } from "./runtime.controller.js";
 import { RuntimeLifecycle } from "./runtime-lifecycle.js";
 import { WorkspaceController } from "./workspace.controller.js";
@@ -172,6 +180,12 @@ import {
   GET_RELAY,
   INTEGRATE_WORKSPACE,
   LIST_ACTIVITY,
+  LIST_TAGS,
+  CREATE_TAG,
+  UPDATE_TAG,
+  DELETE_TAG,
+  LIST_MISSION_TAGS,
+  SET_MISSION_TAGS,
   LIST_MANAGER_CONVERSATIONS,
   LIST_MANAGERS,
   LIST_MISSIONS,
@@ -246,7 +260,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, ActivityController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, ProviderSessionController, RunController, PipelineController, LlmController, EventsController],
+      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, ActivityController, TagController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, ProviderSessionController, RunController, PipelineController, LlmController, EventsController],
       providers: [
         { provide: REPOSITORY_ROOT, useValue: options.repositoryRoot ?? process.cwd() },
         { provide: DATA_ROOT, useValue: options.dataRoot ?? dirname(options.databaseFile) },
@@ -664,6 +678,18 @@ export class NodraModule {
           useFactory: (database: NodraSqliteDatabase) => new ListMissionAudit(new SqliteMissionReadModel(database))
         },
         {
+          provide: LIST_MISSION_TAGS,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) =>
+            new ListMissionTags(new SqliteTagRepository(database), new SqliteMissionReadModel(database))
+        },
+        {
+          provide: SET_MISSION_TAGS,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) =>
+            new SetMissionTags(new SqliteTagRepository(database), new SqliteMissionReadModel(database))
+        },
+        {
           provide: CREATE_PIPELINE,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new CreatePipeline(new SqlitePipelineRepository(database))
@@ -717,6 +743,26 @@ export class NodraModule {
           provide: LIST_ACTIVITY,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new ListActivity(new SqliteActivityRepository(database))
+        },
+        {
+          provide: LIST_TAGS,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ListTags(new SqliteTagRepository(database))
+        },
+        {
+          provide: CREATE_TAG,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new CreateTag(new SqliteTagRepository(database))
+        },
+        {
+          provide: UPDATE_TAG,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new UpdateTag(new SqliteTagRepository(database))
+        },
+        {
+          provide: DELETE_TAG,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new DeleteTag(new SqliteTagRepository(database))
         },
         {
           provide: MARK_ACTIVITY_READ,

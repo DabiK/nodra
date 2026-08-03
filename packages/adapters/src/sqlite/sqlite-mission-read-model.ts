@@ -18,6 +18,7 @@ import { gateBindings, gateDefinitions, gateEvaluations } from "./schema/gates.j
 import { businessAuditEvents, relayItems } from "./schema/operations.js";
 import { providerEvents } from "./schema/provider-events.js";
 import { runConfigSnapshots } from "./schema/runs.js";
+import { missionTags, tags } from "./schema/tags.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
 
 type MissionRow = typeof missions.$inferSelect;
@@ -25,7 +26,7 @@ type MissionRow = typeof missions.$inferSelect;
 /** États de run où l'agent travaille encore (le live du board s'affiche pour ces runs). */
 const ACTIVE_RUN_STATES = new Set(["QUEUED", "STARTING", "RUNNING", "WAITING_APPROVAL", "CANCELLING"]);
 
-const toView = (row: MissionRow): Omit<MissionView, "runState" | "runStartedAt" | "lastAssistantMessage"> => ({
+const toView = (row: MissionRow, tagIds: Id[]): Omit<MissionView, "runState" | "runStartedAt" | "lastAssistantMessage"> => ({
   id: asId(row.id),
   projectId: row.projectId ? asId(row.projectId) : null,
   title: row.title,
@@ -33,7 +34,8 @@ const toView = (row: MissionRow): Omit<MissionView, "runState" | "runStartedAt" 
   state: row.state,
   version: row.version,
   createdAt: row.createdAt,
-  updatedAt: row.updatedAt
+  updatedAt: row.updatedAt,
+  tagIds
 });
 
 const toRunView = (row: typeof runs.$inferSelect): MissionRunView => ({
@@ -125,9 +127,32 @@ export class SqliteMissionReadModel implements MissionReadModel {
     return info;
   }
 
-  private withLatestRun(row: MissionRow, latest: LatestRunInfo | undefined): MissionView {
+  /**
+   * Ids des tags libres (issue #23) pour chaque mission, en une requête batch
+   * (pas de N+1). Ordre stable : libellé du tag.
+   */
+  private tagIdsByMission(missionIds: string[]): Map<string, Id[]> {
+    const uniqueIds = [...new Set(missionIds)];
+    const map = new Map<string, Id[]>();
+    if (uniqueIds.length === 0) return map;
+    const rows = this.database.orm
+      .select({ missionId: missionTags.missionId, tagId: missionTags.tagId, label: tags.label })
+      .from(missionTags)
+      .innerJoin(tags, eq(missionTags.tagId, tags.id))
+      .where(inArray(missionTags.missionId, uniqueIds))
+      .orderBy(asc(tags.label))
+      .all();
+    for (const row of rows) {
+      const list = map.get(row.missionId) ?? [];
+      list.push(asId(row.tagId));
+      map.set(row.missionId, list);
+    }
+    return map;
+  }
+
+  private withLatestRun(row: MissionRow, latest: LatestRunInfo | undefined, tagIds: Id[]): MissionView {
     return {
-      ...toView(row),
+      ...toView(row, tagIds),
       runState: latest?.state ?? null,
       runStartedAt: latest?.startedAt ?? null,
       lastAssistantMessage: latest?.lastAssistantMessage ?? null
@@ -141,7 +166,8 @@ export class SqliteMissionReadModel implements MissionReadModel {
         ? query.all()
         : query.where(filter.projectId === null ? isNull(missions.projectId) : eq(missions.projectId, filter.projectId)).all();
       const latest = this.latestRunInfoByMission(rows.map((row) => row.id));
-      return rows.map((row) => this.withLatestRun(row, latest.get(row.id)));
+      const tagIds = this.tagIdsByMission(rows.map((row) => row.id));
+      return rows.map((row) => this.withLatestRun(row, latest.get(row.id), tagIds.get(row.id) ?? []));
     } catch (error) {
       throw translateSqliteError(error);
     }
@@ -151,7 +177,7 @@ export class SqliteMissionReadModel implements MissionReadModel {
     try {
       const row = this.database.orm.select().from(missions).where(eq(missions.id, id)).get();
       if (!row) return null;
-      return this.withLatestRun(row, this.latestRunInfoByMission([id]).get(id));
+      return this.withLatestRun(row, this.latestRunInfoByMission([id]).get(id), this.tagIdsByMission([id]).get(id) ?? []);
     } catch (error) {
       throw translateSqliteError(error);
     }
@@ -234,9 +260,10 @@ export class SqliteMissionReadModel implements MissionReadModel {
         .all();
       const projection: RelayProjection = { ready: [], active: [], blocked: [], decision_required: [] };
       const latest = this.latestRunInfoByMission(rows.map((row) => row.mission.id));
+      const tagIds = this.tagIdsByMission(rows.map((row) => row.mission.id));
       for (const row of rows) {
         if (filter && filter.projectId !== undefined && row.mission.projectId !== filter.projectId) continue;
-        const item: RelayMissionView = { ...this.withLatestRun(row.mission, latest.get(row.mission.id)), reasonCode: row.reasonCode };
+        const item: RelayMissionView = { ...this.withLatestRun(row.mission, latest.get(row.mission.id), tagIds.get(row.mission.id) ?? []), reasonCode: row.reasonCode };
         projection[row.queue].push(item);
       }
       return projection;

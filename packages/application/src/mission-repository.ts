@@ -68,6 +68,8 @@ export interface MissionView {
   runStartedAt: string | null;
   /** Dernier message assistant du dernier run s'il est encore actif, null sinon. */
   lastAssistantMessage: string | null;
+  /** Ids des tags libres attachés à la mission (issue #23), triés par libellé. */
+  tagIds: Id[];
 }
 
 export interface RelayMissionView extends MissionView {
