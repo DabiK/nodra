@@ -1,5 +1,41 @@
 # Journal d'avancement — DabiK/nodra
 
+## Itération 23 — 2026-08-03 — Task #23 : Tags libres sur missions
+
+### Fait (5 commits atomiques, comme suggéré par l'issue : modèle → endpoints → UI)
+1. **Schéma DB** (`feat(db): schema tag + mission_tag (libellé unique, couleur #RRGGBB)`)
+   - Tables `tag` (id, label **unique**, color, created_at, updated_at) et `mission_tag` (liaison mission ↔ tag, PK composite) dans `packages/adapters/src/sqlite/schema/tags.ts` ; contraintes SQLite : label non vide (`length(trim(label)) > 0`), couleur au format `#RRGGBB` (GLOB), index unique sur le libellé. Migration Drizzle v12 (`0012_nasty_proudstar.sql`) + journal v13 ajouté au passage (test `migrate-database` mis à jour).
+2. **CRUD + liaison (API)** (`feat(api): tags libres sur missions — CRUD, liaison mission et tagIds dans les vues`)
+   - Port `TagRepository` (application) : `MissionTagView`, `create`/`findByLabel`/`list`/`update`/`delete`/`tagsForMission`/`setForMission`, normalisation label (trim) et couleur (`#RRGGBB`).
+   - Use cases : `CreateTag` (doublon → `TAG_ALREADY_EXISTS`), `UpdateTag` (`TAG_NOT_FOUND`), `DeleteTag`, `ListTags`, `ListMissionTags` (mission inconnue → `MISSION_NOT_FOUND`), `SetMissionTags` (remplace l'ensemble, `[]` retire tout). Aucun import adapters (contrainte architecture respectée).
+   - Impl `SqliteTagRepository` (10 tests : CRUD, unicité du libellé, liaison mission, retrait de tous les tags, suppression cascadée de la liaison, 404) + `tagIdsByMission` batch dans le read model missions (pas de N+1, ordre par libellé) : `tagIds` exposé sur les vues mission du board.
+   - Endpoints : `TagController` (`GET/POST /api/tags`, `PUT/DELETE /api/tags/:id`, tokens `LIST_TAGS`/`CREATE_TAG`/`UPDATE_TAG`/`DELETE_TAG`) + `GET/PUT /api/missions/:id/tags` dans `mission.controller.ts` (`SetMissionTagsDto`, token `SET_MISSION_TAGS`), erreurs tag dans le filtre business-error.
+3. **Service web + filtre persisté** (`feat(web): service tags + filtre par tag combinable (persisté) + fixtures MissionView`)
+   - `tag-service.ts` (+ 8 tests) : `MissionTag`, `TAG_COLOR_PALETTE` (10 couleurs), `loadTags`/`createTag`/`updateTag`/`deleteTag`/`loadMissionTags`/`setMissionTags`.
+   - `MissionFilters.tags` (ids de tags, `[]` = aucun filtre) : `filterMissions` garde une mission si elle porte **au moins un** tag sélectionné — combinable avec état/type/requête/Ma journée ; persisté dans `nodra.tasks.filters` (`mission-filter-service`, coerce + défaut). `MissionView.tagIds` déclaré dans `types.ts`, fixtures des 17 fichiers de tests web mis à jour.
+4. **UI board + fiche** (`feat(web): chips de tags sur les cartes, filtre par tag sur le board, panneau Tags + gestionnaire dans la fiche`)
+   - Cartes du board : chips de tags colorées (`.relay-task-tag`, couleur inline `--tag-color`, `aria-label` listant les libellés) sur les cartes kanban et liste.
+   - Filtre par tag : chips dans la rangée de filtres (`TaskIntakeCard`) avec pastille couleur, compteur de missions par tag (découverte, indépendant des filtres), toggle par clic, « ✕ Tags » pour tout retirer, `aria-pressed`.
+   - Fiche mission : panneau `MissionTagsPanel` (tags attachés — ajout/retrait par clic, catalogue chargé une fois, rechargé après chaque changement) + `TagManagerDialog` (créer avec palette de couleurs, renommer, recolorer, supprimer, 8 tests) ; `App.tsx` câble catalogue + filtre + compteurs ; Esc de la fiche gardé quand le gestionnaire est ouvert ; CSS `.relay-task-tag(s)`, `.tag-dot`, `.view-chip.tag*`, `.mission-tags-*` + variantes dark.
+5. **Test journal + libellé export** (`test(db): migration journal v13 + libellé FR de l'événement MISSION_TAGS_UPDATED`)
+   - `describeAuditEvent` gagne le libellé FR « Mise à jour des tags » pour l'événement `MISSION_TAGS_UPDATED` (timeline d'audit et export Markdown).
+
+### Vérifications
+- `npm run typecheck` : OK.
+- `npm run lint -- --quiet` : 8 erreurs pré-existantes hors périmètre inchangées (AgentPage/sidebar, adapters, application), aucun signal sur les fichiers tags.
+- Web : 58 fichiers / 483 tests OK (dont 8 tag-service, 8 TagManagerDialog, +6 mission-filters, +2 mission-filter-service, +5 MissionInspector, +3 MissionRelay).
+- `npm test` (suite complète) : 812 OK ; 6 échecs pré-existants/environnementaux inchangés (architecture-boundaries, health → Temporal, i6/i14 → binaire Codex non certifié, temporal-envelope ×2 → serveur Temporal non démarré), aucun lié aux tags.
+
+### Décisions / notes / limites
+- **Persistance serveur** (choix de l'issue pour la cohérence multi-écrans) : tables `tag` + `mission_tag` ; le label unique est la clé de dédoublonnage (création en doublon rejetée côté API avec `TAG_ALREADY_EXISTS`, l'UI ne le propose pas deux fois).
+- **Filtre = union (OR) des tags sélectionnés** : une mission apparaît si elle porte au moins un tag sélectionné (sémantique de facette, comme les chips d'état/type) ; `[]` = aucun filtre.
+- **`tagIds` sur les vues mission** : ajout batch dans le read model (une requête par liste, pas de N+1), ordre stable par libellé.
+- **Limite** : la couleur est libre (`#RRGGBB` quelconque) au-delà de la palette proposée ; aucune étiquette par défaut côté serveur — le gestionnaire vit dans la fiche mission, accessible depuis le panneau Tags.
+- La suppression d'un tag retire la liaison sur toutes les missions (pas d'orphelins `mission_tag`).
+
+### Statut
+- [x] #23 — Tags libres sur missions
+
 ## Itération 22 — 2026-08-03 — Task #22 : Comparateur de missions / runs
 
 ### Fait

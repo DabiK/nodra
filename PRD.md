@@ -80,7 +80,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #23 — Tags libres sur missions (labels: —)
+- [x] #23 — Tags libres sur missions (labels: —)
 
   **Issue #23 — détail complet**
   > ## Contexte
@@ -93,9 +93,9 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - Persistance serveur (nouveau champ/table) ou localStorage — privilégier serveur pour la cohérence multi-écrans
   >
   > ## Acceptance
-  > - [ ] Ajouter/retirer un tag sur une carte ou dans la fiche
-  > - [ ] Créer/renommer/supprimer des tags
-  > - [ ] Filtre par tag combinable avec les filtres existants
+  > - [x] Ajouter/retirer un tag sur une carte ou dans la fiche
+  > - [x] Créer/renommer/supprimer des tags
+  > - [x] Filtre par tag combinable avec les filtres existants
   >
   > ## Méthode d'implémentation
   > - Cartographier le code avec des **subagents explore** avant d'implémenter
