@@ -5,6 +5,8 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
 
 - [ ] #25 — Retirer Temporal : exécuteur in-process + polling SQLite (labels: —)
 
+  _Avancement 2026-08-03 : commandes de run persistées en SQLite et exécuteur in-process branché à l'API. La suppression intégrale de Temporal (worker, dépendances, supervisor, migrations et tests) reste requise avant de cocher l'issue._
+
   **Issue #25 — détail complet**
   > ## Contexte
   > Temporal est actuellement l'exécuteur des runs (workflow MissionWorkflow → RunWorkflow → activités recordStarted/executeProvider/recordTerminal) et le transport des commandes interactives (steer/resume/cancel) pendant des exécutions de plusieurs minutes.

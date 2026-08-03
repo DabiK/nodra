@@ -636,3 +636,19 @@ Toute action nécessitait d'ouvrir la fiche mission. Le board (`MissionRelay.tsx
 
 ### Statut
 - [x] #19 — Quick actions sur cartes mission
+
+## Itération en cours — 2026-08-03 — Task #25 : Retirer Temporal
+
+### Fait partiel
+- File SQLite `run_command` et `SqliteRunCommandStore` : `steer`, `resume` et `cancel` sont désormais persistés avant traitement.
+- `SqliteRunExecutor` est branché au cycle de vie Nest et poll l'outbox SQLite au démarrage.
+- Les use cases de contrôle de run ne dépendent plus directement de `WorkflowPort`/signaux Temporal ; l'API admet les démarrages selon la santé SQLite.
+- Commits : `d4dbbbf`, `402b69e`, `50663db`, `f867af9`, `b8621ce`.
+
+### Vérifications intermédiaires
+- `npm run typecheck` : OK.
+- `npm run lint` : échec sur 8 erreurs pré-existantes et aucune erreur dans les fichiers modifiés après correction des imports.
+- `npm test` : échec attendu pendant la migration : les suites encore Temporal démarrent un serveur Temporal et plusieurs assertions attendent l'ancien comportement (à réécrire/supprimer avant clôture).
+
+### Statut
+- [ ] #25 — En cours : suppression des packages/worker/supervisor Temporal, migration des colonnes historiques et réécriture des tests restent à faire.
