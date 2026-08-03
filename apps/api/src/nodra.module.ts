@@ -37,7 +37,11 @@ import {
   SqliteProviderCatalogRepository,
   SqliteProviderSessionRepository,
   SqliteRunControlRepository,
+  SqliteRunWorkflowActivity,
   SqliteRunCommandStore,
+  SqliteRunExecutor,
+  SqliteProviderRunStore,
+  SqliteProviderPermissionHandler,
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
   SqliteWorkspaceDeletionReservation,
@@ -205,6 +209,7 @@ import {
   READ_EVIDENCE,
   READ_WORKSPACE,
   RECONCILE_WORKFLOWS,
+  SQLITE_RUN_EXECUTOR,
   REPOSITORY_ROOT,
   RESTORE_WORKSPACE,
   RESOLVE_WORKTREE,
@@ -563,6 +568,28 @@ export class NodraModule {
             address: options.temporalAddress ?? "127.0.0.1:7233",
             namespace: options.temporalNamespace ?? "nodra"
           })
+        },
+        {
+          provide: SQLITE_RUN_EXECUTOR,
+          inject: [DATABASE, PROVIDER_REGISTRY, PROVIDER_CATALOG, MANAGE_CONFIRMATIONS],
+          useFactory: (
+            database: NodraSqliteDatabase,
+            providers: ProviderRegistry,
+            catalog: SqliteProviderCatalogRepository,
+            confirmations: ManageConfirmations
+          ) => {
+            const providerRuns = new SqliteProviderRunStore(database);
+            return new SqliteRunExecutor(
+              database,
+              new SqliteWorkflowOutboxStore(database),
+              new SqliteRunWorkflowActivity(database),
+              providers,
+              providerRuns,
+              new SqliteProviderPermissionHandler(confirmations, providerRuns),
+              catalog,
+              new SqliteRunCommandStore(database)
+            );
+          }
         },
         {
           provide: GET_HEALTH,
