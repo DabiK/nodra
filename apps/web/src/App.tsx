@@ -37,6 +37,7 @@ import { ActivityHub } from "./components/ActivityHub";
 import { BoardEmptyState } from "./components/BoardEmptyState";
 import { MISSION_TEMPLATES, templateDraft, type MissionTemplate } from "./services/mission-template-service";
 import { createExamplePipeline } from "./services/pipeline-template-service";
+import { dismissWelcomeBanner, loadWelcomeDismissed } from "./services/onboarding-service";
 
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -97,6 +98,7 @@ export function App() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [templateBusyId, setTemplateBusyId] = useState<string | null>(null);
   const [examplePipelineBusy, setExamplePipelineBusy] = useState(false);
+  const [welcomeVisible, setWelcomeVisible] = useState<boolean>(() => !loadWelcomeDismissed());
 
   // Raccourcis globaux : ⌘K / Ctrl+K ouvre la palette, « ? » ouvre l'aide, Esc ferme.
   useEffect(() => {
@@ -547,6 +549,35 @@ export function App() {
                 <small>missions ouvertes</small>
               </div>
             </header>
+
+            {welcomeVisible && (
+              <div className="welcome-banner" role="status">
+                <div className="welcome-banner-text">
+                  <strong>👋 Bienvenue dans Nodra</strong>
+                  <small>
+                    Confie une mission à un agent, suis des pipelines, observe les conversations
+                    des agents… Appuie sur « ? » pour découvrir les raccourcis.
+                  </small>
+                </div>
+                <div className="welcome-banner-actions">
+                  <button
+                    type="button"
+                    className="welcome-banner-cta"
+                    onClick={() => { setCreateExpanded(true); document.getElementById("create")?.scrollIntoView({ behavior: "smooth" }); document.querySelector<HTMLInputElement>("#create input")?.focus(); }}
+                  >
+                    Confier une première mission →
+                  </button>
+                  <button
+                    type="button"
+                    className="welcome-banner-close"
+                    aria-label="Masquer le message de bienvenue"
+                    onClick={() => { setWelcomeVisible(false); dismissWelcomeBanner(); }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
 
             {overdueMissions.length > 0 && (
               <div className="overdue-banner" role="status">
