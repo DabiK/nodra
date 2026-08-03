@@ -88,7 +88,7 @@ function relativeTime(value: string): string {
 
 function MissionCard({ mission, tone, pipeline, dragging, disabled, onInspect, onOpenPipeline, onDragStart, onDragEnd }: { mission: MissionView; tone: string; pipeline?: { id: string; name: string; hue: number }; dragging: boolean; disabled: boolean; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onDragStart(id: string): void; onDragEnd(): void }) {
   const style: CSSProperties = pipeline
-    ? { borderLeft: `4px solid hsl(${pipeline.hue} 55% 55%)`, background: `hsl(${pipeline.hue} 68% 97%)` }
+    ? { ["--pipeline-hue" as string]: `${pipeline.hue}` }
     : {};
   return (
     <button
@@ -126,7 +126,7 @@ function MissionCard({ mission, tone, pipeline, dragging, disabled, onInspect, o
             role="button"
             tabIndex={0}
             title={`Ouvrir la pipeline « ${pipeline.name} »`}
-            style={{ color: `hsl(${pipeline.hue} 55% 40%)`, background: `hsl(${pipeline.hue} 60% 92%)` }}
+            style={{ ["--pipeline-hue" as string]: `${pipeline.hue}` }}
             onClick={(event) => { event.stopPropagation(); onOpenPipeline?.(pipeline.id); }}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onOpenPipeline?.(pipeline.id); } }}
           >⌁ {pipeline.name} <b>↗</b></span>
@@ -148,12 +148,7 @@ function pipelineHue(pipelineId: string): number {
 }
 
 function pipelineGroupStyle(pipelineId: string): CSSProperties {
-  const hue = pipelineHue(pipelineId);
-  return {
-    background: `hsl(${hue} 66% 93%)`,
-    borderColor: `hsl(${hue} 50% 68%)`,
-    ["--pipeline-accent" as string]: `hsl(${hue} 55% 40%)`
-  };
+  return { ["--pipeline-hue" as string]: `${pipelineHue(pipelineId)}` };
 }
 
 function Lane({ state, missions, pipelineIndex, draggingId, transitioningId, dayFilter, schedule, getMission, onInspect, onOpenPipeline, onDragStart, onDragEnd, onTransition }: { state: MissionState; missions: MissionView[]; pipelineIndex?: PipelineIndex; draggingId: string | null; transitioningId: string | null; dayFilter?: string; schedule?: MissionSchedule; getMission(id: string): MissionView | undefined; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onDragStart(id: string): void; onDragEnd(): void; onTransition(mission: MissionView, targetState: MissionState): void }) {
