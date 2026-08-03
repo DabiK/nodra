@@ -90,6 +90,29 @@ export interface MissionRunView {
   cacheWriteTokens: number | null;
   costMicros: number | null;
   usageKind: string | null;
+  reasoningEffort: string | null;
+  promptEffective: string | null;
+  permissionPreset: string | null;
+  providerOptions: unknown | null;
+  events: MissionRunEventView[];
+  gates: MissionRunGateView[];
+}
+
+/** Événement provider persisté pour un run, dans l'ordre d'origine. */
+export interface MissionRunEventView {
+  sequence: number;
+  type: string;
+  payload: unknown;
+  sourceAt: string | null;
+  receivedAt: string;
+}
+
+/** Dernier état connu d'un gate évalué pour ce run. */
+export interface MissionRunGateView {
+  name: string;
+  state: string;
+  rationale: string | null;
+  evaluatedAt: string;
 }
 
 /** Historique des runs d'une mission (du plus ancien au plus récent) + coût total cumulé. */

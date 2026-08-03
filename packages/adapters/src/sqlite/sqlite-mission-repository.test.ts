@@ -9,7 +9,9 @@ import { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { projects } from "./schema/core.js";
 import { conversations, conversationItems } from "./schema/conversations.js";
 import { runs } from "./schema/runs.js";
+import { runConfigSnapshots } from "./schema/runs.js";
 import { gateBindings, gateDefinitions, gateEvaluations } from "./schema/gates.js";
+import { providerEvents } from "./schema/provider-events.js";
 import { businessAuditEvents } from "./schema/operations.js";
 import { SqliteMissionReadModel } from "./sqlite-mission-read-model.js";
 import { SqliteMissionRepository } from "./sqlite-mission-repository.js";
@@ -277,6 +279,27 @@ describe("SQLite human mission vertical slice", () => {
         costMicros: null, usageKind: null, createdAt: at(3)
       }
     ]).run();
+    database.orm.insert(runConfigSnapshots).values({
+      runId: "run-runs-1", resolutionSchemaVersion: 1, providerIdRequested: "opencode", providerIdResolved: "opencode",
+      modelIdRequested: "model-a", modelIdResolved: "model-a", reasoningEffortRequested: "high", reasoningEffortResolved: "high",
+      providerOptionsSchemaVersion: 1, providerOptionsJson: '{"temperature":0.2}', providerCapabilitiesJson: '{}',
+      promptKind: "mission", promptCompositionSchemaVersion: 1, promptEffective: "Compare this result", promptGlobal: null,
+      promptManagerInstruction: null, promptMission: "Compare this result", promptBrief: null, permissionPreset: "workspace",
+      budgetSnapshotJson: '{}', workspaceId: null, cwd: "/tmp", gitHead: null, gitTree: null, createdAt: at(1)
+    }).run();
+    database.orm.insert(providerEvents).values({
+      id: "event-runs-1", runId: "run-runs-1", sequence: 0, type: "assistant.message",
+      payloadJson: '{"text":"hello"}', sourceAt: at(1), receivedAt: at(1)
+    }).run();
+    database.orm.insert(gateDefinitions).values({
+      id: "gate-runs", name: "Tests", evaluatorId: "test", evaluatorVersion: "1", criteriaSchemaVersion: 1,
+      criteriaJson: '{}', expectedEvidenceJson: '{}', createdAt: at(1)
+    }).run();
+    database.orm.insert(gateBindings).values({ id: "binding-runs", gateId: "gate-runs", pipelineEdgeId: null, pipelineNodeId: null, missionId: "mission-runs" }).run();
+    database.orm.insert(gateEvaluations).values({
+      id: "evaluation-runs", gateBindingId: "binding-runs", runId: "run-runs-1", evaluatorId: "test", evaluatorVersion: "1",
+      state: "passed", evaluatedAt: at(2), staleAt: null, rationale: "Suite verte"
+    }).run();
 
     const history = await listMissionRuns.execute(asId("mission-runs"));
     expect(history.totalCostMicros).toBe(12_345);
@@ -285,6 +308,11 @@ describe("SQLite human mission vertical slice", () => {
       attempt: 1, state: "SUCCEEDED", providerId: "opencode", modelId: "model-a",
       inputTokens: 1000, outputTokens: 500, cacheReadTokens: 10,
       costMicros: 12_345, usageKind: "reported"
+    });
+    expect(history.runs[0]).toMatchObject({
+      reasoningEffort: "provider_default", promptEffective: "Compare this result", permissionPreset: "workspace",
+      providerOptions: { temperature: 0.2 }, events: [{ sequence: 0, type: "assistant.message", payload: { text: "hello" } }],
+      gates: [{ name: "Tests", state: "passed", rationale: "Suite verte" }]
     });
     expect(history.runs[1]).toMatchObject({ attempt: 2, state: "RUNNING", costMicros: null });
   });

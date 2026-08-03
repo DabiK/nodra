@@ -14,8 +14,10 @@ import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { missions } from "./schema/missions.js";
 import { runs } from "./schema/runs.js";
 import { conversationItems } from "./schema/conversations.js";
-import { gateBindings, gateEvaluations } from "./schema/gates.js";
+import { gateBindings, gateDefinitions, gateEvaluations } from "./schema/gates.js";
 import { businessAuditEvents, relayItems } from "./schema/operations.js";
+import { providerEvents } from "./schema/provider-events.js";
+import { runConfigSnapshots } from "./schema/runs.js";
 import { translateSqliteError } from "./sqlite-error-translation.js";
 
 type MissionRow = typeof missions.$inferSelect;
@@ -48,7 +50,13 @@ const toRunView = (row: typeof runs.$inferSelect): MissionRunView => ({
   cacheReadTokens: row.cacheReadTokens,
   cacheWriteTokens: row.cacheWriteTokens,
   costMicros: row.costMicros ?? null,
-  usageKind: row.usageKind
+  usageKind: row.usageKind,
+  reasoningEffort: row.reasoningEffort,
+  promptEffective: null,
+  permissionPreset: null,
+  providerOptions: null,
+  events: [],
+  gates: []
 });
 
 interface LatestRunInfo {
@@ -157,6 +165,51 @@ export class SqliteMissionReadModel implements MissionReadModel {
         .orderBy(asc(runs.userAttempt), asc(runs.createdAt))
         .all();
       const runViews = rows.map(toRunView);
+      const runIds = rows.map((row) => row.id);
+      if (runIds.length > 0) {
+        const snapshots = this.database.orm.select().from(runConfigSnapshots)
+          .where(inArray(runConfigSnapshots.runId, runIds)).all();
+        const snapshotByRun = new Map(snapshots.map((snapshot) => [snapshot.runId, snapshot]));
+        const eventsByRun = new Map<string, MissionRunView["events"]>();
+        for (const event of this.database.orm.select().from(providerEvents)
+          .where(inArray(providerEvents.runId, runIds)).orderBy(asc(providerEvents.runId), asc(providerEvents.sequence)).all()) {
+          const events = eventsByRun.get(event.runId) ?? [];
+          events.push({
+            sequence: event.sequence,
+            type: event.type,
+            payload: JSON.parse(event.payloadJson) as unknown,
+            sourceAt: event.sourceAt,
+            receivedAt: event.receivedAt
+          });
+          eventsByRun.set(event.runId, events);
+        }
+        const gatesByRun = new Map<string, MissionRunView["gates"]>();
+        const latestGateByRunBinding = new Set<string>();
+        const gateRows = this.database.orm.select({ evaluation: gateEvaluations, definition: gateDefinitions })
+          .from(gateEvaluations)
+          .innerJoin(gateBindings, eq(gateBindings.id, gateEvaluations.gateBindingId))
+          .innerJoin(gateDefinitions, eq(gateDefinitions.id, gateBindings.gateId))
+          .where(inArray(gateEvaluations.runId, runIds))
+          .orderBy(asc(gateEvaluations.runId), asc(gateEvaluations.gateBindingId), desc(gateEvaluations.evaluatedAt), desc(gateEvaluations.id))
+          .all();
+        for (const row of gateRows) {
+          if (!row.evaluation.runId) continue;
+          const key = `${row.evaluation.runId}/${row.evaluation.gateBindingId}`;
+          if (latestGateByRunBinding.has(key)) continue;
+          latestGateByRunBinding.add(key);
+          const gates = gatesByRun.get(row.evaluation.runId) ?? [];
+          gates.push({ name: row.definition.name, state: row.evaluation.state, rationale: row.evaluation.rationale, evaluatedAt: row.evaluation.evaluatedAt });
+          gatesByRun.set(row.evaluation.runId, gates);
+        }
+        for (const run of runViews) {
+          const snapshot = snapshotByRun.get(run.id);
+          run.promptEffective = snapshot?.promptEffective ?? null;
+          run.permissionPreset = snapshot?.permissionPreset ?? null;
+          run.providerOptions = snapshot ? JSON.parse(snapshot.providerOptionsJson) as unknown : null;
+          run.events = eventsByRun.get(run.id) ?? [];
+          run.gates = gatesByRun.get(run.id) ?? [];
+        }
+      }
       const knownCosts = runViews
         .map((run) => run.costMicros)
         .filter((value): value is number => value !== null);

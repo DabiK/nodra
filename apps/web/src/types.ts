@@ -232,6 +232,27 @@ export interface MissionRunView {
   cacheWriteTokens: number | null;
   costMicros: number | null;
   usageKind: string | null;
+  reasoningEffort?: string | null;
+  promptEffective?: string | null;
+  permissionPreset?: string | null;
+  providerOptions?: unknown | null;
+  events?: MissionRunEventView[];
+  gates?: MissionRunGateView[];
+}
+
+export interface MissionRunEventView {
+  sequence: number;
+  type: string;
+  payload: unknown;
+  sourceAt: string | null;
+  receivedAt: string;
+}
+
+export interface MissionRunGateView {
+  name: string;
+  state: string;
+  rationale: string | null;
+  evaluatedAt: string;
 }
 
 /** Historique des runs d'une mission + coût total cumulé. */

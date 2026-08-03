@@ -34,6 +34,7 @@ import { MissionExportDialog } from "./MissionExportDialog";
 import { MissionReplayDialog } from "./MissionReplayDialog";
 import { PixelAvatar } from "./PixelAvatar";
 import { ModelPicker } from "./ModelPicker";
+import { MissionRunComparator } from "./MissionRunComparator";
 
 export interface InspectorForm {
   providerId: string;
@@ -644,6 +645,7 @@ function InspectStep({
         </div>
         {data?.mission && <MissionNotesPanel missionId={data.mission.id} />}
         {data?.mission && <MissionBudgetPanel runs={runs} />}
+        {data?.mission && runs && <MissionRunComparator runs={runs.runs} />}
         {data?.mission && <MissionAuditPanel missionId={data.mission.id} audit={audit} />}
         {data?.config?.workspaceId && <MissionDiffPanel workspaceId={data.config.workspaceId} />}
         {policy?.showResultPanel && (

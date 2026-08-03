@@ -39,6 +39,8 @@ export type {
   MissionReadModel,
   MissionRelayRecord,
   MissionRunView,
+  MissionRunEventView,
+  MissionRunGateView,
   MissionRunsView,
   MissionRepository,
   MissionView,
