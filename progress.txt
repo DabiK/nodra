@@ -1,5 +1,28 @@
 # Journal d'avancement — DabiK/nodra
 
+## Itération 19 — 2026-08-03 — Task #20 : Séquences favorites (templates de pipeline)
+
+### Fait
+- Modèles de pipeline persistés localement dans `nodra.pipelines.favorites` (contrat du PRD) : nom, nœuds, arcs et modes auto/manuels. Les IDs des missions source ne sont jamais sauvegardés.
+- « ☆ Enregistrer comme modèle » sur chaque carte pipeline ; panneau « Créer depuis un modèle » dans l'écran Pipelines, avec création, renommage et suppression.
+- Instanciation sûre : chaque étape génère une mission neuve ; les étapes agent recopient la config agent (provider, modèle, effort, prompt, permissions, workspace et intégration), puis le pipeline est créé avec les nouveaux IDs.
+- Le DTO HTTP de création propage maintenant `transitionMode`, déjà supporté par le domaine, afin de préserver les gates auto/manuels d'un modèle.
+- Tests : nouveau service de favoris (3) et contrôles UI (2), en plus des régressions PipelineFlux.
+
+### Commits
+1. `feat(pipelines): save and instantiate local favorites`
+2. `feat(web): manage pipeline favorite templates`
+3. `test(web): cover pipeline favorite template controls`
+
+### Vérifications
+- `npm run typecheck` : OK.
+- Tests ciblés : 18 tests PipelineFlux/favoris OK.
+- `npm run lint` : 8 erreurs pré-existantes hors périmètre (AgentPage, sidebar, adapters/application), aucun nouveau signal sur les fichiers touchés.
+- `npm test` : suite lancée ; les échecs observés sont les 6 environnementaux connus (architecture-boundaries, health/i6/i14, temporal-envelope x2), sans lien avec les favoris.
+
+### Statut
+- [x] #20 — Séquences favorites (templates de pipeline)
+
 ## Itération 1 — 2026-08-02 — Task #1 : Dark mode (thème sombre)
 
 ### Fait

@@ -3,7 +3,7 @@
 Backlog généré depuis les issues GitHub ouvertes. Chaque item est une tâche.
 Coche la case quand la tâche est terminée. Une seule tâche par itération Ralph.
 
-- [ ] #20 — Séquences favorites (templates de pipeline) (labels: —)
+- [x] #20 — Séquences favorites (templates de pipeline) (labels: —)
 
   **Issue #20 — détail complet**
   > ## Contexte
@@ -16,9 +16,9 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - Renommage/suppression de modèles
   >
   > ## Acceptance
-  > - [ ] Enregistrer une pipeline comme modèle en 1 clic
-  > - [ ] Créer une nouvelle pipeline depuis un modèle
-  > - [ ] Modèles listés dans l'écran Pipelines
+  > - [x] Enregistrer une pipeline comme modèle en 1 clic
+  > - [x] Créer une nouvelle pipeline depuis un modèle
+  > - [x] Modèles listés dans l'écran Pipelines
   >
   > ## Méthode d'implémentation
   > - Cartographier le code avec des **subagents explore** avant d'implémenter (modèle pipeline existant)
