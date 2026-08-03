@@ -1,11 +1,11 @@
 import { DomainError, type Id } from "@nodra/domain";
 import type { RunControlRepository } from "./run-control-repository.js";
-import type { WorkflowPort } from "./workflow-port.js";
+import type { RunCommandPort } from "./run-command-port.js";
 
 export class ResumeRun {
   constructor(
     private readonly runs: RunControlRepository,
-    private readonly workflows: WorkflowPort
+    private readonly commands: RunCommandPort
   ) {}
 
   async execute(runId: Id): Promise<{ runId: Id; state: "resume_requested"; externalSessionId: string }> {
@@ -17,7 +17,7 @@ export class ResumeRun {
     if (!run.providerSessionRef) {
       throw new DomainError("No persisted provider session is available", "PROVIDER_SESSION_REQUIRED");
     }
-    await this.workflows.signal(run.temporalParentWorkflowId, { type: "resume" });
+    await this.commands.enqueue(runId, { type: "resume" });
     return { runId, state: "resume_requested", externalSessionId: run.providerSessionRef };
   }
 }

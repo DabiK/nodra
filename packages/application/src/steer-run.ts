@@ -1,11 +1,11 @@
 import { DomainError, type Id } from "@nodra/domain";
 import type { RunControlRepository } from "./run-control-repository.js";
-import type { WorkflowPort } from "./workflow-port.js";
+import type { RunCommandPort } from "./run-command-port.js";
 
 export class SteerRun {
   constructor(
     private readonly runs: RunControlRepository,
-    private readonly workflows: WorkflowPort
+    private readonly commands: RunCommandPort
   ) {}
 
   async execute(runId: Id, text: string): Promise<{ runId: Id; state: "steer_requested" }> {
@@ -15,7 +15,7 @@ export class SteerRun {
     if (!run.capabilities.steer.available || run.capabilities.steer.mode !== "immediate") {
       throw new DomainError(run.capabilities.steer.reason ?? "Steer is unavailable", "CAPABILITY_UNAVAILABLE");
     }
-    await this.workflows.signal(run.temporalParentWorkflowId, { type: "steer", text: text.trim(), mode: "immediate" });
+    await this.commands.enqueue(runId, { type: "steer", text: text.trim(), mode: "immediate" });
     return { runId, state: "steer_requested" };
   }
 }

@@ -1,11 +1,11 @@
 import { DomainError, type Id } from "@nodra/domain";
 import type { RunControlRepository } from "./run-control-repository.js";
-import type { WorkflowPort } from "./workflow-port.js";
+import type { RunCommandPort } from "./run-command-port.js";
 
 export class CancelRun {
   constructor(
     private readonly runs: RunControlRepository,
-    private readonly workflows: WorkflowPort
+    private readonly commands: RunCommandPort
   ) {}
 
   async execute(runId: Id): Promise<{ runId: Id; state: "cancel_requested" }> {
@@ -14,7 +14,7 @@ export class CancelRun {
     if (!run.capabilities.cancel.available) {
       throw new DomainError(run.capabilities.cancel.reason ?? "Cancel is unavailable", "CAPABILITY_UNAVAILABLE");
     }
-    await this.workflows.signal(run.temporalParentWorkflowId, { type: "cancel" });
+    await this.commands.enqueue(runId, { type: "cancel" });
     return { runId, state: "cancel_requested" };
   }
 }

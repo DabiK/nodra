@@ -232,6 +232,7 @@ export type { ControllableRun, RunControlRepository } from "./run-control-reposi
 export { CancelRun } from "./cancel-run.js";
 export { ResumeRun } from "./resume-run.js";
 export { SteerRun } from "./steer-run.js";
+export type { RunCommand, RunCommandPort } from "./run-command-port.js";
 export { canonicalTarget, targetDigest } from "./exact-target.js";
 export * from "./agent-config-model.js";
 export * from "./agent-config-repository.js";

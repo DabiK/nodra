@@ -29,6 +29,7 @@ import {
   SqliteProviderCatalogRepository,
   SqliteProviderSessionRepository,
   SqliteRunControlRepository,
+  SqliteRunCommandStore,
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
   SqliteWorkspaceDeletionReservation,
@@ -247,9 +248,9 @@ export const runCli = async (
       new I6Cli(
         new GetProviderStatus(providerCatalog, providers),
         new ProbeProvider(providers, providerCatalog),
-        new CancelRun(new SqliteRunControlRepository(database), workflow),
-        new ResumeRun(new SqliteRunControlRepository(database), workflow),
-        new SteerRun(new SqliteRunControlRepository(database), workflow),
+        new CancelRun(new SqliteRunControlRepository(database), new SqliteRunCommandStore(database)),
+        new ResumeRun(new SqliteRunControlRepository(database), new SqliteRunCommandStore(database)),
+        new SteerRun(new SqliteRunControlRepository(database), new SqliteRunCommandStore(database)),
         new ProviderSmokeCli(
           new SmokeProvider(providers, providerCatalog),
           dataRoot

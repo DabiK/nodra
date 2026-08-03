@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { pipelineRuns } from "./pipelines.js";
 import { missions } from "./missions.js";
+import { runs } from "./runs.js";
 
 export const relayItems = sqliteTable("relay_item", {
   id: text("id").primaryKey(),
@@ -50,6 +51,19 @@ export const inbox = sqliteTable("inbox", {
   messageId: text("message_id").notNull(),
   processedAt: text("processed_at").notNull()
 }, (table) => [primaryKey({ columns: [table.consumer, table.messageId] })]);
+
+export const runCommands = sqliteTable("run_command", {
+  id: text("id").primaryKey(),
+  runId: text("run_id").notNull().references(() => runs.id),
+  kind: text("kind", { enum: ["cancel", "resume", "steer"] }).notNull(),
+  payloadJson: text("payload_json").notNull(),
+  createdAt: text("created_at").notNull(),
+  processedAt: text("processed_at")
+}, (table) => [
+  check("ck_run_command_kind", sql`${table.kind} in ('cancel','resume','steer')`),
+  check("ck_run_command_payload", sql`json_valid(${table.payloadJson})`),
+  index("idx_run_command_pending").on(table.runId, table.processedAt, table.createdAt)
+]);
 
 export const retentionPolicies = sqliteTable("retention_policy", {
   id: integer("id").primaryKey(),

@@ -57,6 +57,8 @@ export { SqliteWorkspaceDeletionReservation } from "./sqlite/sqlite-workspace-de
 export { SqliteProviderCatalogRepository } from "./sqlite/sqlite-provider-catalog-repository.js";
 export { SqliteProviderSessionRepository } from "./sqlite/sqlite-provider-session-repository.js";
 export { SqliteRunControlRepository } from "./sqlite/sqlite-run-control-repository.js";
+export { SqliteRunCommandStore } from "./sqlite/sqlite-run-command-store.js";
+export { SqliteRunExecutor } from "./executor/sqlite-run-executor.js";
 export { CodexProviderAdapter } from "./codex/codex-provider-adapter.js";
 export { CodexProviderOneShotAdapter } from "./codex/codex-provider-one-shot-adapter.js";
 export { CodexProviderSessionSyncAdapter } from "./codex/codex-provider-session-sync-adapter.js";

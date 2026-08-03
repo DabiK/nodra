@@ -37,6 +37,7 @@ import {
   SqliteProviderCatalogRepository,
   SqliteProviderSessionRepository,
   SqliteRunControlRepository,
+  SqliteRunCommandStore,
   SqliteConfirmationRepository,
   SqliteWorkspaceRepository,
   SqliteWorkspaceDeletionReservation,
@@ -598,21 +599,21 @@ export class NodraModule {
         },
         {
           provide: CANCEL_RUN,
-          inject: [DATABASE, TEMPORAL_CONNECTION],
-          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection) =>
-            new CancelRun(new SqliteRunControlRepository(database), new LazyTemporalWorkflowAdapter(temporal))
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) =>
+            new CancelRun(new SqliteRunControlRepository(database), new SqliteRunCommandStore(database))
         },
         {
           provide: RESUME_RUN,
-          inject: [DATABASE, TEMPORAL_CONNECTION],
-          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection) =>
-            new ResumeRun(new SqliteRunControlRepository(database), new LazyTemporalWorkflowAdapter(temporal))
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) =>
+            new ResumeRun(new SqliteRunControlRepository(database), new SqliteRunCommandStore(database))
         },
         {
           provide: STEER_RUN,
-          inject: [DATABASE, TEMPORAL_CONNECTION],
-          useFactory: (database: NodraSqliteDatabase, temporal: LazyTemporalConnection) =>
-            new SteerRun(new SqliteRunControlRepository(database), new LazyTemporalWorkflowAdapter(temporal))
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) =>
+            new SteerRun(new SqliteRunControlRepository(database), new SqliteRunCommandStore(database))
         },
         {
           provide: DISPATCH_WORKFLOW_OUTBOX,
