@@ -28,6 +28,19 @@ export async function publishNodeHandover(runId: string, nodeKey: string) {
   return api(`/api/pipelines/runs/${runId}/nodes/${encodeURIComponent(nodeKey)}/publish-handover`, { method: "POST", body: "{}" });
 }
 
+export interface CreatePipelineInput {
+  name: string;
+  nodes: Array<{ nodeKey: string; missionId: string }>;
+  edges?: Array<{ fromNodeKey: string; toNodeKey: string }>;
+}
+
+export async function createPipeline(input: CreatePipelineInput) {
+  return api<PipelineView>("/api/pipelines", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
 export async function createPrerequisitePipeline(input: {
   mission: MissionView;
   prerequisiteMissionIds: string[];
