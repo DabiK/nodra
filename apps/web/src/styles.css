@@ -747,6 +747,7 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
   .sidebar-toggle { display: none; }
   nav { grid-template-columns: 1fr; }
   .sidebar-burger { position: fixed; top: 14px; left: 14px; z-index: 30; width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); font-size: 17px; box-shadow: 0 6px 18px rgba(30, 47, 39, 0.14); }
+  .sidebar-burger:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
   .sidebar-backdrop { position: fixed; inset: 0; z-index: 65; background: rgba(18, 30, 23, 0.42); backdrop-filter: blur(2px); }
 
   /* Workspace : plus de marges latérales énormes, aucun débordement horizontal. */
