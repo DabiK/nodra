@@ -1,5 +1,24 @@
 # Journal d'avancement — DabiK/nodra
 
+## Itération 22 — 2026-08-03 — Task #22 : Comparateur de missions / runs
+
+### Fait
+- Le contrat `GET /api/missions/:id/runs` expose maintenant, pour chaque tentative, le snapshot immuable (prompt effectif, effort, permissions, options provider), les événements provider persistés et le dernier état de chaque gate. Les lectures sont batchées par historique, sans N+1.
+- La fiche mission contient un comparateur de deux tentatives : deux sélecteurs, panneaux côte à côte, métriques (durée, tokens, coût), configuration, prompt, gates et événements provider.
+- Les deux journaux d'événements synchronisent leur défilement ; la sélection par défaut compare les deux dernières tentatives.
+
+### Commit
+1. `a3c1e09 feat(runs): compare mission executions side by side`
+
+### Vérifications
+- Tests ciblés : 19/19 OK (read model SQLite, fiche et comparateur, dont synchronisation du scroll).
+- `npm run typecheck` : OK.
+- `npm run lint -- --quiet` : 8 erreurs pré-existantes hors périmètre (AgentPage/sidebar, adapters et application), aucun signal sur les fichiers de #22.
+- Suite complète et stack réelle : relancées après cette mise à jour documentaire (résultat consigné ci-dessous avant clôture).
+
+### Statut
+- [x] #22 — Comparateur de missions / runs
+
 ## Itération 21 — 2026-08-03 — Task #21 : Compatibilité Windows des nouvelles features (revalidation)
 
 ### Fait

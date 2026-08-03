@@ -58,7 +58,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques par feature corrigée
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #22 — Comparateur de missions / runs (labels: —)
+- [x] #22 — Comparateur de missions / runs (labels: —)
 
   **Issue #22 — détail complet**
   > ## Contexte
@@ -70,9 +70,9 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - Synchroniser le scroll entre les deux panneaux pour les événements
   >
   > ## Acceptance
-  > - [ ] Sélection de 2 runs depuis la fiche mission
-  > - [ ] Panneaux côte à côte avec scroll synchronisé
-  > - [ ] Diff visible sur les métriques (durée, coût, tokens)
+  > - [x] Sélection de 2 runs depuis la fiche mission
+  > - [x] Panneaux côte à côte avec scroll synchronisé
+  > - [x] Diff visible sur les métriques (durée, coût, tokens)
   >
   > ## Méthode d'implémentation
   > - Cartographier le code avec des **subagents explore** avant d'implémenter
