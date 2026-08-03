@@ -14,7 +14,8 @@
 - Tests ciblés : 19/19 OK (read model SQLite, fiche et comparateur, dont synchronisation du scroll).
 - `npm run typecheck` : OK.
 - `npm run lint -- --quiet` : 8 erreurs pré-existantes hors périmètre (AgentPage/sidebar, adapters et application), aucun signal sur les fichiers de #22.
-- Suite complète et stack réelle : relancées après cette mise à jour documentaire (résultat consigné ci-dessous avant clôture).
+- `npm test` : les tests #22 passent ; 6 échecs pré-existants/environnementaux persistent (architecture-boundaries, health, I6, I14, temporal-envelope x2), sans lien avec le comparateur.
+- Stack réelle : `npm run runtime:start` a rendu Temporal, OpenCode, API et worker `ready`. Le `GET /health` réel a confirmé SQLite et workflow `ok` (Codex reste dégradé car version binaire non certifiée). `runtime:stop` a arrêté les composants gérés. Le parcours visuel complet dans un navigateur n'a pas été exécuté dans cette session ; le composant est toutefois couvert en jsdom, y compris la synchronisation de scroll.
 
 ### Statut
 - [x] #22 — Comparateur de missions / runs
