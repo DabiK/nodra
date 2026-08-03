@@ -1,12 +1,35 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MissionState, MissionView } from "../types";
 import { MissionRelay } from "./MissionRelay";
+import { performMissionAction } from "../services/mission-action-service";
+
+// Services chargés paresseusement par le menu contextuel des cartes (issue #19).
+vi.mock("../services/mission-service", () => ({
+  getAgentConfig: vi.fn().mockResolvedValue(null)
+}));
+vi.mock("../services/mission-provider-session-service", () => ({
+  loadMissionProviderSession: vi.fn().mockResolvedValue(null)
+}));
+vi.mock("../services/mission-result-service", () => ({
+  loadMissionResult: vi.fn().mockResolvedValue({
+    latestRunId: null,
+    latestRunState: null,
+    delivery: null,
+    assistantMessage: null,
+    hasStructuredDelivery: false,
+    failure: null
+  })
+}));
+vi.mock("../services/mission-action-service", () => ({
+  performMissionAction: vi.fn().mockResolvedValue({})
+}));
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.clearAllMocks();
 });
 
 const noop = () => undefined;
@@ -274,7 +297,70 @@ describe("MissionRelay live run mini-cards", () => {
   });
 });
 
+describe("MissionRelay quick actions (issue #19)", () => {
+  it("renders an actions button on every card without affecting inspect", () => {
+    renderWithLanes(["READY"], [agentMission, humanMission]);
+    expect(screen.getAllByRole("button", { name: /^Actions pour / })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Ouvrir Agent task" })).toBeTruthy();
+  });
+
+  it("opens the context menu from the ⋯ button, executes an action and shows feedback", async () => {
+    const onActionApplied = vi.fn();
+    render(
+      <MissionRelay
+        missions={[mission({ id: "m-val", title: "Validation task", executionKind: "agent", state: "VALIDATION" })]}
+        onInspect={noop}
+        onOpenPipeline={noop}
+        onNewTask={noop}
+        onActionApplied={onActionApplied}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Actions pour Validation task" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Abandonner" }));
+
+    expect(performMissionAction).toHaveBeenCalledWith(expect.objectContaining({ actionId: "abandon" }));
+    await waitFor(() => expect(onActionApplied).toHaveBeenCalledWith("Abandonner"));
+    expect(await screen.findByText("✓ Abandonner · action appliquée")).toBeTruthy();
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("opens the menu on right-click without triggering inspect", async () => {
+    const onInspect = vi.fn();
+    render(
+      <MissionRelay
+        missions={[mission({ id: "m-rc", title: "Right-click task", executionKind: "human", state: "READY" })]}
+        onInspect={onInspect}
+        onOpenPipeline={noop}
+        onNewTask={noop}
+      />
+    );
+    const card = screen.getByRole("button", { name: "Ouvrir Right-click task" });
+    fireEvent.contextMenu(card, { clientX: 120, clientY: 80 });
+
+    expect(await screen.findByRole("menuitem", { name: "Prendre en charge" })).toBeTruthy();
+    expect(onInspect).not.toHaveBeenCalled();
+  });
+
+  it("closes the menu on Escape", async () => {
+    render(
+      <MissionRelay missions={[humanMission]} onInspect={noop} onOpenPipeline={noop} onNewTask={noop} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Actions pour Human task" }));
+    await screen.findByRole("menuitem", { name: "Prendre en charge" });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("keeps drag & drop working with the menu button present", () => {
+    const onTransition = renderWithLanes(["READY", "ACTIVE"], [humanMission]);
+    dragCard("Human task", "Ça bosse");
+    expect(onTransition).toHaveBeenCalledWith(humanMission, "ACTIVE");
+  });
+});
+
 describe("MissionRelay day filter (ma journée)", () => {
+
   const todayKey = () => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;

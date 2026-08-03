@@ -361,6 +361,32 @@ label input:focus, label textarea:focus, label select:focus, input:focus, select
 .relay-task-pipeline b { font-size: 10px; }
 .relay-task-pipeline:hover { filter: brightness(0.94); text-decoration: underline; }
 
+/* Quick actions sur cartes (issue #19) */
+.relay-task-wrap { position: relative; min-width: 0; }
+.relay-task-wrap .relay-task { width: 100%; }
+.relay-task-wrap:hover .relay-task { border-color: var(--green); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(33,49,41,.08); }
+.relay-task-wrap:hover .relay-arrow { color: var(--green); }
+.relay-task-menu { position: absolute; top: 5px; right: 5px; display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.94); color: var(--muted); font-size: 15px; line-height: 1; opacity: 0; transition: opacity .12s; cursor: pointer; }
+.relay-task-wrap:hover .relay-task-menu,
+.relay-task-menu:focus-visible,
+.relay-task-menu[aria-expanded="true"] { opacity: 1; }
+.relay-task-menu:hover { color: var(--ink); border-color: var(--green); }
+.relay-task-menu:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.card-menu-backdrop { position: fixed; z-index: 92; inset: 0; background: transparent; }
+.card-menu { position: fixed; z-index: 93; width: 236px; max-height: min(420px, 70vh); overflow-y: auto; margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 18px 50px rgba(20,30,25,.22); }
+.card-menu:focus { outline: none; }
+.card-menu-head { display: grid; gap: 2px; margin-bottom: 4px; padding: 7px 10px 9px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.card-menu-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+.card-menu-status { padding: 9px 10px; color: var(--muted); font-size: 11px; }
+.card-menu-status.card-menu-error, .card-menu-error { padding: 9px 10px; color: #a43c33; font-size: 11px; font-weight: 600; }
+.card-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: 700 12px Manrope; text-align: left; cursor: pointer; }
+.card-menu-item:hover:not(:disabled) { background: #eef1ec; }
+.card-menu-item:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.card-menu-item:disabled { opacity: .45; cursor: not-allowed; }
+.card-menu-item.danger { color: var(--red); }
+.card-menu-item-dot { margin-left: auto; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.relay-notice { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 14px; border: 1px solid #bfe3cf; border-radius: 10px; background: #eef9f2; color: #2e7d55; font-size: 12px; font-weight: 600; }
+
 /* Pipeline flux */
 .pipeline-flux { margin: 22px 0; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 7px 25px rgba(33,49,41,.06); padding: 18px; }
 .pipeline-flux-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
@@ -1501,6 +1527,16 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
   .relay-lane.drop-allowed { border-color: var(--green); background: #18241d; }
   .relay-lane.drop-forbidden { border-color: var(--red); background: #241412; }
   .relay-error { border-color: #5a2f29; background: #2c1815; color: #f0a89e; }
+  .relay-task-wrap:hover .relay-task { border-color: var(--green); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3); }
+  .relay-task-menu { border-color: #2b362d; background: #1b241d; color: var(--muted); }
+  .relay-task-menu:hover { color: var(--ink); border-color: var(--green); }
+  .card-menu { border-color: #2b362d; background: #1b241d; }
+  .card-menu-head { border-color: #2b362d; color: var(--muted); }
+  .card-menu-head strong { color: var(--ink); }
+  .card-menu-item { color: var(--ink); }
+  .card-menu-item:hover:not(:disabled) { background: #202a23; }
+  .card-menu-item.danger { color: #e8958b; }
+  .relay-notice { border-color: #1d4a33; background: #14251c; color: #7fc79f; }
   .relay-config { border-color: #2b362d; background: #182019; }
   .relay-config-chip { border-color: #2b362d; background: #1b241d; color: var(--muted); }
   .relay-config-chip i { background: #202a23; color: var(--muted); }

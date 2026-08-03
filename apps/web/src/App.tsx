@@ -698,6 +698,7 @@ export function App() {
               onInspect={setInspectedMissionId}
               onOpenPipeline={openPipeline}
               onTransition={moveMissionOnBoard}
+              onActionApplied={() => void refreshBoard()}
               onNewTask={() => { setCreateExpanded(true); document.getElementById("create")?.scrollIntoView({ behavior: "smooth" }); }}
             />
           )
