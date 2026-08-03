@@ -19,12 +19,14 @@ export function AppSidebar({
   theme,
   activePipelineCount,
   hasActiveManager,
+  activityCount,
   missions,
   query,
   onQueryChange,
   onToggle,
   onNavigate,
   onSelectMission,
+  onOpenActivity,
   onThemeToggle,
   onHelp
 }: {
@@ -33,12 +35,15 @@ export function AppSidebar({
   theme: Theme;
   activePipelineCount: number;
   hasActiveManager: boolean;
+  /** Nombre d'items du hub d'activité non lus (missions à décision humaine…). */
+  activityCount: number;
   missions: SidebarMission[];
   query?: string;
   onQueryChange?(query: string): void;
   onToggle(): void;
   onNavigate(page: AppPage): void;
   onSelectMission(missionId: string): void;
+  onOpenActivity(): void;
   onThemeToggle(): void;
   onHelp?(): void;
 }) {
@@ -49,6 +54,10 @@ export function AppSidebar({
   const openMission = (missionId: string) => (event: { preventDefault(): void }) => {
     event.preventDefault();
     onSelectMission(missionId);
+  };
+  const openActivity = (event: { preventDefault(): void }) => {
+    event.preventDefault();
+    onOpenActivity();
   };
   return (
     <aside className="sidebar" aria-label="Navigation">
@@ -74,6 +83,11 @@ export function AppSidebar({
         <a className={page === "tasks" ? "active" : ""} href="/" title="Flux · Tâches" onClick={go("tasks")}>
           <span className="nav-icon" aria-hidden="true">☰</span>
           <span className="nav-label">Flux · Tâches</span>
+        </a>
+        <a href="/" title="Activité — décisions requises" onClick={openActivity}>
+          <span className="nav-icon" aria-hidden="true">◉</span>
+          <span className="nav-label">Activité</span>
+          {activityCount ? <span className="count">{activityCount}</span> : null}
         </a>
         <a className={page === "pipelines" ? "active" : ""} href="/?page=pipelines" title="Pipelines" onClick={go("pipelines")}>
           <span className="nav-icon" aria-hidden="true">⑃</span>

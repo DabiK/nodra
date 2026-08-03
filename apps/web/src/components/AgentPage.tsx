@@ -62,10 +62,12 @@ function AgentMissionShell({ missionId }: { missionId: string }) {
         theme={theme}
         activePipelineCount={0}
         hasActiveManager={false}
+        activityCount={0}
         missions={selectActiveSidebarMissions(missions)}
         onToggle={toggleSidebar}
         onNavigate={navigateToApp}
         onSelectMission={(id) => { location.assign(`/agent.html?missionId=${encodeURIComponent(id)}`); }}
+        onOpenActivity={() => {}}
         onThemeToggle={toggleTheme}
       />
       <section className="agent-shell-workspace">

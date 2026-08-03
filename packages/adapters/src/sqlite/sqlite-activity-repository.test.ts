@@ -117,7 +117,7 @@ describe("SQLite activity hub (relay blocked + decision_required)", () => {
       createdAt: at(1)
     }).run();
 
-    const relayId = (await listActivity.execute()).items[0].relayId;
+    const relayId = (await listActivity.execute()).items[0]!.relayId;
 
     await markActivityRead.execute({ relayId, readAt: at(10) });
 

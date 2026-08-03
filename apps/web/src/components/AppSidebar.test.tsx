@@ -5,7 +5,7 @@ import { AppSidebar } from "./AppSidebar";
 
 afterEach(cleanup);
 
-function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.fn(), onSelectMission = vi.fn(), onThemeToggle = vi.fn(), onQueryChange = vi.fn()) {
+function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.fn(), onSelectMission = vi.fn(), onThemeToggle = vi.fn(), onQueryChange = vi.fn(), activityCount = 0, onOpenActivity = vi.fn()) {
   render(
     <AppSidebar
       page="tasks"
@@ -13,16 +13,18 @@ function renderSidebar(collapsed: boolean, onToggle = vi.fn(), onNavigate = vi.f
       theme="light"
       activePipelineCount={0}
       hasActiveManager={false}
+      activityCount={activityCount}
       missions={[]}
       query=""
       onQueryChange={onQueryChange}
       onToggle={onToggle}
       onNavigate={onNavigate}
       onSelectMission={onSelectMission}
+      onOpenActivity={onOpenActivity}
       onThemeToggle={onThemeToggle}
     />
   );
-  return { onToggle, onNavigate, onSelectMission, onThemeToggle, onQueryChange };
+  return { onToggle, onNavigate, onSelectMission, onThemeToggle, onQueryChange, onOpenActivity };
 }
 
 describe("AppSidebar", () => {
@@ -78,12 +80,14 @@ describe("AppSidebar", () => {
         theme="light"
         activePipelineCount={0}
         hasActiveManager={false}
+        activityCount={0}
         missions={[]}
         query="paiement"
         onQueryChange={vi.fn()}
         onToggle={vi.fn()}
         onNavigate={vi.fn()}
         onSelectMission={vi.fn()}
+        onOpenActivity={vi.fn()}
         onThemeToggle={vi.fn()}
       />
     );
@@ -112,12 +116,14 @@ describe("AppSidebar", () => {
         theme="light"
         activePipelineCount={0}
         hasActiveManager={false}
+        activityCount={0}
         missions={[]}
         query=""
         onQueryChange={vi.fn()}
         onToggle={vi.fn()}
         onNavigate={vi.fn()}
         onSelectMission={vi.fn()}
+        onOpenActivity={vi.fn()}
         onThemeToggle={vi.fn()}
         onHelp={onHelp}
       />
@@ -125,5 +131,21 @@ describe("AppSidebar", () => {
     const help = screen.getByRole("button", { name: "Aide et raccourcis clavier" });
     fireEvent.click(help);
     expect(onHelp).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the activity count badge when there are unread decisions", () => {
+    renderSidebar(false, undefined, undefined, undefined, undefined, undefined, 3);
+    expect(screen.getByRole("link", { name: /Activité/ }).textContent).toContain("3");
+  });
+
+  it("hides the activity badge when nothing is unread", () => {
+    renderSidebar(false, undefined, undefined, undefined, undefined, undefined, 0);
+    expect(screen.getByRole("link", { name: /Activité/ }).textContent).not.toContain("0");
+  });
+
+  it("opens the activity hub through onOpenActivity", () => {
+    const { onOpenActivity } = renderSidebar(false);
+    fireEvent.click(screen.getByRole("link", { name: /Activité/ }));
+    expect(onOpenActivity).toHaveBeenCalledTimes(1);
   });
 });

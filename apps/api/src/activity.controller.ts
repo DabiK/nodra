@@ -21,10 +21,11 @@ export class ActivityController {
 
   @Post(":relayId/read")
   @HttpCode(200)
-  read(@Param("relayId") relayId: string) {
-    return this.markActivityRead.execute({
+  async read(@Param("relayId") relayId: string) {
+    await this.markActivityRead.execute({
       relayId: toId(relayId),
       readAt: new Date().toISOString()
     });
+    return { ok: true };
   }
 }

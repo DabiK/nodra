@@ -23,6 +23,7 @@ import { probeProvider, selectDefaultModel } from "./services/provider-service";
 import { browseFolders } from "./services/workspace-service";
 import { loadViewMode, saveViewMode, type MissionViewMode } from "./services/view-mode-service";
 import { loadSavedMissionFilters, saveMissionFilters } from "./services/mission-filter-service";
+import { loadActivity, markActivityRead, type ActivityView } from "./services/activity-service";
 import { dragActionId, findDragTransition } from "./services/mission-drag-transitions";
 import { performMissionAction } from "./services/mission-action-service";
 import { loadMissionResult } from "./services/mission-result-service";
@@ -32,6 +33,7 @@ import { applyTheme, initTheme, saveTheme, type Theme } from "./services/theme-s
 import { useSseRefresh } from "./hooks/useSseRefresh";
 import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
+import { ActivityHub } from "./components/ActivityHub";
 
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -88,6 +90,8 @@ export function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [paletteStatus, setPaletteStatus] = useState("");
+  const [activity, setActivity] = useState<ActivityView | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   // Raccourcis globaux : ⌘K / Ctrl+K ouvre la palette, « ? » ouvre l'aide, Esc ferme.
   useEffect(() => {
@@ -102,6 +106,7 @@ export function App() {
       if (event.key === "Escape") {
         setHelpOpen(false);
         setPaletteOpen(false);
+        setActivityOpen(false);
         return;
       }
       if (event.key === "?" && !isTypingTarget(event.target)) {
@@ -131,6 +136,7 @@ export function App() {
     void listMissions().then((next) => { if (mountedRef.current) setMissions(next); }).catch(() => undefined);
     void listPipelines().then((next) => { if (mountedRef.current) setPipelines(next); }).catch(() => undefined);
     void listManagers().then((next) => { if (mountedRef.current) setManagers(next); }).catch(() => undefined);
+    void loadActivity().then((next) => { if (mountedRef.current) setActivity(next); }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -327,6 +333,26 @@ export function App() {
     navigate("tasks");
   };
 
+  const refreshActivity = useCallback(() => {
+    void loadActivity().then((next) => { if (mountedRef.current) setActivity(next); }).catch(() => undefined);
+  }, []);
+
+  const markActivityItemRead = (relayId: string) => {
+    void markActivityRead(relayId).catch(() => undefined).then(refreshActivity);
+  };
+
+  const markAllActivityRead = () => {
+    const unread = activity?.items.filter((item) => item.state === "unread") ?? [];
+    if (unread.length === 0) return;
+    void Promise.all(unread.map((item) => markActivityRead(item.relayId).catch(() => undefined)))
+      .then(refreshActivity);
+  };
+
+  const openMissionFromActivity = (missionId: string) => {
+    setActivityOpen(false);
+    selectMission(missionId);
+  };
+
   const paletteCommands = useMemo(
     () => buildPaletteCommands({ page, missions, pipelines }),
     [page, missions, pipelines]
@@ -402,12 +428,14 @@ export function App() {
         theme={theme}
         activePipelineCount={activePipelineCount}
         hasActiveManager={managers.some((manager) => manager.state === "active")}
+        activityCount={activity?.unreadCount ?? 0}
         missions={activeSidebarMissions}
         query={query}
         onQueryChange={setQuery}
         onToggle={toggleSidebar}
         onNavigate={navigate}
         onSelectMission={selectMission}
+        onOpenActivity={() => setActivityOpen((open) => !open)}
         onThemeToggle={toggleTheme}
         onHelp={() => setHelpOpen((open) => !open)}
       />
@@ -619,6 +647,19 @@ export function App() {
         />
 
         <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+        <ActivityHub
+          open={activityOpen}
+          activity={activity}
+          onClose={() => setActivityOpen(false)}
+          onOpenMission={openMissionFromActivity}
+          onOpenPipeline={(pipelineId) => {
+            setActivityOpen(false);
+            openPipeline(pipelineId);
+          }}
+          onMarkRead={markActivityItemRead}
+          onMarkAllRead={markAllActivityRead}
+        />
 
         <ManagerDock
           managers={managers}

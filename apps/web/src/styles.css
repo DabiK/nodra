@@ -512,6 +512,32 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
 .task-folder-drawer footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .task-folder-drawer footer button { width: 100%; border: 1px solid #cbd8cf; border-radius: 9px; padding: 10px; background: white; color: var(--green); font-size: 9px; font-weight: 800; }
 
+/* activity hub (issue #13) */
+.activity-backdrop { position: fixed; z-index: 90; inset: 0; display: flex; justify-content: flex-end; background: rgba(20, 31, 25, 0.25); backdrop-filter: blur(2px); }
+.activity-drawer { display: flex; flex-direction: column; gap: 14px; width: min(430px, 100%); height: 100%; box-sizing: border-box; padding: 27px 24px; overflow: auto; background: #f7f7f1; border-left: 1px solid #d8ddd6; box-shadow: -24px 0 70px rgba(21, 34, 27, 0.16); }
+.activity-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.activity-header h2 { margin: 5px 0 4px; font: 800 25px/1.1 Manrope; letter-spacing: -0.035em; }
+.activity-summary { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.activity-close { width: 34px; height: 34px; flex: none; border: 1px solid #d9ddd7; border-radius: 9px; background: white; color: #758179; font-size: 20px; cursor: pointer; }
+.activity-close:hover { border-color: var(--green); color: var(--green); }
+.activity-mark-all { align-self: flex-start; border: 1px solid #cbd8cf; border-radius: 9px; padding: 8px 12px; background: white; color: var(--green); font: 800 9px Manrope; cursor: pointer; }
+.activity-mark-all:hover { border-color: var(--green); }
+.activity-groups { display: grid; gap: 16px; }
+.activity-section-label { margin: 0 0 6px; color: var(--muted); font: 800 9px Manrope; letter-spacing: 0.08em; text-transform: uppercase; }
+.activity-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.activity-item { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; box-sizing: border-box; border: 1px solid #e0e5df; border-radius: 11px; padding: 10px 11px; background: white; cursor: pointer; }
+.activity-item:hover { border-color: #c3d8c8; background: #f0f5f0; }
+.activity-item.unread { border-color: var(--green); }
+.activity-item-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #eef0e9; color: #758179; font-size: 15px; }
+.activity-item.unread .activity-item-icon { background: var(--green-soft); color: var(--green); }
+.activity-item-body { min-width: 0; display: grid; gap: 2px; }
+.activity-item-title { overflow: hidden; color: var(--ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.activity-item-reason { color: var(--ink); font-size: 9px; }
+.activity-item-time { color: var(--muted); font-size: 8px; }
+.activity-mark-read { border: 1px solid #cbd8cf; border-radius: 8px; padding: 6px 9px; background: white; color: var(--green); font: 800 8px Manrope; cursor: pointer; }
+.activity-mark-read:hover { border-color: var(--green); background: var(--green-soft); }
+.activity-empty { padding: 18px 0; }
+
 .pixel-agent { position: relative; width: 54px; height: 54px; flex: none; display: grid; place-items: center; overflow: hidden; border: 1px solid #d8ded7; border-radius: 14px; background: #edf3ef; box-shadow: 0 6px 16px rgba(22, 35, 28, 0.08); }
 .pixel-agent.mini { width: 36px; height: 36px; border-radius: 10px; }
 .dice-avatar { position: relative; z-index: 2; width: 100%; height: 100%; display: block; object-fit: cover; }
@@ -1663,4 +1689,21 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
   .conversation-search-toggle[aria-pressed="true"] { border-color: var(--green); background: var(--green-soft); color: var(--green); }
   .conversation-search-bar button:hover:not(:disabled) { border-color: var(--green); color: var(--green); }
   mark.conversation-search-hit { background: #8a6d00; color: #fff7d6; }
+
+  /* activity hub (issue #13) */
+  .activity-backdrop { background: rgba(0, 0, 0, 0.55); }
+  .activity-drawer { background: #141b16; border-left-color: #2b362d; }
+  .activity-item { border-color: #223028; }
+  .activity-item:hover { border-color: #33503e; background: #1a231c; }
+  .activity-item.unread { border-color: var(--green); }
+  .activity-item-icon { background: #202a23; color: var(--muted); }
+  .activity-item.unread .activity-item-icon { background: #1c2d22; color: var(--green); }
+  .activity-item-title { color: var(--ink); }
+  .activity-item-reason, .activity-item-time { color: #a7b4ac; }
+  .activity-mark-read { border-color: #2b362d; background: #1b241d; color: var(--green); }
+  .activity-mark-read:hover { border-color: var(--green); background: #1c2d22; }
+  .activity-mark-all { border-color: #2b362d; background: #1b241d; color: var(--green); }
+  .activity-mark-all:hover { border-color: var(--green); background: #1c2d22; }
+  .activity-close { border-color: #2b362d; background: #1b241d; color: var(--muted); }
+  .activity-section-label { color: #a7b4ac; }
 }
