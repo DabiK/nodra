@@ -595,3 +595,44 @@ La tâche était déjà amorcée dans le working tree (WIP non commité : `RunGl
 
 ### Statut
 - [x] #18 — Glance horizontal : où en est le run ?
+
+## Itération 17 — 2026-08-03 — Task #19 : Quick actions sur cartes mission
+
+### Contexte
+Toute action nécessitait d'ouvrir la fiche mission. Le board (`MissionRelay.tsx`) n'avait aucun raccourci : les cartes n'étaient que cliquables (inspect) et draggables. La policy `mission-ui-policy.ts` pilotait déjà les transitions dans l'inspecteur — il manquait un menu sur les cartes, alimenté par la même policy.
+
+### Fait (1 commit `afc9a24`)
+1. **Composant menu contextuel** (`MissionCardMenu.tsx`) :
+   - Menu flottant `position: fixed` (backdrop transparent z-92, menu z-93) ancré au déclencheur, clampé dans la fenêtre — nécessaire car `.relay-list`/`.relay-lanes` sont à `overflow` (un menu en absolute serait clippé). Alignement droite (bouton ⋯) ou gauche (clic droit).
+   - **Contexte UI chargé paresseusement à l'ouverture** : `getAgentConfig` + `loadMissionProviderSession` (missions agent) + `loadMissionResult` → `getMissionUiPolicy({mission, hasAgentConfig, latestRunId, latestRunState, hasDelivery, hasResultText, hasProviderSession})` — exactement la base de l'inspecteur, mais avec **la mission du board** (version live pour `expectedVersion`). Seules des actions valides pour l'état réel sont proposées (acceptance « pas d'action invalide »).
+   - Items `role="menuitem"` : label, point vert sur l'action primaire, `disabled` + `title` = raison (ex. « Résultat structuré indisponible »), rouge pour les actions `danger`. États : chargement, erreur de chargement, « Aucune action disponible pour cet état » (policy vide).
+   - Clavier : focus du 1er item actif à l'ouverture, ↑/↓/Home/End entre items actifs, Échap (listener window — fonctionne aussi pendant le chargement). Fermeture : Échap, clic backdrop, scroll (capture) et resize (l'ancre deviendrait fausse).
+   - Exécution : `performMissionAction` avec `latestRunId`/`declaredResult` du résultat chargé ; **« Configurer »** (action UI sans endpoint) → ouvre la fiche mission ; succès → fermeture + `onActionApplied(label)` ; échec → erreur inline dans le menu qui reste ouvert.
+2. **Intégration board** (`MissionRelay.tsx`) :
+   - Carte enveloppée dans `.relay-task-wrap` : le bouton `⋯` (`aria-haspopup="menu"`, `aria-expanded`, `aria-label="Actions pour <titre>"`, visible au survol/focus/ouvert) est un **frère non-draggable** de la carte — le drag & drop HTML5 n'est pas affecté (acceptance).
+   - **Clic droit** (`onContextMenu` + preventDefault) sur la carte ouvre aussi le menu à la position du curseur.
+   - Nouvelle prop `onActionApplied?(label)` ; bannière `.relay-notice` (« ✓ <label> · action appliquée », `role="status"`) à côté du `.relay-error` existant — effacée à l'ouverture d'un menu ou d'une transition.
+   - Raccourci ←/→ du board neutralisé quand un menu est ouvert (le menu gère ses propres flèches).
+3. **Câblage App.tsx** : `onActionApplied={() => void refreshBoard()}` (refresh complet : missions + pipelines + managers + activité — une transition peut résoudre des items relay).
+4. **CSS** : `.relay-task-wrap`, `.relay-task-menu`, `.card-menu-*`, `.relay-notice` + variantes dark.
+
+### Vérifications
+- `npm run typecheck` : OK
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
+- Web : 54 fichiers / 444 tests OK (+10 `MissionCardMenu`, +5 `MissionRelay` ; +3 viennent du WIP sidebar externe committé en cours d'itération)
+- ESLint sur tous les fichiers touchés : propre
+- **Smoke test navigateur complet** (stack dev 5174/4100) :
+  - Bouton ⋯ rendu sur chaque carte ; menu VALIDATION agent = « Valider ✓ » (focus initial) + « Ouvrir la conversation » + « Accepter (delivery) »/« Demander corrections » désactivés avec raison réelle (pas de delivery structurée) + « Abandonner » ;
+  - menu READY humain = « Prendre en charge / Terminer / Abandonner » ; menu ACTIVE humain = « Terminer ✓ » seul (policy exacte par état) ;
+  - mission de test créée via API : « Prendre en charge » → notice « ✓ Prendre en charge · action appliquée », carte READY→ACTIVE en live ; « Terminer ✓ » → notice + ACTIVE→DONE (Terminées 43→44) ;
+  - Échap ferme ; clic droit ouvre ; position `fixed` dans le viewport vérifiée (bord droit aligné au déclencheur).
+
+### Décisions / notes / limites
+- **Une seule source de vérité d'actions** : le menu réutilise `getMissionUiPolicy` sans la dupliquer — toute évolution de policy (nouveau state, nouvelle action) est automatiquement reflétée sur les cartes.
+- **Chargement paresseux par ouverture** : 2-3 requêtes par ouverture de menu (config + session + résultat) — volontaire (aucun impact sur le polling live du board), l'inspecteur fait les mêmes appels.
+- **Actions qui naviguent** : `start` / `open-provider-session` → `location.assign(agent.html)` comme dans l'inspecteur (le menu se ferme, la page part) ; « Configurer » ouvre la fiche mission (l'inspecteur montre le panneau config pour DRAFT).
+- **Limite** : la policy dépend de données inspecteur (config, delivery) — un menu ouvert pendant un refresh SSE garde son snapshot ; le menu se ferme au premier scroll, l'ancre ne devient jamais fausse.
+- **Incident environnement — commits externes pendant l'itération** (à signaler, non corrigés) : la boucle de review/processus externe a committé pendant le travail — `f5b5859` (fix dark `relay-pipeline-group` via `--pipeline-hue`, mêmes fichiers que moi : MissionRelay.tsx + styles.css — mes changements ont été ré-appliqués par-dessus via checkout+réapplication), `ea5327d` (**revert de la section Glance #18 dans App.tsx** — le composant `RunGlance`/`run-glance-service` restent dans le repo mais ne sont plus rendus ; décision externe, non contredite), `22d6589` + `d405468` (fix recherche sidebar — WIP utilisateur sur `sidebar-missions.ts`, laissé intact). À chaque fois l'état final a été vérifié par typecheck + tests + build.
+
+### Statut
+- [x] #19 — Quick actions sur cartes mission

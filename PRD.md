@@ -310,7 +310,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #19 — Quick actions sur cartes mission (labels: —)
+- [x] #19 — Quick actions sur cartes mission (labels: —)
 
   **Issue #19 — détail complet**
   > ## Contexte
