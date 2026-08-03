@@ -38,4 +38,23 @@ describe("selectActiveSidebarMissions", () => {
     const result = selectActiveSidebarMissions([active, ...recent]);
     expect(result.map((item) => item.id)).toEqual(["active-old"]);
   });
+
+  it("searches across all states when a query is given", () => {
+    const active = mission({ id: "stripe-payment", state: "ACTIVE", updatedAt: "2026-06-01" });
+    const done = mission({ id: "stripe-refund", state: "DONE", updatedAt: "2026-06-02" });
+    const ready = mission({ id: "auth-login", state: "READY", updatedAt: "2026-06-03" });
+    const result = selectActiveSidebarMissions([active, done, ready], "stripe");
+    expect(result.map((item) => item.id)).toEqual(["stripe-refund", "stripe-payment"]);
+  });
+
+  it("matches case-insensitively and trims the query", () => {
+    const missionA = mission({ id: "Fix Dark Mode", state: "READY", updatedAt: "2026-06-01" });
+    const result = selectActiveSidebarMissions([missionA], "  fix dark  ");
+    expect(result.map((item) => item.id)).toEqual(["Fix Dark Mode"]);
+  });
+
+  it("returns nothing when the query matches no mission", () => {
+    const active = mission({ id: "stripe-payment", state: "ACTIVE", updatedAt: "2026-06-01" });
+    expect(selectActiveSidebarMissions([active], "zzz")).toEqual([]);
+  });
 });
