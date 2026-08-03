@@ -16,9 +16,11 @@
 
 ### Vérifications
 - `npm run typecheck` : OK.
+- `npm run build -w @nodra/web` : OK (warning Vite pré-existant sur chunk > 500 kB).
 - Tests ciblés : 18 tests PipelineFlux/favoris OK.
 - `npm run lint` : 8 erreurs pré-existantes hors périmètre (AgentPage, sidebar, adapters/application), aucun nouveau signal sur les fichiers touchés.
 - `npm test` : suite lancée ; les échecs observés sont les 6 environnementaux connus (architecture-boundaries, health/i6/i14, temporal-envelope x2), sans lien avec les favoris.
+- Stack réelle : `npm run runtime:start` a confirmé Temporal, OpenCode, API et worker prêts ; `GET /health` répond SQLite/workflow OK (provider Codex dégradé car version binaire non certifiée). Parcours navigateur non exécuté dans cette session.
 
 ### Statut
 - [x] #20 — Séquences favorites (templates de pipeline)
