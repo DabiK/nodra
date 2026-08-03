@@ -273,3 +273,78 @@ describe("MissionRelay live run mini-cards", () => {
     expect(status.textContent).toContain("Je travaille sur le livrable");
   });
 });
+
+describe("MissionRelay day filter (ma journée)", () => {
+  const todayKey = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  };
+  const yesterday = new Date(Date.now() - 86_400_000);
+  const onDay = (date: Date, time = "10:00:00") => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}T${time}`;
+  };
+
+  function renderRelayDay(missions: MissionView[], dayFilter: string, schedule: Record<string, string>) {
+    render(
+      <MissionRelay
+        missions={missions}
+        kindFilter="all"
+        dayFilter={dayFilter}
+        schedule={schedule}
+        onInspect={noop}
+        onOpenPipeline={noop}
+        onNewTask={noop}
+      />
+    );
+  }
+
+  it("hides missions neither planned nor touched today when dayFilter is today", () => {
+    renderRelayDay(
+      [
+        mission({ id: "m-today", title: "Task today", executionKind: "agent", state: "READY", createdAt: onDay(new Date()), updatedAt: onDay(new Date()) }),
+        mission({ id: "m-old", title: "Old task", executionKind: "agent", state: "READY", createdAt: onDay(yesterday), updatedAt: onDay(yesterday) })
+      ],
+      "today",
+      {}
+    );
+    expect(screen.getByText("Task today")).toBeTruthy();
+    expect(screen.queryByText("Old task")).toBeNull();
+  });
+
+  it("includes a mission planned today through the local schedule", () => {
+    renderRelayDay(
+      [mission({ id: "m-planned", title: "Planned task", executionKind: "agent", state: "READY", createdAt: onDay(yesterday), updatedAt: onDay(yesterday) })],
+      "today",
+      { "m-planned": todayKey() }
+    );
+    expect(screen.getByText("Planned task")).toBeTruthy();
+  });
+
+  it("keeps every mission when dayFilter is all", () => {
+    renderRelayDay(
+      [mission({ id: "m-old", title: "Old task", executionKind: "agent", state: "READY", createdAt: onDay(yesterday), updatedAt: onDay(yesterday) })],
+      "all",
+      {}
+    );
+    expect(screen.getByText("Old task")).toBeTruthy();
+  });
+
+  it("floats overdue missions to the top of their lane when the day filter is active", () => {
+    renderRelayDay(
+      [
+        mission({ id: "m-new", title: "New today", executionKind: "agent", state: "ACTIVE", createdAt: onDay(new Date(), "09:00:00"), updatedAt: onDay(new Date(), "09:00:00") }),
+        mission({ id: "m-overdue", title: "Overdue", executionKind: "agent", state: "ACTIVE", createdAt: onDay(yesterday, "09:00:00"), updatedAt: onDay(new Date(), "08:00:00") })
+      ],
+      "today",
+      { "m-overdue": onDay(yesterday).slice(0, 10) }
+    );
+    const cards = screen.getAllByRole("button", { name: /^Ouvrir / });
+    expect(cards.map((card) => card.textContent)).toEqual([
+      expect.stringContaining("Overdue"),
+      expect.stringContaining("New today")
+    ]);
+  });
+});

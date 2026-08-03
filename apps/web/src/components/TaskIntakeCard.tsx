@@ -25,6 +25,8 @@ export function TaskIntakeCard({
   stateCounts,
   stateFilter,
   kindFilter,
+  dayFilter,
+  dayCount,
   viewMode,
   onSubmit,
   onDraftChange,
@@ -33,6 +35,7 @@ export function TaskIntakeCard({
   onProbeProvider,
   onStateFilterChange,
   onKindFilterChange,
+  onDayFilterChange,
   onViewModeChange,
   onFolderOpen,
   onFolderClose,
@@ -56,6 +59,8 @@ export function TaskIntakeCard({
   stateCounts: Partial<Record<MissionState, number>>;
   stateFilter: string;
   kindFilter: string;
+  dayFilter: string;
+  dayCount: number;
   viewMode: MissionViewMode;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   onDraftChange(patch: Partial<MissionIntakeDraft>): void;
@@ -64,6 +69,7 @@ export function TaskIntakeCard({
   onProbeProvider(providerId: string): void;
   onStateFilterChange(value: string): void;
   onKindFilterChange(value: string): void;
+  onDayFilterChange(value: string): void;
   onViewModeChange(mode: MissionViewMode): void;
   onFolderOpen(): void;
   onFolderClose(): void;
@@ -136,6 +142,17 @@ export function TaskIntakeCard({
               {label}
             </button>
           ))}
+          <span className="chip-divider" />
+          <button
+            type="button"
+            className={`view-chip day${dayFilter === "today" ? " active" : ""}`}
+            aria-pressed={dayFilter === "today"}
+            onClick={() => onDayFilterChange(dayFilter === "today" ? "all" : "today")}
+            title="Missions planifiées ou touchées aujourd'hui (créées, activées, validées, échouées) — triées par urgence"
+          >
+            ☀ Ma journée
+            <small>{dayCount}</small>
+          </button>
           {draft?.kind !== "human" && (
             <button type="button" className="folder-chip active" onClick={onFolderOpen}>
               <span aria-hidden="true">▰</span>

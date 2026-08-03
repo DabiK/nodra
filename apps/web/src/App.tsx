@@ -18,6 +18,7 @@ import { ProviderSessionsPage } from "./components/ProviderSessionsPage";
 import { listManagers } from "./services/manager-service";
 import { listMissions } from "./services/mission-service";
 import { loadSchedule, rescheduleToday, scheduledDay, todayKey, type MissionSchedule } from "./services/mission-schedule-service";
+import { countTodayMissions } from "./services/mission-day-service";
 import { listPipelines } from "./services/pipeline-service";
 import { probeProvider, selectDefaultModel } from "./services/provider-service";
 import { browseFolders } from "./services/workspace-service";
@@ -269,6 +270,8 @@ export function App() {
     }, {}),
     [missions]
   );
+  // Compteur « Ma journée » : missions planifiées ou touchées aujourd'hui.
+  const dayCount = useMemo(() => countTodayMissions(missions, schedule), [missions, schedule]);
   const missionGroups = useMemo(() => {
     const groups = filtered.reduce<Record<string, MissionView[]>>((accumulator, mission) => {
       const key = stateFilter === "all" ? mission.state : mission.executionKind;
@@ -643,6 +646,8 @@ export function App() {
           stateCounts={stateCounts}
           stateFilter={stateFilter}
           kindFilter={kindFilter}
+          dayFilter={dayFilter}
+          dayCount={dayCount}
           onSubmit={createMission}
           onDraftChange={patchDraft}
           onExpandedChange={setCreateExpanded}
@@ -650,6 +655,7 @@ export function App() {
           onProbeProvider={(providerId) => void refreshProviderOptions(providerId)}
           onStateFilterChange={setStateFilter}
           onKindFilterChange={setKindFilter}
+          onDayFilterChange={setDayFilter}
           onViewModeChange={changeViewMode}
           viewMode={viewMode}
           onFolderOpen={() => void openFolderBrowser(draft?.workspacePath || undefined)}
@@ -675,6 +681,8 @@ export function App() {
               missionPipelineIndex={missionPipelineIndex}
               kindFilter={kindFilter}
               stateFilter={stateFilter}
+              dayFilter={dayFilter}
+              schedule={schedule}
               onInspect={setInspectedMissionId}
               onOpenPipeline={openPipeline}
               onTransition={moveMissionOnBoard}

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type CSSProperties, type DragEvent } from
 import type { MissionState, MissionView } from "../types";
 import { hasMissionNotes } from "../services/mission-notes-service";
 import { findDragTransition } from "../services/mission-drag-transitions";
+import { isMissionToday, sortByUrgency } from "../services/mission-day-service";
+import type { MissionSchedule } from "../services/mission-schedule-service";
 import { PixelAvatar } from "./PixelAvatar";
 
 const COLUMN_ORDER: MissionState[] = ["DRAFT", "BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
@@ -154,12 +156,14 @@ function pipelineGroupStyle(pipelineId: string): CSSProperties {
   };
 }
 
-function Lane({ state, missions, pipelineIndex, draggingId, transitioningId, getMission, onInspect, onOpenPipeline, onDragStart, onDragEnd, onTransition }: { state: MissionState; missions: MissionView[]; pipelineIndex?: PipelineIndex; draggingId: string | null; transitioningId: string | null; getMission(id: string): MissionView | undefined; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onDragStart(id: string): void; onDragEnd(): void; onTransition(mission: MissionView, targetState: MissionState): void }) {
+function Lane({ state, missions, pipelineIndex, draggingId, transitioningId, dayFilter, schedule, getMission, onInspect, onOpenPipeline, onDragStart, onDragEnd, onTransition }: { state: MissionState; missions: MissionView[]; pipelineIndex?: PipelineIndex; draggingId: string | null; transitioningId: string | null; dayFilter?: string; schedule?: MissionSchedule; getMission(id: string): MissionView | undefined; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onDragStart(id: string): void; onDragEnd(): void; onTransition(mission: MissionView, targetState: MissionState): void }) {
   const column = COLUMN_LIBRARY[state];
   const [dropState, setDropState] = useState<"idle" | "allowed" | "forbidden">("idle");
-  const items = missions
-    .filter((mission) => mission.state === state)
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+  const inState = missions.filter((mission) => mission.state === state);
+  // « Ma journée » : les missions en retard remontent en tête de colonne.
+  const items = dayFilter === "today" && schedule
+    ? sortByUrgency(inState, schedule)
+    : inState.sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 
   const groups = new Map<string, { name: string; missions: MissionView[] }>();
   const standalone: MissionView[] = [];
@@ -227,7 +231,7 @@ function Lane({ state, missions, pipelineIndex, draggingId, transitioningId, get
   );
 }
 
-export function MissionRelay({ missions, missionPipelineIndex, kindFilter, stateFilter, onInspect, onOpenPipeline, onNewTask, onTransition }: { missions: MissionView[]; missionPipelineIndex?: PipelineIndex; kindFilter?: string; stateFilter?: string; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onNewTask?(): void; onTransition?(mission: MissionView, targetState: MissionState): Promise<void> | void }) {
+export function MissionRelay({ missions, missionPipelineIndex, kindFilter, stateFilter, dayFilter, schedule, onInspect, onOpenPipeline, onNewTask, onTransition }: { missions: MissionView[]; missionPipelineIndex?: PipelineIndex; kindFilter?: string; stateFilter?: string; dayFilter?: string; schedule?: MissionSchedule; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onNewTask?(): void; onTransition?(mission: MissionView, targetState: MissionState): Promise<void> | void }) {
   const [columns, setColumns] = useState<MissionState[]>(loadColumns);
   const [configOpen, setConfigOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -248,12 +252,12 @@ export function MissionRelay({ missions, missionPipelineIndex, kindFilter, state
       : orderedColumns),
     [stateFilter, orderedColumns]
   );
-  const filteredMissions = useMemo(
-    () => kindFilter && kindFilter !== "all"
-      ? missions.filter((mission) => mission.executionKind === kindFilter)
-      : missions,
-    [missions, kindFilter]
-  );
+  const filteredMissions = useMemo(() => {
+    let result = missions;
+    if (kindFilter && kindFilter !== "all") result = result.filter((mission) => mission.executionKind === kindFilter);
+    if (dayFilter === "today" && schedule) result = result.filter((mission) => isMissionToday(mission, schedule));
+    return result;
+  }, [missions, kindFilter, dayFilter, schedule]);
   const inFlux = useMemo(
     () => filteredMissions.filter((mission) => visibleColumns.includes(mission.state)).length,
     [filteredMissions, visibleColumns]
@@ -348,7 +352,7 @@ export function MissionRelay({ missions, missionPipelineIndex, kindFilter, state
 
       <div className="relay-lanes" style={{ ["--relay-columns" as string]: String(visibleColumns.length || 1) }}>
         {visibleColumns.length
-          ? visibleColumns.map((state) => <Lane key={state} state={state} missions={filteredMissions} pipelineIndex={missionPipelineIndex} draggingId={draggingId} transitioningId={transitioningId} getMission={getMission} onInspect={onInspect} onOpenPipeline={onOpenPipeline} onDragStart={setDraggingId} onDragEnd={() => setDraggingId(null)} onTransition={(mission, target) => void handleTransition(mission, target)} />)
+          ? visibleColumns.map((state) => <Lane key={state} state={state} missions={filteredMissions} pipelineIndex={missionPipelineIndex} draggingId={draggingId} transitioningId={transitioningId} dayFilter={dayFilter} schedule={schedule} getMission={getMission} onInspect={onInspect} onOpenPipeline={onOpenPipeline} onDragStart={setDraggingId} onDragEnd={() => setDraggingId(null)} onTransition={(mission, target) => void handleTransition(mission, target)} />)
           : <p className="relay-empty board-empty"><span aria-hidden="true">·</span>Aucune colonne sélectionnée. Ajoute un état via ⚙ Colonnes.</p>}
       </div>
     </section>
