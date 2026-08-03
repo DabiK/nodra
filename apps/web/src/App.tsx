@@ -40,6 +40,8 @@ import { BoardEmptyState } from "./components/BoardEmptyState";
 import { MISSION_TEMPLATES, templateDraft, type MissionTemplate } from "./services/mission-template-service";
 import { createExamplePipeline } from "./services/pipeline-template-service";
 import { dismissWelcomeBanner, loadWelcomeDismissed } from "./services/onboarding-service";
+import { buildRunGlance, type RunGlanceItem } from "./services/run-glance-service";
+import { RunGlance } from "./components/RunGlance";
 
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -88,6 +90,7 @@ export function App() {
     return value === "pipelines" || value === "managers" || value === "provider-sessions" ? value : "tasks";
   });
   const [focusPipelineId, setFocusPipelineId] = useState<string | null>(null);
+  const [managerFocusId, setManagerFocusId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<MissionSchedule>(() => loadSchedule());
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => loadSidebarCollapsed());
   const [theme, setTheme] = useState<Theme>(() => initTheme());
@@ -202,6 +205,13 @@ export function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Navigation depuis la sidebar : le focus glance manager est à usage unique
+  // (ouvrir le chat), il ne doit pas rouvrir le chat au retour sur la page.
+  const navigateFromSidebar = (next: AppPage) => {
+    setManagerFocusId(null);
+    navigate(next);
+  };
+
   const openPipeline = (pipelineId: string) => {
     setFocusPipelineId(pipelineId);
     navigate("pipelines");
@@ -253,6 +263,26 @@ export function App() {
     }
     return index;
   }, [pipelines]);
+
+  // Glance : tous les runs actifs (missions, pipelines, managers) en une barre.
+  // Données déjà rafraîchies par le SSE → aucun polling additionnel.
+  const glanceItems = useMemo(
+    () => buildRunGlance({ missions, pipelines, managers }),
+    [missions, pipelines, managers]
+  );
+
+  const openGlanceItem = (item: RunGlanceItem) => {
+    if (item.kind === "mission") {
+      location.assign(`/agent.html?missionId=${encodeURIComponent(item.id)}`);
+      return;
+    }
+    if (item.kind === "pipeline") {
+      openPipeline(item.id);
+      return;
+    }
+    setManagerFocusId(item.id);
+    navigate("managers");
+  };
 
   const filtered = useMemo(
     () => filterMissions(missions, { query, state: stateFilter, kind: kindFilter, sort, day: dayFilter }, schedule),
@@ -511,7 +541,7 @@ export function App() {
         query={query}
         onQueryChange={setQuery}
         onToggle={toggleSidebar}
-        onNavigate={navigate}
+        onNavigate={navigateFromSidebar}
         onSelectMission={selectMission}
         onOpenActivity={() => { setSidebarOpen(false); setActivityOpen((open) => !open); }}
         onThemeToggle={toggleTheme}
@@ -568,7 +598,7 @@ export function App() {
                 <small>managers</small>
               </div>
             </header>
-            <ManagersPage managers={managers} providerOptions={providerOptions} onChanged={refreshManagers} />
+            <ManagersPage managers={managers} providerOptions={providerOptions} onChanged={refreshManagers} initialManagerId={managerFocusId} />
           </>
         ) : (
           <>
@@ -666,6 +696,8 @@ export function App() {
             setFolderOpen(false);
           }}
         />
+
+        <RunGlance items={glanceItems} onOpen={openGlanceItem} />
 
         {effectiveViewMode === "board" ? (
           missions.length === 0 ? (

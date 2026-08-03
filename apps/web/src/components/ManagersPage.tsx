@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ManagerView, ProviderOptionsCatalog, ProviderPermissionPreset, ProviderReasoningEffort } from "../types";
 import { archiveManager, createManager, updateManager } from "../services/manager-service";
 import { serverConfig } from "../services/config-service";
@@ -29,19 +29,28 @@ interface Editable {
 export function ManagersPage({
   managers,
   providerOptions,
-  onChanged
+  onChanged,
+  initialManagerId = null
 }: {
   managers: ManagerView[];
   providerOptions: ProviderOptionsCatalog | null;
   onChanged(): void;
+  /** Ouvre directement le chat de ce manager au montage (navigation glance). */
+  initialManagerId?: string | null;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialManagerId);
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [draft, setDraft] = useState<Editable & { workspacePath: string }>(() => initialDraft(providerOptions));
   const [edit, setEdit] = useState<Editable | null>(null);
+
+  // Un clic glance (barre « Runs actifs ») sur un manager ouvre son chat même
+  // si la page est déjà affichée avec un autre chat ouvert.
+  useEffect(() => {
+    if (initialManagerId) setSelectedId(initialManagerId);
+  }, [initialManagerId]);
 
   const selected = useMemo(() => managers.find((manager) => manager.id === selectedId) ?? null, [managers, selectedId]);
   const providers = providerOptions?.providers ?? [];
