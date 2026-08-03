@@ -342,3 +342,37 @@ La boucle de review a rejeté l'itération #11 (timeline d'audit) : typecheck ro
 
 ### Statut
 - [x] #11 — Timeline d'audit sur la fiche mission — REJECTED corrigé, feature complète commitée
+
+## Itération 10 — 2026-08-03 — Task #12 : Diff Git avant validation
+
+### Fait (2 commits atomiques, comme suggéré par l'issue : endpoint diff → composant)
+1. **Diff Git (backend)** (`feat(api): diff Git de workspace (GET /api/workspaces/:id/diff)`)
+   - Nouvelle méthode `diff({path, base, head})` sur `WorkspacePort` + implémentation `LocalWorkspaceAdapter` : compare une ref de base (par défaut `repository.head`) à une ref explicite ou à l'arbre de travail (`head` null). Sous le capot : `git diff --name-status --find-renames`, `--numstat` (compteurs, `null` pour les binaires) et `--unified=3` — découpés par fichier (parse des en-têtes `diff --git a/… b/…`, C-quoting Git décodé pour les chemins spéciaux, préfixes `a/`/`b/` retirés).
+   - Fichiers non suivis (working tree) : listés via `status --porcelain --untracked-files=all` et rendus en diff synthétique "nouveau fichier" (contenu lu, compteur de lignes aligné sur git — la ligne vide terminale n'est pas comptée, cap 1 Mo).
+   - Use case `DiffWorkspace` (couche application, aucun import adapters) : base par défaut = `repository.baseRef` (le snapshot initial du workspace), refus des workspaces `deleted` (`WORKSPACE_STATE_CONFLICT`) et sans dépôt Git / scratch (`GIT_OPERATION_FAILED`).
+   - Endpoint `GET /api/workspaces/:id/diff?base=&head=` dans `workspace.controller.ts` (token `DIFF_WORKSPACE` + câblage `nodra.module.ts`, exports `index.ts`).
+   - Tests : `local-workspace-diff.test.ts` (8 tests sur dépôt Git réel : arbre de travail M/D/A avec contenu et compteurs, commit→commit sans les untracked, renommage, binaire → compteurs null, chemin avec espaces, liste vide, base/head explicites, sous-dossier canonisé) + `diff-workspace.test.ts` (5 tests : base par défaut, passage base/head, deleted, sans dépôt, workspace inconnu). Fakes de port existants complétés (`create-workspace.test.ts`, `workspace-lifecycle-concurrency.test.ts`).
+2. **Panneau Diff (web)** (`feat(web): panneau Fichiers modifiés / Diff Git dans la fiche mission`)
+   - Service `mission-diff-service.ts` : `loadWorkspaceDiff(workspaceId, base?, head?)` (pattern URLSearchParams de `browseFolders`) + types `WorkspaceDiffView`/`WorkspaceDiffFileView` + `DIFF_FILE_STATUS_LABELS`.
+   - `MissionDiffPanel` dans `MissionInspector.tsx` : visible dès qu'une config agent a un `workspaceId` (chargement auto, caché silencieusement si l'appel échoue, cohérent avec budget/audit) — liste des fichiers avec badge de statut (A/M/D/R + libellé), compteurs `+N −N`, chemins `ancien → nouveau` pour les renommages, diff unifié au clic (accordéon, `aria-expanded`, `role="region"`), état vide ("Aucune modification depuis le snapshot initial"), total "N fichiers".
+   - CSS : bloc `.mission-diff-*` (liserés par statut : vert ajouté / bleu modifié / rouge supprimé / violet renommé, `<pre>` diff sombre avec scroll) + overrides dark.
+   - Tests : `MissionInspector.test.tsx` +4 (masqué tant que non chargé, liste + statuts + compteurs + total, expansion/repli du diff au clic, état vide) — mock `worktree-service.showWorkspace` corrigé au passage (retournait `undefined` → crash dès qu'une config porte un workspaceId).
+
+### Vérifications
+- `npm run typecheck` (racine) : OK
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
+- Web : 41 fichiers / 319 tests OK (315 → 319, +4)
+- Adapters + application : 21/21 tests nouveaux OK ; suite packages/adapters+application : 2 échecs pré-existants (temporal-envelope.integration : serveur Temporal non démarré)
+- apps/api : 2 passes complètes — échecs uniquement environnementaux documentés (health → Temporal, i6/i14 → binaire Codex non certifié) ; 2 tests flaky sous charge parallèle (i5-workspace, mission, validation) passent en isolation et au 2ᵉ run complet — pattern flaky pré-existant (`pipeline.test.ts` documenté aux itérations 7-8)
+- ESLint sur tous les fichiers touchés : propre
+
+### Décisions / notes / limites
+- **"Snapshot initial → état delivery"** : la base par défaut est `repository.baseRef` (HEAD initial enregistré à la création du workspace), la tête par défaut est l'arbre de travail (commits de l'agent + changements non commités + fichiers non suivis). Le paramètre `head` permet une comparaison commit→commit si besoin.
+- **Onglet vs panneau** : l'inspecteur n'a pas de système d'onglets — le panneau suit le pattern stacked des panneaux existants (notes/budget/audit), placé sous la timeline d'audit. Visible pour tout état de mission (utile dès VALIDATION avant acceptation, mais aussi pendant ACTIVE).
+- **Pas de nouvel appel réseau par poll** : chargement unique à l'ouverture de la fiche (aucun polling ajouté — l'inspecteur n'en a pas, le board SSE est inchangé).
+- **Fichiers binaires** : compteurs `null` (numstat `-`) et contenu "Binary files … differ".
+- **Untracked en arbre de travail** : inclus comme "Ajouté" avec contenu (cap 1 Mo/fichier) — `git diff` seul ne les montre pas.
+- **Adapter ≠ use case** : l'adaptateur retombe sur `repository.head` quand base est null ; le défaut métier (snapshot initial) vit dans le use case via `repository.baseRef`.
+
+### Statut
+- [x] #12 — Diff Git avant validation

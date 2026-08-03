@@ -112,7 +112,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques (endpoint → composant → filtres)
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #12 — Diff Git avant validation (labels: —)
+- [x] #12 — Diff Git avant validation (labels: —)
 
   **Issue #12 — détail complet**
   > ## Contexte
