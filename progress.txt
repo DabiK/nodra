@@ -516,3 +516,40 @@ L'UI était desktop-only : aucun breakpoint 768px, sidebar statique (voire barre
 
 ### Statut
 - [x] #16 — Rejouer / dupliquer un run
+
+## Itération 15 — 2026-08-03 — Task #17 : Filtre « Ma journée »
+
+### Contexte
+Le board listait tout. Le planning local (`nodra.mission.schedule` + bannière « en retard ») et la timeline d'audit existaient, mais rien n'agrégeait les missions « touchées aujourd'hui ». Le backend n'expose l'audit que par mission (`GET /api/missions/:id/audit`) — un filtrage par audit coûterait N+1 sur le board, inacceptable pour un filtre live.
+
+### Fait (2 commits atomiques)
+1. **Service « ma journée »** (`feat(web): service « ma journée » — prédicat du jour, tri par urgence et filtre persisté (#17)`)
+   - `mission-day-service.ts` (pur, + 17 tests) :
+     - `isMissionToday(mission, schedule)` : mission **planifiée aujourd'hui** (planning local, par défaut le jour de création) **ou touchée aujourd'hui** — `updatedAt` est posé à chaque transition d'état par le domaine (`transitionFrom`), c'est le proxy du « stateChangedAt » (couvre créée/activée/validée/échouée/bloquée du jour, sans aucun appel audit par mission) ;
+     - `urgencyRank` (0 = retard, 1 = validation en attente, 2 = active, 3 = nouveau) — le retard suit la même règle que la bannière « en retard » (planifié avant aujourd'hui et pas DONE/ABANDONED) ;
+     - `sortByUrgency` (rang puis updatedAt desc, non mutateur) et `countTodayMissions`.
+   - `MissionFilters.day` (« all » | « today ») persisté dans `nodra.tasks.filters` (`mission-filter-service` : défaut + coerce) ; `filterMissions(missions, filters, schedule?)` applique le filtre du jour + le tri par urgence quand `day === "today"` (repli normal sinon, y compris sans schedule).
+   - `App.tsx` câblé (état `dayFilter`, `filtered`, effet de sauvegarde).
+2. **Filtre sur le board** (`feat(web): filtre « Ma journée » sur le board — chip avec compteur, kanban et liste (#17)`)
+   - `TaskIntakeCard` : chip « ☀ Ma journée » avec **compteur** (`aria-pressed`, `title` explicatif) dans la rangée de chips du board, combinable avec les filtres état/type existants, toggle all/today.
+   - `MissionRelay` : props `dayFilter`/`schedule` — filtrage des missions du flux + **tri par urgence dans chaque colonne** (les missions en retard remontent en tête de lane) ; la vue liste applique le filtre via `filterMissions` (groupes conservés).
+   - Tests : + 4 dans `MissionRelay.test.tsx` (filtrage day, planning local inclus, défaut all, remontée des retards) ; `WorkspaceModePicker.test.tsx` mis à jour (nouvelles props).
+
+### Vérifications
+- `npm run typecheck` (racine) : OK
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
+- Web : 50 fichiers / 396 tests OK (+17 service, +4 relay)
+- Suite complète `npm test` : 714 OK / **6 échecs pré-existants environnementaux** inchangés (architecture-boundaries, health/i6/i14 → Temporal/Codex, temporal-envelope ×2 → serveur Temporal non démarré) — aucun lié aux changements
+- ESLint : 8 erreurs pré-existantes hors périmètre inchangées (documentées itération 1), aucun fichier touché
+- Smoke test navigateur (stack dev déjà lancé) : chip « ☀ Ma journée 4 » rendu avec compteur → clic : 13 missions dans le flux → 2 (kanban) / 4 (liste), chip `pressed` persisté après reload, état neutre restauré après le test
+
+### Décisions / notes / limites
+- **Audit events vs updatedAt** : l'issue suggérait de dériver « activées/validées/échouées aujourd'hui » des audit events, mais l'endpoint est par mission (N+1 sur 74 missions, rechargé en live SSE). `updatedAt` (posé par le domaine à **chaque** transition d'état, `transitionFrom`) est un proxy exact du moment de la dernière transition — le filtre ne coûte aucun appel réseau. L'issue autorisait l'appui sur « le planning local existant » ; le jour de création couvre « créée aujourd'hui » via le défaut de `scheduledDay`.
+- **Tri par urgence** : exactement les 4 rangs de l'issue (retard > validation en attente > active > nouveau) ; à rang égal, plus récent d'abord. Le « retard » s'applique aux missions planifiées avant aujourd'hui mais touchées aujourd'hui (ex. mission d'hier bloquée/relancée ce matin) — les missions en retard non touchées restent hors « Ma journée » et vivent dans la bannière « en retard ».
+- **Compteur** : `countTodayMissions` sur **toutes** les missions (indépendant des filtres état/type/requête) — c'est un compteur de découverte, comme « Toutes 74 ».
+- **Kanban** : seules les colonnes visibles montrent les cartes du jour (le kanban reste groupé par état — le tri par urgence s'applique à l'intérieur de chaque colonne) ; la vue liste montre les 4 missions du jour.
+- **Limite** : `day` est un string générique (`"all" | "today"`), cohérent avec state/kind ; le sélecteur de tri de la vue liste reste affiché mais le tri par urgence prime quand « Ma journée » est actif (comportement voulu de l'issue).
+- La mission en `DONE` planifiée aujourd'hui reste incluse dans « Ma journée » (elle faisait partie du plan du jour), mais n'est pas classée « retard » (même règle que la bannière).
+
+### Statut
+- [x] #17 — Filtre 'ma journée'
