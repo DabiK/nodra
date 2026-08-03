@@ -14,7 +14,7 @@ function mission(overrides: Partial<MissionView>): MissionView {
     updatedAt: "2026-08-02T09:00:00Z",
     runState: null,
     runStartedAt: null,
-    lastAssistantMessage: null,
+    lastAssistantMessage: null, tagIds: [],
     ...overrides
   };
 }

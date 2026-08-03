@@ -105,7 +105,7 @@ describe("Provider sessions observation", () => {
 
   it("sends read-only attachment body and preserves a command id for a retry", async () => {
     const onAttach = vi.fn().mockResolvedValue(undefined);
-    render(<ProviderSessionAttachDialog missions={[{ id: "mission-1", projectId: null, title: "Existing", executionKind: "human", state: "READY", version: 1, createdAt: "2026-01-01", updatedAt: "2026-01-01", runState: null, runStartedAt: null, lastAssistantMessage: null }]} submitting={false} error="Réessaie" onClose={vi.fn()} onAttach={onAttach} onCreate={vi.fn()} />);
+    render(<ProviderSessionAttachDialog missions={[{ id: "mission-1", projectId: null, title: "Existing", executionKind: "human", state: "READY", version: 1, createdAt: "2026-01-01", updatedAt: "2026-01-01", runState: null, runStartedAt: null, lastAssistantMessage: null , tagIds: []}]} submitting={false} error="Réessaie" onClose={vi.fn()} onAttach={onAttach} onCreate={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Lier en lecture seule" }));
     fireEvent.click(screen.getByRole("button", { name: "Lier en lecture seule" }));
     await waitFor(() => expect(onAttach).toHaveBeenCalledTimes(2));

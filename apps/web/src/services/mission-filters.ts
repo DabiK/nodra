@@ -10,6 +10,8 @@ export interface MissionFilters {
   sort: string;
   /** Filtre « Ma journée » (#17) : "all" ou "today". */
   day: string;
+  /** Filtre par tags libres (#23) : ids de tags — vide = aucun filtre. */
+  tags: string[];
 }
 
 /** French labels used by the full-text search so "en cours" matches ACTIVE. */
@@ -30,7 +32,9 @@ export function filterMissions(missions: MissionView[], filters: MissionFilters,
   const filtered = missions
     .filter((mission) => !normalized || matchesQuery(mission, normalized, noteMatches))
     .filter((mission) => filters.state === "all" || mission.state === filters.state)
-    .filter((mission) => filters.kind === "all" || mission.executionKind === filters.kind);
+    .filter((mission) => filters.kind === "all" || mission.executionKind === filters.kind)
+    // Filtre par tags (#23) : la mission doit porter au moins un tag sélectionné.
+    .filter((mission) => filters.tags.length === 0 || (mission.tagIds ?? []).some((tagId) => filters.tags.includes(tagId)));
 
   // « Ma journée » : seules les missions planifiées ou touchées aujourd'hui,
   // triées par urgence (retard > validation en attente > active > nouveau).

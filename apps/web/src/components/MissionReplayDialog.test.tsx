@@ -22,7 +22,7 @@ const mission: MissionView = {
   updatedAt: "2026-08-02T09:00:00Z",
   runState: null,
   runStartedAt: null,
-  lastAssistantMessage: null
+  lastAssistantMessage: null, tagIds: []
 };
 
 const config: AgentConfigView = {
@@ -76,7 +76,7 @@ const created: MissionView = {
   updatedAt: "2026-08-02T10:00:00Z",
   runState: null,
   runStartedAt: null,
-  lastAssistantMessage: null
+  lastAssistantMessage: null, tagIds: []
 };
 
 function renderDialog({ onClose = vi.fn(), onReplayed = vi.fn() } = {}) {

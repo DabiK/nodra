@@ -17,12 +17,12 @@ function mission(overrides: Partial<MissionView>): MissionView {
     updatedAt: "2026-08-01T10:00:00.000Z",
     runState: null,
     runStartedAt: null,
-    lastAssistantMessage: null,
+    lastAssistantMessage: null, tagIds: [],
     ...overrides
   };
 }
 
-const baseFilters: MissionFilters = { query: "", state: "all", kind: "all", sort: "recent", day: "all" };
+const baseFilters: MissionFilters = { query: "", state: "all", kind: "all", sort: "recent", day: "all", tags: [] };
 
 afterEach(() => localStorage.clear());
 
@@ -97,6 +97,49 @@ describe("filterMissions combinable filters", () => {
   it("combines state + kind without query", () => {
     const result = filterMissions(missions, { ...baseFilters, state: "ACTIVE", kind: "human" });
     expect(result.map((item) => item.id)).toEqual(["human-active"]);
+  });
+});
+
+describe("filterMissions tag filter (issue #23)", () => {
+  const missions = [
+    mission({ id: "tagged-a", tagIds: ["tag-urgent", "tag-wip"], title: "A taguée" }),
+    mission({ id: "tagged-b", tagIds: ["tag-urgent"], title: "B taguée" }),
+    mission({ id: "plain", tagIds: [], title: "Sans tag" })
+  ];
+
+  it("keeps everything when no tag is selected", () => {
+    expect(filterMissions(missions, baseFilters)).toHaveLength(3);
+  });
+
+  it("keeps missions carrying at least one selected tag", () => {
+    const result = filterMissions(missions, { ...baseFilters, tags: ["tag-urgent"] });
+    expect(result.map((item) => item.id)).toEqual(["tagged-a", "tagged-b"]);
+  });
+
+  it("keeps missions carrying any selected tag when several are chosen (OR)", () => {
+    const result = filterMissions(missions, { ...baseFilters, tags: ["tag-urgent", "tag-wip"] });
+    expect(result.map((item) => item.id)).toEqual(["tagged-a", "tagged-b"]);
+  });
+
+  it("returns nothing when the tag does not exist", () => {
+    const result = filterMissions(missions, { ...baseFilters, tags: ["tag-ghost"] });
+    expect(result).toEqual([]);
+  });
+
+  it("combines the tag filter with state and kind", () => {
+    const mixed = [
+      mission({ id: "agent-urgent", executionKind: "agent", state: "ACTIVE", tagIds: ["tag-urgent"], title: "A" }),
+      mission({ id: "agent-plain", executionKind: "agent", state: "ACTIVE", tagIds: [], title: "B" }),
+      mission({ id: "human-urgent", executionKind: "human", state: "ACTIVE", tagIds: ["tag-urgent"], title: "C" })
+    ];
+    const result = filterMissions(mixed, { ...baseFilters, tags: ["tag-urgent"], kind: "agent" });
+    expect(result.map((item) => item.id)).toEqual(["agent-urgent"]);
+  });
+
+  it("tolerates missions without the tagIds field", () => {
+    const legacy = [{ id: "legacy", title: "Ancienne" }] as unknown as MissionView[];
+    expect(filterMissions(legacy, { ...baseFilters, tags: ["tag-urgent"] })).toEqual([]);
+    expect(filterMissions(legacy, baseFilters)).toHaveLength(1);
   });
 });
 

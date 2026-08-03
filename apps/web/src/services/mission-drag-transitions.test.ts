@@ -3,7 +3,7 @@ import type { MissionState, MissionView } from "../types";
 import { dragActionId, findDragTransition } from "./mission-drag-transitions";
 
 function mission(executionKind: "human" | "agent", state: MissionState): MissionView {
-  return { id: `m-${executionKind}-${state}`, projectId: null, title: "Task", executionKind, state, version: 1, createdAt: "2026-01-01", updatedAt: "2026-01-01", runState: null, runStartedAt: null, lastAssistantMessage: null };
+  return { id: `m-${executionKind}-${state}`, projectId: null, title: "Task", executionKind, state, version: 1, createdAt: "2026-01-01", updatedAt: "2026-01-01", runState: null, runStartedAt: null, lastAssistantMessage: null , tagIds: []};
 }
 
 function route(mission: MissionView, target: MissionState) {

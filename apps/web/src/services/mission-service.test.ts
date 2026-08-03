@@ -42,7 +42,7 @@ describe("mission service — duplicateMission (rejouer un run)", () => {
       id: "m2", projectId: null, title: "Refactorise le module auth.",
       executionKind: "human", state: "DRAFT", version: 0,
       createdAt: "2026-08-03T09:00:00Z", updatedAt: "2026-08-03T09:00:00Z",
-      runState: null, runStartedAt: null, lastAssistantMessage: null
+      runState: null, runStartedAt: null, lastAssistantMessage: null, tagIds: []
     };
     const ready: MissionView = { ...created, id: "m2", executionKind: "agent", state: "READY", version: 1 };
     const fetchMock = stubFetch([
@@ -99,7 +99,7 @@ describe("mission service — duplicateMission (rejouer un run)", () => {
       id: "m3", projectId: "p1", title: "Sans workspace",
       executionKind: "human", state: "DRAFT", version: 0,
       createdAt: "2026-08-03T09:00:00Z", updatedAt: "2026-08-03T09:00:00Z",
-      runState: null, runStartedAt: null, lastAssistantMessage: null
+      runState: null, runStartedAt: null, lastAssistantMessage: null, tagIds: []
     };
     const ready: MissionView = { ...created, executionKind: "agent", state: "READY", version: 1 };
     const fetchMock = stubFetch([
@@ -128,7 +128,7 @@ describe("mission service — duplicateMission (rejouer un run)", () => {
       id: "m4", projectId: null, title: "Vide",
       executionKind: "human", state: "DRAFT", version: 0,
       createdAt: "2026-08-03T09:00:00Z", updatedAt: "2026-08-03T09:00:00Z",
-      runState: null, runStartedAt: null, lastAssistantMessage: null
+      runState: null, runStartedAt: null, lastAssistantMessage: null, tagIds: []
     };
     const ready: MissionView = { ...created, executionKind: "agent", state: "READY", version: 1 };
     const fetchMock = stubFetch([

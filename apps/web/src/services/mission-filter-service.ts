@@ -2,11 +2,11 @@ import type { MissionFilters } from "./mission-filters";
 
 const KEY = "nodra.tasks.filters";
 
-const DEFAULTS: MissionFilters = { query: "", state: "all", kind: "all", sort: "recent", day: "all" };
+const DEFAULTS: MissionFilters = { query: "", state: "all", kind: "all", sort: "recent", day: "all", tags: [] };
 
 /**
  * Restores the last used mission board filters (query + state + kind + sort
- * + day) so the board reopens in the same configuration across reloads.
+ * + day + tags) so the board reopens in the same configuration across reloads.
  */
 export function loadSavedMissionFilters(): MissionFilters {
   try {
@@ -18,7 +18,8 @@ export function loadSavedMissionFilters(): MissionFilters {
       state: typeof parsed.state === "string" ? parsed.state : DEFAULTS.state,
       kind: typeof parsed.kind === "string" ? parsed.kind : DEFAULTS.kind,
       sort: typeof parsed.sort === "string" ? parsed.sort : DEFAULTS.sort,
-      day: typeof parsed.day === "string" ? parsed.day : DEFAULTS.day
+      day: typeof parsed.day === "string" ? parsed.day : DEFAULTS.day,
+      tags: Array.isArray(parsed.tags) ? parsed.tags.filter((tagId): tagId is string => typeof tagId === "string") : DEFAULTS.tags
     };
   } catch {
     return { ...DEFAULTS };

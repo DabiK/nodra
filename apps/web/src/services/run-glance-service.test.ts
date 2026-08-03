@@ -10,7 +10,7 @@ function mission(overrides: Partial<MissionView> & Pick<MissionView, "id" | "tit
     updatedAt: "2026-01-01T10:00:00Z",
     runState: null,
     runStartedAt: null,
-    lastAssistantMessage: null,
+    lastAssistantMessage: null, tagIds: [],
     ...overrides
   };
 }
@@ -72,7 +72,7 @@ function manager(overrides: Partial<ManagerView> & Pick<ManagerView, "id" | "nam
 describe("buildRunGlance", () => {
   it("liste les missions avec un run actif (RUNNING) avec dernier message et état", () => {
     const items = buildRunGlance({
-      missions: [mission({ id: "m1", title: "Refonte", executionKind: "agent", state: "ACTIVE", runState: "RUNNING", runStartedAt: "2026-08-03T09:00:00Z", lastAssistantMessage: "J'analyse la base de code." })],
+      missions: [mission({ id: "m1", title: "Refonte", executionKind: "agent", state: "ACTIVE", runState: "RUNNING", runStartedAt: "2026-08-03T09:00:00Z", lastAssistantMessage: "J'analyse la base de code.", tagIds: [] })],
       pipelines: [],
       managers: []
     });

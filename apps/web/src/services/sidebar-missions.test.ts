@@ -3,7 +3,7 @@ import { selectActiveSidebarMissions } from "./sidebar-missions";
 import type { MissionView } from "../types";
 
 function mission(partial: Partial<MissionView> & Pick<MissionView, "id" | "state" | "updatedAt">): MissionView {
-  return { projectId: null, title: partial.id, executionKind: "agent", version: 1, createdAt: "2026-01-01", runState: null, runStartedAt: null, lastAssistantMessage: null, ...partial };
+  return { projectId: null, title: partial.id, executionKind: "agent", version: 1, createdAt: "2026-01-01", runState: null, runStartedAt: null, lastAssistantMessage: null, tagIds: [], ...partial };
 }
 
 describe("selectActiveSidebarMissions", () => {

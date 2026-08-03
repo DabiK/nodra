@@ -42,7 +42,7 @@ function mission(overrides: Partial<MissionView> & Pick<MissionView, "id" | "tit
     updatedAt: "2026-01-01T10:00:00Z",
     runState: null,
     runStartedAt: null,
-    lastAssistantMessage: null,
+    lastAssistantMessage: null, tagIds: [],
     ...overrides
   };
 }
@@ -226,7 +226,7 @@ describe("MissionRelay live run mini-cards", () => {
         state: "ACTIVE",
         runState: "RUNNING",
         runStartedAt: "2026-08-02T10:00:00Z",
-        lastAssistantMessage: "J'analyse le code de la route /api/missions avant de proposer une refonte."
+        lastAssistantMessage: "J'analyse le code de la route /api/missions avant de proposer une refonte.", tagIds: []
       })
     ]);
     const status = screen.getByRole("status", { name: "Activité du run en cours" });
@@ -247,7 +247,7 @@ describe("MissionRelay live run mini-cards", () => {
 
   it("labels a run waiting for human approval", () => {
     renderWithLanes(["ACTIVE"], [
-      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "WAITING_APPROVAL", lastAssistantMessage: "Voici le diff, merci de valider." })
+      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "WAITING_APPROVAL", lastAssistantMessage: "Voici le diff, merci de valider.", tagIds: [] })
     ]);
     const status = screen.getByRole("status", { name: "Activité du run en cours" });
     expect(status.textContent).toContain("attend une approbation");
@@ -257,7 +257,7 @@ describe("MissionRelay live run mini-cards", () => {
   it("exposes the full last message via title for long output", () => {
     const longMessage = "Un très long message de l'assistant qui dépasse la largeur de la carte et doit être tronqué visuellement par ellipsis tout en restant consultable au survol via l'attribut title.".repeat(1);
     renderWithLanes(["ACTIVE"], [
-      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "RUNNING", lastAssistantMessage: longMessage })
+      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "RUNNING", lastAssistantMessage: longMessage , tagIds: []})
     ]);
     const message = screen.getByTitle(longMessage);
     expect(message.textContent).toBe(`« ${longMessage} »`);
@@ -265,7 +265,7 @@ describe("MissionRelay live run mini-cards", () => {
 
   it("keeps the static hint when the mission is ACTIVE but the run is finished", () => {
     renderWithLanes(["ACTIVE"], [
-      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "DONE", runStartedAt: "2026-08-02T10:00:00Z", lastAssistantMessage: null })
+      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: "DONE", runStartedAt: "2026-08-02T10:00:00Z", lastAssistantMessage: null , tagIds: []})
     ]);
     expect(screen.queryByRole("status", { name: "Activité du run en cours" })).toBeNull();
     expect(screen.getByText("Travaille maintenant")).toBeTruthy();
@@ -273,7 +273,7 @@ describe("MissionRelay live run mini-cards", () => {
 
   it("keeps the static hint when there is no run yet", () => {
     renderWithLanes(["ACTIVE"], [
-      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: null, runStartedAt: null, lastAssistantMessage: null })
+      mission({ id: "m-live", title: "Live task", executionKind: "agent", state: "ACTIVE", runState: null, runStartedAt: null, lastAssistantMessage: null , tagIds: []})
     ]);
     expect(screen.queryByRole("status", { name: "Activité du run en cours" })).toBeNull();
     expect(screen.getByText("Travaille maintenant")).toBeTruthy();
@@ -281,7 +281,7 @@ describe("MissionRelay live run mini-cards", () => {
 
   it("does not show the live block on non-ACTIVE cards even with an active run", () => {
     renderWithLanes(["VALIDATION"], [
-      mission({ id: "m-val", title: "Validation task", executionKind: "agent", state: "VALIDATION", runState: "RUNNING", lastAssistantMessage: "En attente." })
+      mission({ id: "m-val", title: "Validation task", executionKind: "agent", state: "VALIDATION", runState: "RUNNING", lastAssistantMessage: "En attente.", tagIds: [] })
     ]);
     expect(screen.queryByRole("status", { name: "Activité du run en cours" })).toBeNull();
     expect(screen.getByText("A rendu la main · attend ta décision")).toBeTruthy();
@@ -289,7 +289,7 @@ describe("MissionRelay live run mini-cards", () => {
 
   it("shows the live block on human ACTIVE missions too when a run is active", () => {
     renderWithLanes(["ACTIVE"], [
-      mission({ id: "m-live", title: "Human live task", executionKind: "human", state: "ACTIVE", runState: "RUNNING", lastAssistantMessage: "Je travaille sur le livrable." })
+      mission({ id: "m-live", title: "Human live task", executionKind: "human", state: "ACTIVE", runState: "RUNNING", lastAssistantMessage: "Je travaille sur le livrable.", tagIds: [] })
     ]);
     const status = screen.getByRole("status", { name: "Activité du run en cours" });
     expect(status.textContent).toContain("réfléchit");
