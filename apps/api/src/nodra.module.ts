@@ -22,6 +22,7 @@ import {
   ReadOnlyGitObservationAdapter,
   SqliteApprovalRepository,
   SqliteAgentConfigRepository,
+  SqliteActivityRepository,
   SqliteDeliveryRepository,
   SqliteEvidenceRepository,
   SqliteGateRepository,
@@ -74,6 +75,7 @@ import {
   ListMissions,
   ListMissionRuns,
   ListMissionAudit,
+  ListActivity,
   ListManagerConversations,
   ListProviderSessions,
   ListManagers,
@@ -81,6 +83,7 @@ import {
   ManageConfirmations,
   ManageDelivery,
   ManageGates,
+  MarkActivityRead,
   ReadEvidence,
   ReadWorkspace,
   ResumeRun,
@@ -133,6 +136,7 @@ import { MissionController } from "./mission.controller.js";
 import { ManagerController } from "./manager.controller.js";
 import { ConfigController } from "./config.controller.js";
 import { RelayController } from "./relay.controller.js";
+import { ActivityController } from "./activity.controller.js";
 import { RuntimeController } from "./runtime.controller.js";
 import { RuntimeLifecycle } from "./runtime-lifecycle.js";
 import { WorkspaceController } from "./workspace.controller.js";
@@ -167,6 +171,7 @@ import {
   GET_PROVIDER_STATUS,
   GET_RELAY,
   INTEGRATE_WORKSPACE,
+  LIST_ACTIVITY,
   LIST_MANAGER_CONVERSATIONS,
   LIST_MANAGERS,
   LIST_MISSIONS,
@@ -176,6 +181,7 @@ import {
   MANAGE_CONFIRMATIONS,
   MANAGE_DELIVERY,
   MANAGE_GATES,
+  MARK_ACTIVITY_READ,
   PROBE_PROVIDER,
   PUBLISH_PIPELINE_NODE_HANDOVER,
   PROVIDER_CATALOG,
@@ -240,7 +246,7 @@ export class NodraModule {
   static register(options: NodraModuleOptions): DynamicModule {
     return {
       module: NodraModule,
-      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, ProviderSessionController, RunController, PipelineController, LlmController, EventsController],
+      controllers: [HealthController, MissionController, ManagerController, ConfigController, RelayController, ActivityController, RuntimeController, EvidenceController, GateController, FolderController, AgentSessionController, ApprovalController, DeliveryController, ConfirmationController, WorkspaceController, ProviderController, ProviderSessionController, RunController, PipelineController, LlmController, EventsController],
       providers: [
         { provide: REPOSITORY_ROOT, useValue: options.repositoryRoot ?? process.cwd() },
         { provide: DATA_ROOT, useValue: options.dataRoot ?? dirname(options.databaseFile) },
@@ -706,6 +712,16 @@ export class NodraModule {
           provide: GET_RELAY,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new GetRelay(new SqliteMissionReadModel(database))
+        },
+        {
+          provide: LIST_ACTIVITY,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ListActivity(new SqliteActivityRepository(database))
+        },
+        {
+          provide: MARK_ACTIVITY_READ,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new MarkActivityRead(new SqliteActivityRepository(database))
         },
         {
           provide: CREATE_MANAGER,

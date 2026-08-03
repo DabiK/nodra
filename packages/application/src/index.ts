@@ -7,6 +7,17 @@ export {
 } from "./change-mission-state.js";
 export { CreateMission, type CreateMissionInput } from "./create-mission.js";
 export { GetRelay } from "./get-relay.js";
+export { ListActivity } from "./list-activity.js";
+export { MarkActivityRead } from "./mark-activity-read.js";
+export type {
+  ActivityItemView,
+  ActivityMissionSubject,
+  ActivityPipelineSubject,
+  ActivityQueue,
+  ActivityRepository,
+  ActivitySubject,
+  ActivityView
+} from "./activity-repository.js";
 export { GetHealth, type HealthReport } from "./get-health.js";
 export type { HealthProbe } from "./health-probe.js";
 export type { RuntimeHealthProbe } from "./runtime-health-probe.js";
