@@ -7,6 +7,10 @@ export class PipelineNodeDto {
 
   @IsString()
   missionId!: string;
+
+  @IsOptional()
+  @IsString()
+  transitionMode?: "auto" | "human";
 }
 
 export class PipelineEdgeDto {

@@ -30,7 +30,7 @@ export async function publishNodeHandover(runId: string, nodeKey: string) {
 
 export interface CreatePipelineInput {
   name: string;
-  nodes: Array<{ nodeKey: string; missionId: string }>;
+  nodes: Array<{ nodeKey: string; missionId: string; transitionMode?: "auto" | "human" }>;
   edges?: Array<{ fromNodeKey: string; toNodeKey: string }>;
 }
 
