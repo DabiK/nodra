@@ -1,5 +1,21 @@
 # Journal d'avancement — DabiK/nodra
 
+## Itération 25 — 2026-08-03 — Task #26 : docs — imprécisions mineures dans progress.txt (itération 11)
+
+### Contexte
+Review du commit bd4590e (docs itération 11 — #13) : trois imprécisions factuelles dans la section Vérifications / Fait de la section itération 11 de progress.txt. Vérifiées dans le code avant correction (aucun impact fonctionnel).
+
+### Fait
+1. **« ActivityHub … + 11 tests » → + 12 tests** : `apps/web/src/components/ActivityHub.test.tsx` contient bien **12** blocs `it()` (comptés : rendu fermé, état vide, groupement, compteur + mark-all, mark-all masqué, ouverture mission, ouverture pipeline, marquage individuel, marquage total, fermeture ×/fond, `formatActivityTime`, reason codes inconnus). La ligne détail désormais la liste.
+2. **« Web : 43 fichiers / 336 tests OK (315 → 336, +21) » → (319 → 336, +17)** : l'itération 10 documentait 319 tests ; le delta réel est 12 + 2 (activity-service) + 3 (AppSidebar) = **+17**, répartis explicitement.
+3. **« health → binaire Codex non certifié » → « health → runtime Temporal indisponible »** : `apps/api/health.test.ts` s'intitule « keeps SQLite readable and reports an unavailable **Temporal** runtime explicitly » — l'échec est lié au runtime Temporal non démarré ; seuls i6/i14 échouent sur le binaire Codex. Cohérent avec la formulation de l'itération 10 (« health → Temporal »).
+
+### Vérifications
+- Aucun code touché ; `rg` sur progress.txt confirme l'absence de toute occurrence résiduelle de « 315 → 336 », « +21 » ou « health → binaire ».
+
+### Statut
+- [x] #26 — docs: imprécisions mineures dans progress.txt (itération 11, hub d'activité #13)
+
 ## Itération 24 — 2026-08-03 — Task #24 : Historique des conversations entre managers
 
 ### Contexte
@@ -549,16 +565,16 @@ Le relay (`relay_item`) matérialisait déjà exactement les 4 sources du hub (q
 2. **Web** (`feat(web): hub d'activité — badge sidebar + liste des décisions humaines (#13)`)
    - `activity-service.ts` : `loadActivity()` → GET /api/activity, `markActivityRead(relayId)` → POST (types miroirs de la vue serveur). + 2 tests.
    - `AppSidebar` : entrée « Activité » (◉) avec badge `.count` = items non lus, props `activityCount` + `onOpenActivity` (fournies aussi par `AgentPage` à vide). + 3 tests (badge visible/masqué, clic → onOpenActivity).
-   - `ActivityHub` : drawer droit (pattern FolderDrawer), sections « Décision requise · N » et « Bloquées · N », par item : icône par reasonCode, titre (mission ou pipeline), libellé FR (`REASON_LABELS`), état + temps relatif (`formatActivityTime` : "à l'instant / il y a X min / il y a X h / date"), liseré et bouton « Lu » si non lu, « ✓ Tout marquer lu » ; clic item → fiche mission (`selectMission`) ou page pipelines (`openPipeline`) puis fermeture du hub ; Esc et fond ferment. + 11 tests.
+    - `ActivityHub` : drawer droit (pattern FolderDrawer), sections « Décision requise · N » et « Bloquées · N », par item : icône par reasonCode, titre (mission ou pipeline), libellé FR (`REASON_LABELS`), état + temps relatif (`formatActivityTime` : "à l'instant / il y a X min / il y a X h / date"), liseré et bouton « Lu » si non lu, « ✓ Tout marquer lu » ; clic item → fiche mission (`selectMission`) ou page pipelines (`openPipeline`) puis fermeture du hub ; Esc et fond ferment. + 12 tests (`ActivityHub.test.tsx` : rendu fermé, état vide, groupement, compteur non lus + mark-all, mark-all masqué, ouverture mission, ouverture pipeline, marquage individuel, marquage total, fermeture bouton + fond, `formatActivityTime`, reason codes inconnus).
    - `App.tsx` : état `activity`/`activityOpen`, `refreshBoard` recharge aussi l'activité (même mécanique live SSE — aucun polling ajouté), Esc ferme le hub, handlers mark read / mark all (rafraîchissement immédiat après mutation).
    - CSS : bloc `.activity-*` (drawer, items, badges) + overrides dark.
 
 ### Vérifications
 - `npm run typecheck` (racine) : OK
 - `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
-- Web : 43 fichiers / 336 tests OK (315 → 336, +21)
+- Web : 43 fichiers / 336 tests OK (319 → 336, +17 : 12 ActivityHub, 2 activity-service, 3 AppSidebar)
 - packages/application + adapters + domain : 47 fichiers OK hors `temporal-envelope.integration` (2 échecs environnementaux pré-existants — serveur Temporal non démarré)
-- apps/api : 7 fichiers OK ; 3 échecs pré-existants documentés (health → binaire Codex non certifié, i6 + i14 → idem) — le module Nest démarre avec le nouveau controller
+- apps/api : 7 fichiers OK ; 3 échecs pré-existants documentés (health → runtime Temporal indisponible, i6 + i14 → binaire Codex non certifié) — le module Nest démarre avec le nouveau controller
 - ESLint sur tous les fichiers touchés : propre
 
 ### Décisions / notes / limites

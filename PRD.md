@@ -125,7 +125,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques (endpoint agrégé → composant → filtres)
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #26 — docs: imprécisions mineures dans progress.txt (itération 11, hub d'activité #13) (labels: —)
+- [x] #26 — docs: imprécisions mineures dans progress.txt (itération 11, hub d'activité #13) (labels: —)
 
   **Issue #26 — détail complet**
   > Relevé pendant la review du commit bd4590e (docs itération 11 — #13).
