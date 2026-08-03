@@ -1,6 +1,6 @@
 import { api } from "../api";
 import type { AgentConfigView, MissionInspectorData, MissionIntakeDraft, MissionRunsView, MissionView, ProviderOptionsCatalog } from "../types";
-import { createWorkspaceForMission } from "./workspace-service";
+import { createWorkspace, createWorkspaceForMission, workspacePathFromName } from "./workspace-service";
 import { loadMissionProviderSession } from "./mission-provider-session-service";
 
 export async function listMissions() {
@@ -110,4 +110,66 @@ export async function createConfiguredMission(draft: MissionIntakeDraft, catalog
   });
 
   return mission;
+}
+
+export interface DuplicateMissionInput {
+  title: string;
+  projectId: string | null;
+  /** Configuration agent de la mission source (mêmes réglages, même workspace). */
+  source: AgentConfigView;
+  /** Modèle choisi au relancement (par défaut celui de la source). */
+  modelId: string;
+}
+
+/**
+ * Duplique une mission avec les mêmes réglages : config agent + prompt +
+ * workspace, puis la place directement en READY (issue #16).
+ *
+ * Le workspace n'est pas recréé : la copie référence le même workspace que la
+ * mission source (dédup serveur par chemin si besoin). S'il n'y en a pas, un
+ * workspace scratch est créé.
+ */
+export async function duplicateMission(input: DuplicateMissionInput) {
+  const created = await api<MissionView>("/api/missions", {
+    method: "POST",
+    body: JSON.stringify({ title: input.title, projectId: input.projectId || null })
+  });
+
+  let workspaceId = input.source.workspaceId;
+  if (!workspaceId) {
+    const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "workspace";
+    const workspace = await createWorkspace({ kind: "scratch", path: workspacePathFromName(slug) });
+    workspaceId = workspace.id;
+  }
+
+  const enabled = await api<AgentConfigView>(`/api/missions/${created.id}/agent-config/enable`, {
+    method: "POST",
+    body: JSON.stringify({ expectedVersion: created.version })
+  });
+
+  await api(`/api/missions/${created.id}/agent-config`, {
+    method: "PUT",
+    body: JSON.stringify({
+      expectedVersion: enabled.version,
+      providerId: input.source.providerId ?? "opencode",
+      modelId: input.modelId,
+      reasoningEffort: input.source.reasoningEffort ?? "provider_default",
+      providerOptions: input.source.providerOptions,
+      missionPrompt: input.source.missionPrompt.trim()
+        || `Traite la mission « ${input.title} » de bout en bout.`,
+      permissionPreset: input.source.permissionPreset ?? "workspace",
+      workspaceId,
+      autoCommitAuthorized: input.source.autoCommitAuthorized,
+      integrationTargetRef: input.source.integrationTargetRef
+    })
+  });
+
+  // Statut READY : la copie apparaît immédiatement dans le board, prête à lancer.
+  // La mission source a été créée en version 0 puis incrémentée par l'enable — la
+  // copie est donc en version `created.version + 1` à ce stade (l'update de config
+  // n'incrémente que la version de la config, pas celle de la mission).
+  return api<MissionView>(`/api/missions/${created.id}/ready`, {
+    method: "POST",
+    body: JSON.stringify({ expectedVersion: created.version + 1 })
+  });
 }
