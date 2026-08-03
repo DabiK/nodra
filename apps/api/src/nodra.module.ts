@@ -593,23 +593,21 @@ export class NodraModule {
         },
         {
           provide: GET_HEALTH,
-          inject: [DATABASE, TEMPORAL_CONNECTION, PROVIDER_CATALOG],
+          inject: [DATABASE, PROVIDER_CATALOG],
           useFactory: (
             database: NodraSqliteDatabase,
-            temporal: LazyTemporalConnection,
             catalog: SqliteProviderCatalogRepository
           ) => new GetHealth(
             new SqliteHealthProbe(database),
-            temporal,
+            new SqliteHealthProbe(database),
             new CatalogProviderHealthProbe(catalog, "codex")
           )
         },
         {
           provide: START_MISSION,
-          inject: [DATABASE, TEMPORAL_CONNECTION, PROVIDER_CATALOG, RESOLVE_AGENT_CONFIG],
+          inject: [DATABASE, PROVIDER_CATALOG, RESOLVE_AGENT_CONFIG],
           useFactory: (
             database: NodraSqliteDatabase,
-            temporal: LazyTemporalConnection,
             catalog: SqliteProviderCatalogRepository,
             resolver: ResolveAgentConfig
           ) => {
@@ -617,7 +615,7 @@ export class NodraModule {
             return new StartMission(
               repository,
               new SqliteMissionExecutionRepository(database),
-              temporal,
+              new SqliteHealthProbe(database),
               catalog,
               resolver,
               new SqliteProviderSessionRepository(database)
@@ -783,15 +781,14 @@ export class NodraModule {
         },
         {
           provide: START_MANAGER_RUN,
-          inject: [DATABASE, TEMPORAL_CONNECTION, PROVIDER_CATALOG],
+          inject: [DATABASE, PROVIDER_CATALOG],
           useFactory: (
             database: NodraSqliteDatabase,
-            temporal: LazyTemporalConnection,
             catalog: SqliteProviderCatalogRepository
           ) => new StartManagerRun(
             new SqliteManagerRepository(database),
             new SqliteManagerExecutionRepository(database),
-            temporal,
+            new SqliteHealthProbe(database),
             catalog
           )
         },
