@@ -1050,6 +1050,24 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
 .mission-export-preview em { color: var(--muted); }
 .mission-export-footer { display: flex; justify-content: flex-end; gap: 8px; }
 
+/* ============ Mission replay dialog (issue #16) ============ */
+.mission-replay-dialog { position: relative; z-index: 70; width: min(540px, 94vw); max-height: 88vh; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; margin: auto; padding: 24px; border-radius: 18px; background: var(--panel); box-shadow: 0 24px 70px rgba(20, 30, 25, 0.28); }
+.mission-replay-dialog header { display: grid; gap: 4px; }
+.mission-replay-dialog h2 { margin: 2px 0; font: 800 22px Manrope; }
+.mission-replay-subtitle { margin: 0; color: var(--muted); font-size: 12px; }
+.mission-replay-form { display: grid; gap: 12px; overflow-y: auto; }
+.mission-replay-form > label { display: grid; gap: 5px; font: 700 12px Manrope; color: var(--muted); }
+.mission-replay-title-input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); font: 600 14px Manrope; box-sizing: border-box; }
+.mission-replay-form > label:focus-within { color: var(--green); }
+.mission-replay-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.mission-replay-summary div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+.mission-replay-summary dt { color: var(--muted); }
+.mission-replay-summary dd { margin: 0; font-weight: 700; word-break: break-all; }
+.mission-replay-prompt { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.mission-replay-prompt span { font: 700 11px Manrope; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.mission-replay-prompt p { margin: 0; max-height: 96px; overflow-y: auto; white-space: pre-wrap; font-size: 12px; line-height: 1.5; color: var(--ink); }
+.mission-replay-footer { display: flex; justify-content: flex-end; gap: 8px; }
+
 /* ============ Provider-session observatory ============ */
 .provider-sessions-hero { margin-bottom: 20px; }
 .provider-sessions-hero .subtitle { max-width: 620px; }
@@ -1663,6 +1681,7 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
   /* worktree dialog */
   .worktree-dialog { box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5); }
   .mission-export-dialog { box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5); }
+  .mission-replay-dialog { box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5); }
   .mission-export-preview { background: #1a221c; }
   .mission-export-preview th { background: #222c24; }
   .mission-export-preview code { background: #2b362d; color: #c9d4cc; }

@@ -63,6 +63,17 @@ vi.mock("./MissionExportDialog", () => ({
     </div>
   )
 }));
+vi.mock("./MissionReplayDialog", () => ({
+  MissionReplayDialog: ({ mission, onClose, onReplayed }: { mission: MissionView; onClose(): void; onReplayed(created: MissionView): void }) => (
+    <div data-testid="replay-dialog">
+      <span>REPLAY {mission.title}</span>
+      <button type="button" onClick={() => onReplayed({ ...mission, id: "m2", state: "READY", version: 1 })}>
+        Simuler rejoué
+      </button>
+      <button type="button" onClick={onClose}>Fermer replay</button>
+    </div>
+  )
+}));
 
 afterEach(cleanup);
 
@@ -80,28 +91,28 @@ const mission: MissionView = {
   lastAssistantMessage: null
 };
 
-function renderInspector(onClose = vi.fn()) {
+function renderInspector(onClose = vi.fn(), onSaved = vi.fn()) {
   render(
     <MissionInspector
       missionId="m1"
       missions={[mission]}
       providerOptions={null}
       onClose={onClose}
-      onSaved={() => undefined}
+      onSaved={onSaved}
     />
   );
-  return onClose;
+  return { onClose, onSaved };
 }
 
 describe("MissionInspector keyboard", () => {
   it("ferme la fiche avec Escape", () => {
-    const onClose = renderInspector();
+    const { onClose } = renderInspector();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("ignore Escape pendant la saisie dans un champ", () => {
-    const onClose = renderInspector();
+    const { onClose } = renderInspector();
     const input = document.createElement("input");
     document.body.appendChild(input);
     input.focus();
@@ -111,7 +122,7 @@ describe("MissionInspector keyboard", () => {
   });
 
   it("ignore Escape quand le model picker est ouvert", () => {
-    const onClose = renderInspector();
+    const { onClose } = renderInspector();
     const picker = document.createElement("div");
     picker.className = "model-picker-backdrop";
     document.body.appendChild(picker);
@@ -197,7 +208,7 @@ describe("MissionInspector export markdown", () => {
   });
 
   it("ferme le dialog d'export sans fermer la fiche", async () => {
-    const onClose = renderInspector();
+    const { onClose } = renderInspector();
     fireEvent.click(await screen.findByRole("button", { name: /Exporter/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Fermer export" }));
     expect(screen.queryByTestId("export-dialog")).toBeNull();
@@ -404,5 +415,79 @@ describe("MissionInspector diff git panel", () => {
 
     const panel = await screen.findByLabelText("Fichiers modifiés du workspace");
     expect(panel.textContent).toContain("Aucune modification depuis le snapshot initial");
+  });
+});
+
+describe("MissionInspector replay (rejouer / dupliquer)", () => {
+  const config: AgentConfigView = {
+    missionId: "m1",
+    version: 3,
+    providerId: "opencode",
+    modelId: "model-a",
+    reasoningEffort: "high",
+    providerOptions: { schemaVersion: 1, value: {} },
+    missionPrompt: "Fais la mission.",
+    permissionPreset: "workspace",
+    workspaceId: "ws-1",
+    autoCommitAuthorized: false,
+    integrationTargetRef: null,
+    updatedAt: "2026-08-02T09:00:00Z"
+  };
+
+  function renderWithConfig(overrides: Partial<MissionView> = {}, onSaved = vi.fn()) {
+    vi.mocked(loadMissionInspector).mockResolvedValueOnce({
+      mission: { ...mission, ...overrides },
+      config,
+      providerSession: null
+    });
+    renderInspector(vi.fn(), onSaved);
+    return onSaved;
+  }
+
+  it("n'affiche pas Rejouer tant que la config agent n'est pas chargée", () => {
+    renderInspector();
+    expect(screen.queryByRole("button", { name: /Rejouer/ })).toBeNull();
+  });
+
+  it("affiche Rejouer pour une mission agent configurée", async () => {
+    renderWithConfig();
+    expect(await screen.findByRole("button", { name: /Rejouer/ })).toBeTruthy();
+  });
+
+  it("masque Rejouer pendant qu'une mission est en cours (ACTIVE)", async () => {
+    renderWithConfig({ state: "ACTIVE" });
+    await screen.findByRole("heading", { name: "Mission test" });
+    expect(screen.queryByRole("button", { name: /Rejouer/ })).toBeNull();
+  });
+
+  it("masque Rejouer pour une mission humaine", async () => {
+    vi.mocked(loadMissionInspector).mockResolvedValueOnce({
+      mission: { ...mission, executionKind: "human" },
+      config: null,
+      providerSession: null
+    });
+    renderInspector();
+    await screen.findByRole("heading", { name: "Mission test" });
+    expect(screen.queryByRole("button", { name: /Rejouer/ })).toBeNull();
+  });
+
+  it("ouvre le dialog de replay et rafraîchit le board après duplication", async () => {
+    const onSaved = renderWithConfig();
+    fireEvent.click(await screen.findByRole("button", { name: /Rejouer/ }));
+    expect(await screen.findByTestId("replay-dialog")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Simuler rejoué" }));
+    expect(screen.queryByTestId("replay-dialog")).toBeNull();
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect((await screen.findByRole("status")).textContent).toContain("dupliquée");
+  });
+
+  it("ferme le dialog de replay sans fermer la fiche ni rafraîchir", async () => {
+    const onSaved = renderWithConfig();
+    fireEvent.click(await screen.findByRole("button", { name: /Rejouer/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Fermer replay" }));
+    expect(screen.queryByTestId("replay-dialog")).toBeNull();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Mission test" })).toBeTruthy();
   });
 });

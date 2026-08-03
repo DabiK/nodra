@@ -31,6 +31,7 @@ import { showWorkspace } from "../services/worktree-service";
 import { WorkspaceModePicker } from "./WorkspaceModePicker";
 import { WorktreeResolutionDialog } from "./WorktreeResolutionDialog";
 import { MissionExportDialog } from "./MissionExportDialog";
+import { MissionReplayDialog } from "./MissionReplayDialog";
 import { PixelAvatar } from "./PixelAvatar";
 import { ModelPicker } from "./ModelPicker";
 
@@ -79,6 +80,7 @@ export function MissionInspector({
   const [worktree, setWorktree] = useState<{ id: string; branchName: string | null } | null>(null);
   const [showWorktreeDialog, setShowWorktreeDialog] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
 
   // Raccourci clavier : Escape ferme la fiche. Ignoré pendant la saisie et
   // quand un sous-dialog (model picker, worktree) est ouvert — ces derniers
@@ -90,12 +92,12 @@ export function MissionInspector({
       if (target?.isContentEditable) return;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
-      if (document.querySelector(".model-picker-backdrop") || showWorktreeDialog) return;
+      if (document.querySelector(".model-picker-backdrop") || showWorktreeDialog || showReplay) return;
       onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, showWorktreeDialog]);
+  }, [onClose, showWorktreeDialog, showReplay]);
 
   useEffect(() => {
     void loadMissionInspector(missionId)
@@ -167,6 +169,18 @@ export function MissionInspector({
   }) : null;
 
   const patch = (patchValue: Partial<InspectorForm>) => setForm((current) => current ? { ...current, ...patchValue } : current);
+  // Rejouer / dupliquer : dispo pour toute mission agent configurée, hors run en cours.
+  const canReplay = Boolean(
+    data?.mission
+    && data.mission.executionKind === "agent"
+    && data.config
+    && data.mission.state !== "ACTIVE"
+  );
+  const replayDone = (created: MissionView) => {
+    setShowReplay(false);
+    onSaved();
+    setNotice(`Mission « ${created.title} » dupliquée — prête dans le board (READY).`);
+  };
   const setProvider = (providerId: string) => {
     if (!providerOptions) return;
     const modelId = selectDefaultModel(providerOptions, providerId);
@@ -304,6 +318,11 @@ export function MissionInspector({
               🌿 Résoudre le terrain de travail
             </button>
           )}
+          {step === "inspect" && canReplay && (
+            <button className="secondary-button" type="button" onClick={() => setShowReplay(true)}>
+              ↻ Rejouer
+            </button>
+          )}
           {step === "inspect" && data?.mission && (
             <button className="secondary-button" type="button" onClick={() => setShowExport(true)}>
               ⤓ Exporter
@@ -342,6 +361,15 @@ export function MissionInspector({
           result={result}
           runs={runs}
           onClose={() => setShowExport(false)}
+        />
+      )}
+      {showReplay && data?.mission && data.config && (
+        <MissionReplayDialog
+          mission={data.mission}
+          config={data.config}
+          providerOptions={providerOptions}
+          onClose={() => setShowReplay(false)}
+          onReplayed={replayDone}
         />
       )}
     </div>
