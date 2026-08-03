@@ -12,3 +12,4 @@ export * from "./provider-catalog.js";
 export * from "./provider-sessions.js";
 export * from "./runs.js";
 export * from "./scheduling.js";
+export * from "./tags.js";
