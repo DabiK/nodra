@@ -25,6 +25,21 @@ function mockBothProviders() {
 }
 
 describe("Provider sessions observation", () => {
+  it("affiche un état vide avec CTA de rechargement quand aucune session n'est observée", async () => {
+    const emptyListed = { sessions: [], nextCursor: null };
+    const fetchMock = vi.fn<(url: RequestInfo | URL, init?: RequestInit) => Promise<Response>>((url) => {
+      const path = String(url);
+      if (path.includes("capabilities")) return json(path.includes("providerId=opencode") ? opencodeCapabilities : codexCapabilities);
+      return json(emptyListed);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ProviderSessionsPage missions={[]} initialSessionId={null} onSessionChange={vi.fn()} onOpenMission={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Aucune conversation observée" })).toBeTruthy();
+    const reload = screen.getByRole("button", { name: "⟳ Recharger" });
+    fireEvent.click(reload);
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/provider-sessions?providerId=")).length).toBeGreaterThanOrEqual(4));
+  });
+
   it("loads sessions from both providers with badges and selects the initial session", async () => {
     const fetchMock = mockBothProviders();
     vi.stubGlobal("fetch", fetchMock);

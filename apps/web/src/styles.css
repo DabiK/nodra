@@ -1278,6 +1278,42 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
 .help-shortcut kbd { flex: none; min-width: 74px; box-sizing: border-box; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 7px; padding: 3px 8px; background: #fbfaf6; color: var(--ink); font: 800 10px ui-monospace, monospace; text-align: center; }
 .help-shortcut span { color: var(--muted); font-size: 11px; line-height: 1.45; }
 
+/* ============ Onboarding: empty states + welcome (issue #14) ============ */
+.board-empty-state { display: grid; gap: 22px; margin-top: 22px; padding: 34px 26px; border: 1px dashed #d7d7cf; border-radius: 18px; background: linear-gradient(120deg, rgba(31, 107, 79, 0.05), transparent 60%); }
+.board-empty-copy { display: grid; justify-items: start; gap: 8px; }
+.board-empty-mark { font-size: 30px; color: var(--green); }
+.board-empty-copy h2 { margin: 0; font: 800 20px Manrope; letter-spacing: -0.02em; }
+.board-empty-copy p { margin: 0; max-width: 640px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.board-empty-cta { margin-top: 8px; }
+.template-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.template-card { display: grid; gap: 5px; justify-items: start; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); text-align: left; box-shadow: var(--shadow); cursor: pointer; }
+.template-card:hover:not(:disabled) { border-color: var(--green); transform: translateY(-1px); }
+.template-card:disabled { opacity: 0.6; cursor: default; }
+.template-emoji { font-size: 22px; }
+.template-label { font: 800 14px Manrope; color: var(--ink); }
+.template-desc { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.template-create { color: var(--green); font-size: 11px; font-weight: 800; font-style: normal; }
+
+.pipeline-empty-state { display: grid; justify-items: center; gap: 10px; margin-top: 18px; padding: 44px 24px; border: 1px dashed #d7d7cf; border-radius: 16px; text-align: center; }
+.pipeline-empty-mark { font-size: 28px; color: var(--green); }
+.pipeline-empty-state h3 { margin: 0; font: 800 17px Manrope; }
+.pipeline-empty-state p { margin: 0; max-width: 560px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+.provider-sessions-empty { display: grid; justify-items: center; gap: 10px; margin-top: 18px; padding: 44px 24px; border: 1px dashed #d7d7cf; border-radius: 16px; text-align: center; }
+.provider-sessions-empty-mark { font-size: 28px; color: var(--green); }
+.provider-sessions-empty h3 { margin: 0; font: 800 17px Manrope; }
+.provider-sessions-empty p { margin: 0; max-width: 560px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+.welcome-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 22px 0 4px; padding: 14px 18px; border: 1px solid #cfe0d4; border-left: 4px solid var(--green); border-radius: 14px; background: linear-gradient(120deg, #eef6f0, var(--panel)); box-shadow: var(--shadow); }
+.welcome-banner-text { display: grid; gap: 3px; }
+.welcome-banner-text strong { font: 800 14px Manrope; color: #1f4a36; }
+.welcome-banner-text small { color: #5c7264; font-size: 12px; line-height: 1.5; }
+.welcome-banner-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.welcome-banner-cta { border: 0; border-radius: 10px; background: var(--green); color: #f4fbf5; padding: 10px 16px; font-weight: 800; font-size: 12px; box-shadow: 0 6px 16px rgba(31, 107, 79, 0.25); cursor: pointer; }
+.welcome-banner-cta:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.welcome-banner-close { border: 1px solid var(--line); background: transparent; color: var(--muted); width: 30px; height: 30px; border-radius: 9px; font-size: 16px; cursor: pointer; }
+.welcome-banner-close:hover { border-color: var(--green); color: var(--green); }
+
 /* ============ Dark mode surface overrides ============
    Tokens live in `:root[data-theme="dark"]`; these rules re-map the hard-coded
    light surfaces so the whole app reads as a dark forest UI. */
@@ -1706,4 +1742,16 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
   .activity-mark-all:hover { border-color: var(--green); background: #1c2d22; }
   .activity-close { border-color: #2b362d; background: #1b241d; color: var(--muted); }
   .activity-section-label { color: #a7b4ac; }
+
+  /* onboarding: empty states + welcome (issue #14) */
+  .board-empty-state, .pipeline-empty-state, .provider-sessions-empty { border-color: #2b362d; }
+  .template-card { border-color: #2b362d; background: #1b241d; }
+  .template-card:hover:not(:disabled) { border-color: #33503e; }
+  .template-label { color: var(--ink); }
+  .welcome-banner { border-color: #2b362d; background: linear-gradient(120deg, #14241b, var(--panel)); }
+  .welcome-banner-text strong { color: #7fd0a4; }
+  .welcome-banner-text small { color: #8fa89a; }
+  .welcome-banner-cta { background: var(--green); color: #f4fbf5; }
+  .welcome-banner-close { border-color: #2b362d; color: #a7b4ac; }
+  .welcome-banner-close:hover { border-color: var(--green); color: var(--green); }
 }

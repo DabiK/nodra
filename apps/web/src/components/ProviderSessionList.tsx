@@ -1,6 +1,22 @@
 import type { ProviderSessionListItem } from "../types";
 import { providerLabel } from "../services/provider-label";
 
+/** État vide de l'observatoire : aucune conversation observée, CTA de rechargement. */
+export function ProviderSessionsEmpty({ onReload }: { onReload(): void }) {
+  return (
+    <div className="provider-sessions-empty">
+      <span className="provider-sessions-empty-mark" aria-hidden="true">◫</span>
+      <h3>Aucune conversation observée</h3>
+      <p>
+        Les conversations apparaissent ici dès qu'un agent (Codex ou OpenCode) travaille avec
+        le serveur d'application — le snapshot est ensuite mis à jour en temps réel. Vérifie
+        l'état des capacités ci-dessus, puis recharge.
+      </p>
+      <button type="button" className="primary-button" onClick={onReload}>⟳ Recharger</button>
+    </div>
+  );
+}
+
 export function ProviderSessionList({ sessions, selectedId, onSelect }: { sessions: ProviderSessionListItem[]; selectedId: string | null; onSelect(id: string): void }) {
   if (!sessions.length) return <p className="empty">Aucune session observée.</p>;
   return (

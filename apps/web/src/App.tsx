@@ -34,6 +34,9 @@ import { useSseRefresh } from "./hooks/useSseRefresh";
 import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { ActivityHub } from "./components/ActivityHub";
+import { BoardEmptyState } from "./components/BoardEmptyState";
+import { MISSION_TEMPLATES, templateDraft, type MissionTemplate } from "./services/mission-template-service";
+import { createExamplePipeline } from "./services/pipeline-template-service";
 
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -92,6 +95,8 @@ export function App() {
   const [paletteStatus, setPaletteStatus] = useState("");
   const [activity, setActivity] = useState<ActivityView | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [templateBusyId, setTemplateBusyId] = useState<string | null>(null);
+  const [examplePipelineBusy, setExamplePipelineBusy] = useState(false);
 
   // Raccourcis globaux : ⌘K / Ctrl+K ouvre la palette, « ? » ouvre l'aide, Esc ferme.
   useEffect(() => {
@@ -326,6 +331,43 @@ export function App() {
     }
   };
 
+  // Onboarding : créer une mission en 1 clic depuis un modèle pré-rempli.
+  const createMissionFromTemplate = async (template: MissionTemplate) => {
+    if (!providerOptions) return;
+    setTemplateBusyId(template.id);
+    setError("");
+    setNotice("");
+    try {
+      const mission = await submitMissionIntake(templateDraft(template, providerOptions), providerOptions);
+      setDraft(createInitialDraft(providerOptions));
+      setCreateExpanded(false);
+      setNotice(`Mission créée depuis le modèle « ${template.label} » : ${mission.title}`);
+      setMissions(await listMissions());
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setTemplateBusyId(null);
+    }
+  };
+
+  // Onboarding : pipeline d'exemple en 1 clic (2 missions enchaînées).
+  const createExamplePipelineHandler = async () => {
+    if (!providerOptions) return;
+    setExamplePipelineBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const pipeline = await createExamplePipeline(providerOptions);
+      refreshPipelines();
+      setFocusPipelineId(pipeline.id);
+      setNotice(`Pipeline d'exemple créé : ${pipeline.name}`);
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setExamplePipelineBusy(false);
+    }
+  };
+
   const activeSidebarMissions = useMemo(() => selectActiveSidebarMissions(missions), [missions]);
 
   const selectMission = (missionId: string) => {
@@ -472,6 +514,9 @@ export function App() {
               focusPipelineId={focusPipelineId}
               onInspect={setInspectedMissionId}
               onChanged={refreshPipelines}
+              onCreateExample={() => void createExamplePipelineHandler()}
+              exampleBusy={examplePipelineBusy}
+              error={error}
             />
           </>
         ) : page === "managers" ? (
@@ -555,16 +600,25 @@ export function App() {
         />
 
         {viewMode === "board" ? (
-          <MissionRelay
-            missions={missions}
-            missionPipelineIndex={missionPipelineIndex}
-            kindFilter={kindFilter}
-            stateFilter={stateFilter}
-            onInspect={setInspectedMissionId}
-            onOpenPipeline={openPipeline}
-            onTransition={moveMissionOnBoard}
-            onNewTask={() => { setCreateExpanded(true); document.getElementById("create")?.scrollIntoView({ behavior: "smooth" }); }}
-          />
+          missions.length === 0 ? (
+            <BoardEmptyState
+              templates={MISSION_TEMPLATES}
+              busyTemplateId={templateBusyId}
+              onTemplate={(template) => void createMissionFromTemplate(template)}
+              onCreateMission={() => { setCreateExpanded(true); document.getElementById("create")?.scrollIntoView({ behavior: "smooth" }); document.querySelector<HTMLInputElement>("#create input")?.focus(); }}
+            />
+          ) : (
+            <MissionRelay
+              missions={missions}
+              missionPipelineIndex={missionPipelineIndex}
+              kindFilter={kindFilter}
+              stateFilter={stateFilter}
+              onInspect={setInspectedMissionId}
+              onOpenPipeline={openPipeline}
+              onTransition={moveMissionOnBoard}
+              onNewTask={() => { setCreateExpanded(true); document.getElementById("create")?.scrollIntoView({ behavior: "smooth" }); }}
+            />
+          )
         ) : (
         <section className="panel missions-panel" id="missions">
           <div className="panel-head">

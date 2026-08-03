@@ -68,10 +68,38 @@ function renderPage(overrides: Partial<Parameters<typeof PipelinesPage>[0]> = {}
       pipelines={[pipeline()]}
       onInspect={noop}
       onChanged={noop}
+      onCreateExample={noop}
+      exampleBusy={false}
       {...overrides}
     />
   );
 }
+
+describe("PipelinesPage empty state", () => {
+  it("affiche un état vide avec CTA de pipeline d'exemple quand aucun pipeline n'existe", () => {
+    renderPage({ pipelines: [] });
+    expect(screen.getByRole("heading", { name: "Aucun pipeline pour l'instant" })).toBeTruthy();
+    const cta = screen.getByRole("button", { name: "⚡ Créer un pipeline d'exemple" });
+    expect(cta).toBeTruthy();
+  });
+
+  it("déclenche la création du pipeline d'exemple et affiche l'état occupé", () => {
+    const onCreateExample = vi.fn();
+    renderPage({ pipelines: [], onCreateExample, exampleBusy: true });
+    const cta = screen.getByRole("button", { name: "Création…" }) as HTMLButtonElement;
+    expect(cta.disabled).toBe(true);
+    fireEvent.click(cta);
+    expect(onCreateExample).not.toHaveBeenCalled();
+    renderPage({ pipelines: [], onCreateExample, exampleBusy: false });
+    fireEvent.click(screen.getByRole("button", { name: "⚡ Créer un pipeline d'exemple" }));
+    expect(onCreateExample).toHaveBeenCalledTimes(1);
+  });
+
+  it("affiche une erreur de création dans l'état vide", () => {
+    renderPage({ pipelines: [], error: "Le provider est injoignable" });
+    expect(screen.getByRole("alert").textContent).toContain("Le provider est injoignable");
+  });
+});
 
 describe("PipelinesPage timeline view", () => {
   it("switches from graph to timeline with the toggle and persists the choice", () => {

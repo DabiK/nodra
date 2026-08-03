@@ -266,7 +266,15 @@ function pipelineProgress(pipeline: PipelineListItem): { completed: number; tota
   return { completed, total };
 }
 
-export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged }: { pipelines: PipelineListItem[]; focusPipelineId?: string | null; onInspect(missionId: string): void; onChanged(): void }) {
+export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged, onCreateExample, exampleBusy, error }: {
+  pipelines: PipelineListItem[];
+  focusPipelineId?: string | null;
+  onInspect(missionId: string): void;
+  onChanged(): void;
+  onCreateExample(): void;
+  exampleBusy: boolean;
+  error?: string;
+}) {
   const [showAll, setShowAll] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [view, setView] = useState<PipelineViewMode>(() => loadPipelineViewMode());
@@ -292,7 +300,19 @@ export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged
       </div>
 
       {!pipelines.length ? (
-        <p className="pipeline-empty-page">Aucun pipeline. Configure des pré-requis (séquence) dans une fiche de mission pour en créer un, il apparaîtra ici.</p>
+        <div className="pipeline-empty-state">
+          <span className="pipeline-empty-mark" aria-hidden="true">⌁</span>
+          <h3>Aucun pipeline pour l'instant</h3>
+          <p>
+            Un pipeline enchaîne plusieurs missions (pré-requis → étape finale). Crée un
+            exemple en un clic — deux missions enchaînées, prêtes à démarrer — ou
+            configure des pré-requis (séquence) dans une fiche de mission pour en créer un.
+          </p>
+          <button type="button" className="primary-button" disabled={exampleBusy} onClick={onCreateExample}>
+            {exampleBusy ? "Création…" : "⚡ Créer un pipeline d'exemple"}
+          </button>
+          {error && <p className="pipeline-error" role="alert">{error}</p>}
+        </div>
       ) : (
         <>
           <div className="workflow-tabs" role="tablist">
