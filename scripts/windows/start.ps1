@@ -38,21 +38,30 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 Set-Location $repoRoot
 
-function Assert-Command($name, $hint) {
-    if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
-        throw "'$name' was not found on PATH. $hint"
+function Resolve-NodraBinary($environmentVariable, $defaultName, $hint) {
+    $configured = [Environment]::GetEnvironmentVariable($environmentVariable)
+    if ($configured) {
+        if (-not (Test-Path -LiteralPath $configured -PathType Leaf)) {
+            throw "'$environmentVariable' points to '$configured', which does not exist. $hint"
+        }
+        return (Resolve-Path -LiteralPath $configured).Path
     }
+
+    $command = Get-Command $defaultName -ErrorAction SilentlyContinue
+    if (-not $command) {
+        throw "'$defaultName' was not found on PATH. $hint"
+    }
+    return $command.Source
 }
 
 Write-Host "Nodra — starting on Windows from $repoRoot" -ForegroundColor Cyan
 
-Assert-Command "node" "Install Node.js >= 22.12.0 from https://nodejs.org"
-Assert-Command "npm"  "npm ships with Node.js."
+$npmBinary = Resolve-NodraBinary "NODRA_NPM_BINARY" "npm" "npm ships with Node.js."
 if (-not $SkipTemporal) {
-    Assert-Command "temporal" "Install the Temporal CLI or set NODRA_TEMPORAL_BINARY, or pass -SkipTemporal."
+    $temporalBinary = Resolve-NodraBinary "NODRA_TEMPORAL_BINARY" "temporal" "Install the Temporal CLI or set NODRA_TEMPORAL_BINARY, or pass -SkipTemporal."
 }
 if (-not $SkipOpenCode) {
-    Assert-Command "opencode" "Install OpenCode or set NODRA_OPENCODE_BINARY, or pass -SkipOpenCode."
+    $opencodeBinary = Resolve-NodraBinary "NODRA_OPENCODE_BINARY" "opencode" "Install OpenCode or set NODRA_OPENCODE_BINARY, or pass -SkipOpenCode."
 }
 
 # Ensure the local data directories exist.
@@ -61,7 +70,7 @@ New-Item -ItemType Directory -Force -Path $temporalDbDir | Out-Null
 
 # Make sure the SQLite database is migrated before the API/worker boot.
 Write-Host "Preparing the local database (npm run db:setup)..." -ForegroundColor DarkGray
-& npm run db:setup | Out-Null
+& $npmBinary run db:setup | Out-Null
 
 function Start-Component($title, $command) {
     # Each component runs in its own PowerShell window, in the repo root.
@@ -74,23 +83,22 @@ function Start-Component($title, $command) {
 
 if (-not $SkipTemporal) {
     Start-Component "nodra-temporal" `
-        "temporal server start-dev --namespace nodra --ip 127.0.0.1 --port 7233 --db-filename `"data\local\temporal\dev-server.db`""
+        "& `"$temporalBinary`" server start-dev --namespace nodra --ip 127.0.0.1 --port 7233 --db-filename `"data\local\temporal\dev-server.db`""
     Start-Sleep -Seconds 3
 }
 
 if (-not $SkipOpenCode) {
-    Start-Component "nodra-opencode" `
-        "opencode serve --hostname 127.0.0.1 --port 4096"
+    Start-Component "nodra-opencode" "& `"$opencodeBinary`" serve --hostname 127.0.0.1 --port 4096"
     Start-Sleep -Seconds 2
 }
 
-Start-Component "nodra-api"    "npm run dev"
+Start-Component "nodra-api"    "& `"$npmBinary`" run dev"
 Start-Sleep -Seconds 2
-Start-Component "nodra-worker" "npm run worker"
+Start-Component "nodra-worker" "& `"$npmBinary`" run worker"
 
 if ($Web) {
     Start-Sleep -Seconds 1
-    Start-Component "nodra-web" "npm run web"
+    Start-Component "nodra-web" "& `"$npmBinary`" run web"
 }
 
 Write-Host ""
