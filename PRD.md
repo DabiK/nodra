@@ -50,7 +50,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - [x] `Ctrl+K` (et autres raccourcis) fonctionnels sur Windows
   > - [x] SSE OK sur Windows et WSL2
   > - [x] Boucle Ralph documentée WSL2-only (ou équivalent PowerShell)
-  > - [ ] Vérifications `npm run typecheck` / `lint` / `test` sur Windows natives — nécessite une machine Windows réelle
+  > - [ ] Vérifications `npm run typecheck` / `lint` / `test` sur Windows natives — nécessite une machine Windows réelle (revalidation macOS / WSL2 du 2026-08-03 : code, tests de contrat et stack réelle OK ; preuve Windows toujours requise)
   >
   > ## Méthode d'implémentation
   > - Cartographier le code avec des **subagents explore** avant d'implémenter (rechercher slashs durs, raccourcis, dépendances Unix)

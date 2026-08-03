@@ -1,5 +1,20 @@
 # Journal d'avancement — DabiK/nodra
 
+## Itération 21 — 2026-08-03 — Task #21 : Compatibilité Windows des nouvelles features (revalidation)
+
+### Fait
+- Relecture ciblée du parcours Windows : `App.tsx` ouvre la palette avec `metaKey || ctrlKey`; le SSE reste relatif (`/api/events/stream`) et passe par le proxy Vite; `start.ps1` résout puis invoque les binaires `NODRA_*_BINARY` sans dépendre d'un shell POSIX.
+- Revalidation macOS/WSL2 : `npm run runtime:start` a rendu Temporal, OpenCode, API et worker `ready`; `/health` répond SQLite/workflow OK et `http://127.0.0.1:5174/api/events/stream` a émis `hello` à travers le proxy Vite. `npm run runtime:stop` a ensuite arrêté tous les composants gérés.
+
+### Vérifications
+- `npm run typecheck` : OK.
+- `npm run lint` : 8 erreurs pré-existantes hors périmètre (AgentPage/sidebar, adapters et application).
+- `npm test` : 6 échecs pré-existants/environnementaux (architecture-boundaries, health, I6, I14, temporal-envelope x2), sans lien avec le code Windows; les tests de contrat Windows, palette et SSE restent couverts dans la suite.
+- Validation manuelle Windows native : non réalisable depuis cette machine macOS. La preuve manquante est l'exécution sur PowerShell/cmd de `npm run typecheck`, `npm run lint`, `npm test` et `npm run win:start:web`.
+
+### Statut
+- [BLOCKED] #21 — Compatibilité Windows des nouvelles features (implémentation, tests de contrat et documentation terminés ; seule la preuve matérielle Windows native manque)
+
 ## Itération 20 — 2026-08-03 — Task #21 : Compatibilité Windows des nouvelles features
 
 ### Fait
