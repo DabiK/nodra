@@ -4,7 +4,6 @@ export interface ControllableRun {
   id: Id;
   missionId: Id | null;
   managerId: Id | null;
-  temporalParentWorkflowId: string;
   state: string;
   providerSessionRef: string | null;
   capabilities: {
