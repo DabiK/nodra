@@ -1,5 +1,28 @@
 # Journal d'avancement — DabiK/nodra
 
+## Itération 20 — 2026-08-03 — Task #21 : Compatibilité Windows des nouvelles features
+
+### Fait
+- Audit des features livrées : le raccourci global de palette teste déjà `metaKey || ctrlKey` dans `App.tsx` ; les flèches et Escape ne dépendent pas de la plateforme. Les tests ciblés couvrent la palette et le flux SSE relatif `/api/events/stream` ; le proxy Vite `/api` a aussi été fumé sur la stack réelle.
+- Audit des chemins/sous-processus : configuration runtime en `node:path`, résolution pure Node avec `PATH` + `PATHEXT`, et fournisseurs/Git lancés via `spawn`/`execFile` à arguments (sans `sh -c`).
+- Correctif PowerShell : `scripts/windows/start.ps1` honorait les variables `NODRA_*_BINARY` dans ses messages, mais lançait malgré tout les noms nus. `Resolve-NodraBinary` valide et lance désormais les binaires explicites Temporal/OpenCode, y compris si leur chemin contient des espaces ; repli vers `PATH` sinon. Test de contrat ajouté (`scripts/windows/start-script.test.ts`).
+- Documentation : README + `docs/windows-compatibility.md` précisent que les helpers/boucle Ralph sont WSL2-only sous Windows et que les overrides de binaires sont aussi appliqués par le starter natif.
+
+### Commits
+1. `fix(windows): honor explicit provider binaries in starter`
+2. `docs(windows): document Ralph WSL2 boundary`
+
+### Vérifications
+- Tests ciblés : 20/20 OK (starter Windows, résolution runtime, palette et SSE).
+- `npm run typecheck` : OK.
+- `npm run lint` : 8 erreurs pré-existantes hors périmètre (AgentPage/sidebar, adapters et application), aucun signal sur les fichiers de cette itération.
+- `npm test` : la nouvelle couverture passe ; 6 échecs pré-existants/environnementaux persistent (architecture-boundaries, health, I6, I14, temporal-envelope x2), sans lien avec le correctif Windows.
+- Stack réelle macOS : `npm run runtime:start` a confirmé Temporal, OpenCode, API et worker `ready`. Le flux SSE a été reçu via `http://127.0.0.1:5174/api/events/stream` (`hello`), donc traversée réelle du proxy Vite. Stack arrêtée ensuite avec `npm run runtime:stop`.
+- Validation manuelle native Windows non exécutable depuis cette machine macOS : l'acceptance restante consiste à lancer les trois quality gates et `npm run win:start:web` sur Windows PowerShell/cmd. La tâche reste ouverte uniquement pour cette preuve matérielle.
+
+### Statut
+- [ ] #21 — Compatibilité Windows des nouvelles features (code et documentation terminés ; validation Windows native à faire)
+
 ## Itération 19 — 2026-08-03 — Task #20 : Séquences favorites (templates de pipeline)
 
 ### Fait

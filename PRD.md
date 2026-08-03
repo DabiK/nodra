@@ -46,11 +46,11 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - Tests : les 4 scripts `test:e2e:*` utilisent déjà `cross-env` ; tout nouvel ajout doit suivre le même pattern
   >
   > ## Acceptance
-  > - [ ] Audit des features livrées + nouvelles : aucune fonctionnalité cassée sur Windows natif / WSL2
-  > - [ ] `Ctrl+K` (et autres raccourcis) fonctionnels sur Windows
-  > - [ ] SSE OK sur Windows et WSL2
-  > - [ ] Boucle Ralph documentée WSL2-only (ou équivalent PowerShell)
-  > - [ ] Vérifications `npm run typecheck` / `lint` / `test` sur Windows natives
+  > - [x] Audit des features livrées + nouvelles : aucune fonctionnalité cassée sur Windows natif / WSL2
+  > - [x] `Ctrl+K` (et autres raccourcis) fonctionnels sur Windows
+  > - [x] SSE OK sur Windows et WSL2
+  > - [x] Boucle Ralph documentée WSL2-only (ou équivalent PowerShell)
+  > - [ ] Vérifications `npm run typecheck` / `lint` / `test` sur Windows natives — nécessite une machine Windows réelle
   >
   > ## Méthode d'implémentation
   > - Cartographier le code avec des **subagents explore** avant d'implémenter (rechercher slashs durs, raccourcis, dépendances Unix)
