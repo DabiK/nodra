@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { MissionView } from "../types";
 import { filterMissions, type MissionFilters } from "./mission-filters";
 import { saveMissionNotes } from "./mission-notes-service";
+import { dayKey, todayKey, type MissionSchedule } from "./mission-schedule-service";
 
 function mission(overrides: Partial<MissionView>): MissionView {
   return {
@@ -21,7 +22,7 @@ function mission(overrides: Partial<MissionView>): MissionView {
   };
 }
 
-const baseFilters: MissionFilters = { query: "", state: "all", kind: "all", sort: "recent" };
+const baseFilters: MissionFilters = { query: "", state: "all", kind: "all", sort: "recent", day: "all" };
 
 afterEach(() => localStorage.clear());
 
@@ -96,5 +97,54 @@ describe("filterMissions combinable filters", () => {
   it("combines state + kind without query", () => {
     const result = filterMissions(missions, { ...baseFilters, state: "ACTIVE", kind: "human" });
     expect(result.map((item) => item.id)).toEqual(["human-active"]);
+  });
+});
+
+describe("filterMissions day filter (ma journée)", () => {
+  const today = todayKey();
+  const yesterday = dayKey(new Date(Date.now() - 86_400_000));
+  const onDay = (day: string, time = "10:00:00") => `${day}T${time}`;
+
+  it("keeps only the missions of the day and sorts by urgency when day is today", () => {
+    const schedule: MissionSchedule = {
+      "m-overdue": yesterday,
+      "m-validation": today
+    };
+    const missions = [
+      mission({ id: "m-overdue", title: "Retard", state: "ACTIVE", createdAt: onDay(yesterday), updatedAt: onDay(today, "08:00:00") }),
+      mission({ id: "m-old", title: "Ancienne", state: "READY", createdAt: onDay(yesterday), updatedAt: onDay(yesterday, "11:00:00") }),
+      mission({ id: "m-validation", title: "À valider", state: "VALIDATION", createdAt: onDay(yesterday), updatedAt: onDay(yesterday, "12:00:00") }),
+      mission({ id: "m-new", title: "Nouvelle", state: "READY", createdAt: onDay(today), updatedAt: onDay(today) })
+    ];
+    const result = filterMissions(missions, { ...baseFilters, day: "today" }, schedule);
+    expect(result.map((item) => item.id)).toEqual(["m-overdue", "m-validation", "m-new"]);
+  });
+
+  it("keeps every mission when day is all", () => {
+    const missions = [
+      mission({ id: "old", title: "Ancienne", createdAt: "2026-07-01T09:00:00", updatedAt: "2026-07-01T10:00:00" }),
+      mission({ id: "today", title: "Aujourd'hui", createdAt: onDay(today), updatedAt: onDay(today) })
+    ];
+    expect(filterMissions(missions, baseFilters, {}).map((item) => item.id)).toEqual(["today", "old"]);
+  });
+
+  it("falls back to the regular sort when day is today without a schedule", () => {
+    const missions = [
+      mission({ id: "a", title: "A", state: "VALIDATION" }),
+      mission({ id: "b", title: "B", state: "ACTIVE" })
+    ];
+    const result = filterMissions(missions, { ...baseFilters, day: "today" }, undefined);
+    expect(result.map((item) => item.id)).toEqual(["a", "b"]);
+  });
+
+  it("combines the day filter with state and kind", () => {
+    const schedule: MissionSchedule = {};
+    const missions = [
+      mission({ id: "agent-today", title: "Agent", executionKind: "agent", state: "READY", createdAt: onDay(today), updatedAt: onDay(today) }),
+      mission({ id: "human-today", title: "Humain", executionKind: "human", state: "READY", createdAt: onDay(today), updatedAt: onDay(today) }),
+      mission({ id: "agent-old", title: "Ancien", executionKind: "agent", state: "READY", createdAt: onDay(yesterday), updatedAt: onDay(yesterday) })
+    ];
+    const result = filterMissions(missions, { ...baseFilters, day: "today", kind: "agent" }, schedule);
+    expect(result.map((item) => item.id)).toEqual(["agent-today"]);
   });
 });

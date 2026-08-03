@@ -74,6 +74,7 @@ export function App() {
   const [stateFilter, setStateFilter] = useState(savedFilters.state);
   const [kindFilter, setKindFilter] = useState(savedFilters.kind);
   const [sort, setSort] = useState(savedFilters.sort);
+  const [dayFilter, setDayFilter] = useState(savedFilters.day);
   const [viewMode, setViewMode] = useState<MissionViewMode>(() => loadViewMode());
   const [createExpanded, setCreateExpanded] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
@@ -253,14 +254,14 @@ export function App() {
   }, [pipelines]);
 
   const filtered = useMemo(
-    () => filterMissions(missions, { query, state: stateFilter, kind: kindFilter, sort }),
-    [missions, query, stateFilter, kindFilter, sort]
+    () => filterMissions(missions, { query, state: stateFilter, kind: kindFilter, sort, day: dayFilter }, schedule),
+    [missions, query, stateFilter, kindFilter, sort, dayFilter, schedule]
   );
 
   // Filtres sauvegardés : le board rouvre avec la même configuration.
   useEffect(() => {
-    saveMissionFilters({ query, state: stateFilter, kind: kindFilter, sort });
-  }, [query, stateFilter, kindFilter, sort]);
+    saveMissionFilters({ query, state: stateFilter, kind: kindFilter, sort, day: dayFilter });
+  }, [query, stateFilter, kindFilter, sort, dayFilter]);
   const stateCounts = useMemo(
     () => missions.reduce<Partial<Record<MissionState, number>>>((counts, mission) => {
       counts[mission.state] = (counts[mission.state] ?? 0) + 1;
