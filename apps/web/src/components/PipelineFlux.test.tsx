@@ -120,6 +120,24 @@ describe("PipelinesPage timeline view", () => {
     expect(document.querySelector(".workflow-graph")).toBeNull();
   });
 
+  it("force la timeline sous le breakpoint tablette (fallback du graph SVG)", () => {
+    const listeners = new Set<() => void>();
+    vi.stubGlobal("matchMedia", vi.fn(() => ({
+      matches: true,
+      media: "(max-width: 768px)",
+      addEventListener: (_type: string, listener: () => void) => { listeners.add(listener); },
+      removeEventListener: (_type: string, listener: () => void) => { listeners.delete(listener); },
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => true,
+      onchange: null
+    })));
+    renderPage();
+    expect(document.querySelector(".pipeline-timeline")).toBeTruthy();
+    expect(document.querySelector(".workflow-graph")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
   it("lists steps in chronological order with duration, time range and summary", () => {
     localStorage.setItem("nodra.pipelines.view", "timeline");
     renderPage();

@@ -50,6 +50,8 @@ button { color: inherit; cursor: pointer; }
 .app-shell.sidebar-collapsed .brand { padding: 0 0 24px; justify-content: center; }
 .app-shell.sidebar-collapsed .brand > div { display: none; }
 .sidebar-toggle { align-self: flex-end; margin: -8px 0 14px; width: 30px; height: 30px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: #637068; font-weight: 800; cursor: pointer; }
+/* Burger mobile : affiché uniquement sous le breakpoint tablette (media query ci-dessous). */
+.sidebar-burger { display: none; }
 .sidebar-toggle:hover { color: var(--ink); background: #fff; }
 .sidebar-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .app-shell.sidebar-collapsed .sidebar-toggle { align-self: center; }
@@ -734,6 +736,37 @@ h2 { margin: 4px 0 0; font: 800 20px Manrope; letter-spacing: -0.03em; }
   .agent-compose { grid-template-columns: 1fr; }
 }
 
+/* ============ Responsive tablette / mobile (issue #15) ============ */
+/* Breakpoint tablette : board → liste (fallback), graph SVG → timeline, sidebar → drawer. */
+@media (max-width: 768px) {
+  /* Sidebar : drawer plein écran coulissant (override la règle ≤900px « statique en haut »,
+     y compris quand l'état replié desktop est persisté). */
+  .app-shell, .app-shell.sidebar-collapsed { grid-template-columns: 1fr; }
+  .sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: min(300px, 84vw); height: 100vh; padding: 28px 20px 20px; transform: translateX(-102%); transition: transform 0.25s ease; z-index: 70; box-shadow: none; }
+  .app-shell.sidebar-open .sidebar { transform: translateX(0); box-shadow: 18px 0 50px rgba(18, 30, 23, 0.28); }
+  .sidebar-toggle { display: none; }
+  nav { grid-template-columns: 1fr; }
+  .sidebar-burger { position: fixed; top: 14px; left: 14px; z-index: 30; width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); font-size: 17px; box-shadow: 0 6px 18px rgba(30, 47, 39, 0.14); }
+  .sidebar-backdrop { position: fixed; inset: 0; z-index: 65; background: rgba(18, 30, 23, 0.42); backdrop-filter: blur(2px); }
+
+  /* Workspace : plus de marges latérales énormes, aucun débordement horizontal. */
+  .workspace { padding: 60px 16px 40px; }
+  .hero-row { align-items: flex-start; gap: 14px; }
+  .hero-row h1 { font-size: 30px; letter-spacing: -0.04em; }
+  .focus-score { min-width: auto; }
+  .focus-score span { font-size: 26px; }
+
+  /* Fallbacks forcés en petit écran : le mode board est remplacé par la liste,
+     le graph SVG par la timeline — les bascules manuelles sont masquées. */
+  .task-view-chips .view-chip.view-mode { display: none; }
+  .pipeline-view-toggle { display: none; }
+
+  /* Têtes de carte et dock manager : pas de débordement ni d'empilement cassé. */
+  .workflow-head, .pipeline-page-head { flex-wrap: wrap; }
+  .manager-dock { right: 12px; bottom: 12px; }
+  .manager-dock-panel { width: min(340px, calc(100vw - 24px)); }
+}
+
 /* ============ Managers ============ */
 .managers-page { display: grid; gap: 22px; margin-top: 30px; }
 .manager-manifesto { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 26px 28px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(120deg, var(--green-soft), var(--panel)); box-shadow: var(--shadow); }
@@ -1325,6 +1358,8 @@ mark.conversation-search-hit { border-radius: 3px; padding: 0 1px; background: #
   nav a.active { background: var(--panel); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
   .sidebar-toggle { background: var(--panel); border-color: var(--line); color: var(--muted); }
   .sidebar-toggle:hover { background: #202a23; color: var(--ink); }
+  .sidebar-burger { background: var(--panel); border-color: var(--line); color: var(--ink); }
+  .sidebar-backdrop { background: rgba(0, 0, 0, 0.55); }
   .sidebar-mission-dot { background: #55635a; }
   .sidebar-mission-dot.state-draft { background: #55635a; }
 

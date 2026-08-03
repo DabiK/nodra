@@ -12,6 +12,7 @@ import {
   sortTimelineNodes
 } from "../services/pipeline-timeline-service";
 import { formatCostMicros } from "../services/budget-service";
+import { TABLET_BREAKPOINT, useMediaQuery } from "../hooks/use-media-query";
 
 const RUN_STATE_LABEL: Record<string, string> = {
   queued: "en file", active: "en cours", blocked: "à débloquer", completed: "terminé", failed: "échec", cancelled: "annulé", archived: "archivé"
@@ -160,6 +161,10 @@ function PipelineCard({ pipeline, view, onViewChange, onInspect, onChanged }: { 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const graph = useMemo(() => computeGraph(pipeline.nodes, pipeline.edges), [pipeline.nodes, pipeline.edges]);
+  // Responsive : sous le breakpoint tablette, le graph SVG (largeur minimum 560px)
+  // bascule sur la timeline chronologique — le choix explicite reste persisté.
+  const isNarrow = useMediaQuery(TABLET_BREAKPOINT);
+  const effectiveView: PipelineViewMode = isNarrow ? "timeline" : view;
   const completed = pipeline.nodes.filter((node) => node.nodeRunState === "completed" || (!pipeline.runId && node.missionState === "DONE")).length;
   const total = pipeline.nodes.length;
   const started = Boolean(pipeline.runId);
@@ -197,7 +202,7 @@ function PipelineCard({ pipeline, view, onViewChange, onInspect, onChanged }: { 
 
       {(() => { const status = pipelineStatus(pipeline); return <p className={`pipeline-status ${status.tone}`}><i aria-hidden="true" />{status.text}</p>; })()}
 
-      {view === "timeline" ? (
+      {effectiveView === "timeline" ? (
         <PipelineTimeline pipeline={pipeline} onInspect={onInspect} />
       ) : (
         <div className="workflow-graph">

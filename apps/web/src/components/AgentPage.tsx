@@ -8,6 +8,7 @@ import { ProviderMissionConversationPage } from "./ProviderMissionConversationPa
 import { selectActiveSidebarMissions } from "../services/sidebar-missions";
 import { applyTheme, initTheme, saveTheme, type Theme } from "../services/theme-service";
 import { useSseRefresh } from "../hooks/useSseRefresh";
+import { TABLET_BREAKPOINT, useMediaQuery } from "../hooks/use-media-query";
 
 function navigateToApp(page: AppPage) {
   location.assign(page === "tasks" ? "/" : `/?page=${page}`);
@@ -45,6 +46,21 @@ function AgentMissionShell({ missionId }: { missionId: string }) {
     });
   };
 
+  // Responsive : sous le breakpoint tablette, la sidebar devient un drawer.
+  const isNarrow = useMediaQuery(TABLET_BREAKPOINT);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  useEffect(() => {
+    if (!isNarrow) setSidebarOpen(false);
+  }, [isNarrow]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const toggleTheme = () => {
     setTheme((current) => {
       const next: Theme = current === "dark" ? "light" : "dark";
@@ -55,7 +71,22 @@ function AgentMissionShell({ missionId }: { missionId: string }) {
   };
 
   return (
-    <main className={appShellClassName(sidebarCollapsed)}>
+    <main className={`${appShellClassName(sidebarCollapsed)}${sidebarOpen ? " sidebar-open" : ""}`}>
+      {isNarrow && (
+        <button
+          type="button"
+          className="sidebar-burger"
+          aria-label={sidebarOpen ? "Fermer la navigation" : "Ouvrir la navigation"}
+          aria-expanded={sidebarOpen}
+          aria-controls="sidebar-nav"
+          onClick={() => setSidebarOpen((open) => !open)}
+        >
+          <span aria-hidden="true">{sidebarOpen ? "×" : "☰"}</span>
+        </button>
+      )}
+      {isNarrow && sidebarOpen && (
+        <div className="sidebar-backdrop" aria-hidden="true" onClick={closeSidebar} />
+      )}
       <AppSidebar
         page="tasks"
         collapsed={sidebarCollapsed}

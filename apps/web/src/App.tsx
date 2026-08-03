@@ -31,6 +31,7 @@ import { advancePipelineRun, startPipeline } from "./services/pipeline-service";
 import { buildPaletteCommands, type PaletteCommand } from "./services/palette-service";
 import { applyTheme, initTheme, saveTheme, type Theme } from "./services/theme-service";
 import { useSseRefresh } from "./hooks/useSseRefresh";
+import { TABLET_BREAKPOINT, useMediaQuery } from "./hooks/use-media-query";
 import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { ActivityHub } from "./components/ActivityHub";
@@ -100,6 +101,18 @@ export function App() {
   const [examplePipelineBusy, setExamplePipelineBusy] = useState(false);
   const [welcomeVisible, setWelcomeVisible] = useState<boolean>(() => !loadWelcomeDismissed());
 
+  // Responsive : en deçà du breakpoint tablette, le board bascule en liste (fallback)
+  // et la sidebar devient un drawer piloté par `sidebarOpen`.
+  const isNarrow = useMediaQuery(TABLET_BREAKPOINT);
+  const effectiveViewMode: MissionViewMode = isNarrow ? "list" : viewMode;
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  // En passant au-dessus du breakpoint, le drawer n'a plus de sens : on le referme.
+  useEffect(() => {
+    if (!isNarrow) setSidebarOpen(false);
+  }, [isNarrow]);
+
   // Raccourcis globaux : ⌘K / Ctrl+K ouvre la palette, « ? » ouvre l'aide, Esc ferme.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -114,6 +127,7 @@ export function App() {
         setHelpOpen(false);
         setPaletteOpen(false);
         setActivityOpen(false);
+        setSidebarOpen(false);
         return;
       }
       if (event.key === "?" && !isTypingTarget(event.target)) {
@@ -176,6 +190,7 @@ export function App() {
   }, []);
 
   const navigate = (next: AppPage) => {
+    setSidebarOpen(false);
     const url = new URL(location.href);
     if (next === "tasks") url.searchParams.delete("page");
     else url.searchParams.set("page", next);
@@ -465,7 +480,22 @@ export function App() {
   };
 
   return (
-    <main className={appShellClassName(sidebarCollapsed)}>
+    <main className={`${appShellClassName(sidebarCollapsed)}${sidebarOpen ? " sidebar-open" : ""}`}>
+      {isNarrow && (
+        <button
+          type="button"
+          className="sidebar-burger"
+          aria-label={sidebarOpen ? "Fermer la navigation" : "Ouvrir la navigation"}
+          aria-expanded={sidebarOpen}
+          aria-controls="sidebar-nav"
+          onClick={() => setSidebarOpen((open) => !open)}
+        >
+          <span aria-hidden="true">{sidebarOpen ? "×" : "☰"}</span>
+        </button>
+      )}
+      {isNarrow && sidebarOpen && (
+        <div className="sidebar-backdrop" aria-hidden="true" onClick={closeSidebar} />
+      )}
       <AppSidebar
         page={page}
         collapsed={sidebarCollapsed}
@@ -630,7 +660,7 @@ export function App() {
           }}
         />
 
-        {viewMode === "board" ? (
+        {effectiveViewMode === "board" ? (
           missions.length === 0 ? (
             <BoardEmptyState
               templates={MISSION_TEMPLATES}
