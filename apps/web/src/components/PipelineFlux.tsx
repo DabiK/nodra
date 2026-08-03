@@ -13,6 +13,7 @@ import {
 } from "../services/pipeline-timeline-service";
 import { formatCostMicros } from "../services/budget-service";
 import { TABLET_BREAKPOINT, useMediaQuery } from "../hooks/use-media-query";
+import { deletePipelineFavorite, loadPipelineFavorites, renamePipelineFavorite, type PipelineFavorite } from "../services/pipeline-favorites-service";
 
 const RUN_STATE_LABEL: Record<string, string> = {
   queued: "en file", active: "en cours", blocked: "à débloquer", completed: "terminé", failed: "échec", cancelled: "annulé", archived: "archivé"
@@ -157,7 +158,7 @@ function PipelineTimeline({ pipeline, onInspect }: { pipeline: PipelineListItem;
   );
 }
 
-function PipelineCard({ pipeline, view, onViewChange, onInspect, onChanged }: { pipeline: PipelineListItem; view: PipelineViewMode; onViewChange(mode: PipelineViewMode): void; onInspect(missionId: string): void; onChanged(): void }) {
+function PipelineCard({ pipeline, view, onViewChange, onInspect, onChanged, onSaveFavorite, favoriteBusy }: { pipeline: PipelineListItem; view: PipelineViewMode; onViewChange(mode: PipelineViewMode): void; onInspect(missionId: string): void; onChanged(): void; onSaveFavorite(pipeline: PipelineListItem): void; favoriteBusy: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const graph = useMemo(() => computeGraph(pipeline.nodes, pipeline.edges), [pipeline.nodes, pipeline.edges]);
@@ -193,6 +194,7 @@ function PipelineCard({ pipeline, view, onViewChange, onInspect, onChanged }: { 
             <button type="button" className={view === "graph" ? "active" : ""} aria-pressed={view === "graph"} onClick={() => onViewChange("graph")}>Graph</button>
             <button type="button" className={view === "timeline" ? "active" : ""} aria-pressed={view === "timeline"} onClick={() => onViewChange("timeline")}>Timeline</button>
           </div>
+          <button type="button" className="pipeline-action" disabled={favoriteBusy || busy !== null} onClick={() => onSaveFavorite(pipeline)}>{favoriteBusy ? "Enregistrement…" : "☆ Enregistrer comme modèle"}</button>
           {canStart && <button type="button" className="pipeline-action primary" disabled={busy !== null} onClick={() => void run("start", () => startPipeline(pipeline.id))}>{busy === "start" ? "…" : started ? "Relancer →" : "Démarrer →"}</button>}
           {canAdvance && <button type="button" className="pipeline-action" disabled={busy !== null} onClick={() => void run("advance", () => advancePipelineRun(pipeline.runId!))}>{busy === "advance" ? "…" : "↻ Avancer"}</button>}
         </div>
@@ -271,24 +273,32 @@ function pipelineProgress(pipeline: PipelineListItem): { completed: number; tota
   return { completed, total };
 }
 
-export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged, onCreateExample, exampleBusy, error }: {
+export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged, onCreateExample, exampleBusy, onSaveFavorite, onCreateFavorite, favoriteBusy, error }: {
   pipelines: PipelineListItem[];
   focusPipelineId?: string | null;
   onInspect(missionId: string): void;
   onChanged(): void;
   onCreateExample(): void;
   exampleBusy: boolean;
+  onSaveFavorite(pipeline: PipelineListItem): Promise<PipelineFavorite | null>;
+  onCreateFavorite(favorite: PipelineFavorite): void;
+  favoriteBusy: string | null;
   error?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [view, setView] = useState<PipelineViewMode>(() => loadPipelineViewMode());
+  const [favorites, setFavorites] = useState<PipelineFavorite[]>(() => loadPipelineFavorites());
   useEffect(() => { if (focusPipelineId) { setSelectedId(focusPipelineId); setShowAll(true); } }, [focusPipelineId]);
   const isDone = (pipeline: PipelineListItem) => pipeline.state === "archived" || pipeline.runState === "completed" || pipeline.runState === "cancelled" || pipeline.runState === "archived";
   const visible = pipelines.filter((pipeline) => showAll || !isDone(pipeline));
   const active = pipelines.filter((pipeline) => pipeline.runState === "active" || pipeline.runState === "blocked").length;
   const doneCount = pipelines.filter(isDone).length;
   const selected = visible.find((pipeline) => pipeline.id === selectedId) ?? visible[0] ?? null;
+  const renameFavorite = (favorite: PipelineFavorite) => {
+    const name = window.prompt("Nom du modèle", favorite.name);
+    if (name !== null) setFavorites(renamePipelineFavorite(favorite.id, name));
+  };
 
   return (
     <section className="pipeline-page" aria-label="Pipelines">
@@ -303,6 +313,22 @@ export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged
           </button>
         )}
       </div>
+
+      {favorites.length > 0 && (
+        <section className="pipeline-favorites" aria-label="Modèles de pipeline">
+          <div><span className="eyebrow">MODÈLES SAUVEGARDÉS</span><h3>Créer depuis un modèle</h3></div>
+          <div className="pipeline-favorite-list">
+            {favorites.map((favorite) => <article key={favorite.id} className="pipeline-favorite">
+              <div><b>{favorite.name}</b><small>{favorite.nodes.length} étapes · {favorite.nodes.filter((node) => node.kind === "agent").length} agent{favorite.nodes.filter((node) => node.kind === "agent").length > 1 ? "s" : ""}</small></div>
+              <div className="pipeline-favorite-actions">
+                <button type="button" className="pipeline-action primary" disabled={favoriteBusy !== null} onClick={() => onCreateFavorite(favorite)}>{favoriteBusy === favorite.id ? "Création…" : "Créer"}</button>
+                <button type="button" className="pipeline-action" disabled={favoriteBusy !== null} onClick={() => renameFavorite(favorite)}>Renommer</button>
+                <button type="button" className="pipeline-action danger" disabled={favoriteBusy !== null} onClick={() => setFavorites(deletePipelineFavorite(favorite.id))}>Supprimer</button>
+              </div>
+            </article>)}
+          </div>
+        </section>
+      )}
 
       {!pipelines.length ? (
         <div className="pipeline-empty-state">
@@ -342,6 +368,8 @@ export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged
                 onViewChange={(mode) => { setView(mode); savePipelineViewMode(mode); }}
                 onInspect={onInspect}
                 onChanged={onChanged}
+                onSaveFavorite={(pipeline) => { void onSaveFavorite(pipeline).then((favorite) => { if (favorite) setFavorites(loadPipelineFavorites()); }); }}
+                favoriteBusy={favoriteBusy === selected.id}
               />
             : <p className="pipeline-empty-page">Aucun pipeline en cours. Active « Voir terminés » pour consulter l'historique.</p>}
         </>
@@ -349,4 +377,3 @@ export function PipelinesPage({ pipelines, focusPipelineId, onInspect, onChanged
     </section>
   );
 }
-

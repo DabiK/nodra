@@ -393,6 +393,14 @@ label input:focus, label textarea:focus, label select:focus, input:focus, select
 .pipeline-flux-head .eyebrow { color: var(--green); font-size: 9px; font-weight: 900; letter-spacing: .1em; }
 .pipeline-flux-head h2 { margin: 6px 0 0; }
 .pipeline-page { margin-top: 4px; }
+.pipeline-favorites { margin: 0 0 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.pipeline-favorites h3 { margin: .15rem 0 .7rem; font-size: 1rem; }
+.pipeline-favorite-list { display: grid; gap: .5rem; }
+.pipeline-favorite { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: .65rem .75rem; border: 1px solid var(--line); border-radius: 8px; }
+.pipeline-favorite b, .pipeline-favorite small { display: block; }
+.pipeline-favorite small { color: var(--muted); margin-top: .2rem; }
+.pipeline-favorite-actions { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: end; }
+.pipeline-action.danger { color: var(--red); }
 .pipeline-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
 .pipeline-page-head .eyebrow { color: var(--green); font-size: 9px; font-weight: 900; letter-spacing: .1em; }
 .pipeline-page-head h2 { margin: 6px 0 0; }

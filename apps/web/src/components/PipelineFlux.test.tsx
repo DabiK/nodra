@@ -70,6 +70,9 @@ function renderPage(overrides: Partial<Parameters<typeof PipelinesPage>[0]> = {}
       onChanged={noop}
       onCreateExample={noop}
       exampleBusy={false}
+      onSaveFavorite={async () => null}
+      onCreateFavorite={noop}
+      favoriteBusy={null}
       {...overrides}
     />
   );

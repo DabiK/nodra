@@ -39,6 +39,7 @@ import { ActivityHub } from "./components/ActivityHub";
 import { BoardEmptyState } from "./components/BoardEmptyState";
 import { MISSION_TEMPLATES, templateDraft, type MissionTemplate } from "./services/mission-template-service";
 import { createExamplePipeline } from "./services/pipeline-template-service";
+import { createPipelineFromFavorite, savePipelineFavorite, type PipelineFavorite } from "./services/pipeline-favorites-service";
 import { dismissWelcomeBanner, loadWelcomeDismissed } from "./services/onboarding-service";
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
@@ -101,6 +102,7 @@ export function App() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [templateBusyId, setTemplateBusyId] = useState<string | null>(null);
   const [examplePipelineBusy, setExamplePipelineBusy] = useState(false);
+  const [favoritePipelineBusy, setFavoritePipelineBusy] = useState<string | null>(null);
   const [welcomeVisible, setWelcomeVisible] = useState<boolean>(() => !loadWelcomeDismissed());
 
   // Responsive : en deçà du breakpoint tablette, le board bascule en liste (fallback)
@@ -401,6 +403,25 @@ export function App() {
     }
   };
 
+  const savePipelineFavoriteHandler = async (pipeline: PipelineListItem) => {
+    setFavoritePipelineBusy(pipeline.id);
+    setError(""); setNotice("");
+    try { const favorite = await savePipelineFavorite(pipeline); setNotice(`Modèle enregistré : ${favorite.name}`); return favorite; }
+    catch (reason) { setError((reason as Error).message); return null; }
+    finally { setFavoritePipelineBusy(null); }
+  };
+
+  const createPipelineFromFavoriteHandler = async (favorite: PipelineFavorite) => {
+    setFavoritePipelineBusy(favorite.id);
+    setError(""); setNotice("");
+    try {
+      const pipeline = await createPipelineFromFavorite(favorite);
+      refreshPipelines(); setFocusPipelineId(pipeline.id);
+      setNotice(`Pipeline créé depuis le modèle « ${favorite.name} »`);
+    } catch (reason) { setError((reason as Error).message); }
+    finally { setFavoritePipelineBusy(null); }
+  };
+
   const activeSidebarMissions = useMemo(() => selectActiveSidebarMissions(missions, query), [missions, query]);
 
   const selectMission = (missionId: string) => {
@@ -564,6 +585,9 @@ export function App() {
               onChanged={refreshPipelines}
               onCreateExample={() => void createExamplePipelineHandler()}
               exampleBusy={examplePipelineBusy}
+              onSaveFavorite={savePipelineFavoriteHandler}
+              onCreateFavorite={(favorite) => void createPipelineFromFavoriteHandler(favorite)}
+              favoriteBusy={favoritePipelineBusy}
               error={error}
             />
           </>
