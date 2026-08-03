@@ -26,6 +26,12 @@ each in their own PowerShell window — no Unix process groups, no `ps`/`lsof`.
 `stop.ps1` terminates whatever listens on the Nodra ports (7233/4096/4100/5174)
 via `Get-NetTCPConnection` + `taskkill /T /F`.
 
+The starter resolves `NODRA_TEMPORAL_BINARY` and `NODRA_OPENCODE_BINARY` before
+falling back to `PATH`, so explicit `.exe` / `.cmd` locations work in the same
+way as the runtime configuration. The Ralph automation/helpers remain shell
+scripts: they are **WSL2-only on Windows** and are not part of the native
+PowerShell workflow.
+
 ## Incompatibilities found and how they were handled
 
 1. **Process‑group supervision (`scripts/runtime/**`)** — uses `ps`, `lsof`,
@@ -55,6 +61,14 @@ via `Get-NetTCPConnection` + `taskkill /T /F`.
 4. **POSIX inline env in npm scripts** (`package.json` `test:e2e:*`) —
    `VAR=value cmd` fails in PowerShell/cmd.
    *Fixed:* wrapped with `cross-env` (added as a devDependency).
+
+5. **Native PowerShell starter ignored explicit provider binaries**
+   (`scripts/windows/start.ps1`) — it checked `NODRA_*_BINARY` in its message
+   but launched the bare command name afterwards.
+   *Fixed:* `Resolve-NodraBinary` now validates and launches the explicit
+   `NODRA_TEMPORAL_BINARY` / `NODRA_OPENCODE_BINARY` when present, including
+   paths containing spaces; otherwise it uses the `PATH` command discovered by
+   PowerShell.
 
 ## What was actually tested (on macOS / darwin)
 

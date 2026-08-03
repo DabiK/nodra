@@ -218,7 +218,8 @@ npm run cli -- health
 
 `temporal` / `opencode` are resolved from `PATH` honouring `PATHEXT`
 (`temporal.exe`, `opencode.cmd`, …). Set `NODRA_TEMPORAL_BINARY` /
-`NODRA_OPENCODE_BINARY` if they live outside `PATH`.
+`NODRA_OPENCODE_BINARY` if they live outside `PATH`; the native PowerShell
+starter uses these overrides too.
 
 ### Running the full stack on Windows
 
@@ -257,6 +258,9 @@ which do not exist on native Windows. You have two options:
   `NODRA_*_BINARY` variables).
 - Paths shown in the UI are computed server‑side (`GET /api/config`), so no
   absolute path is hardcoded for any OS.
+- The repository's Ralph automation/helpers are shell scripts and are
+  **WSL2-only on Windows**. Run them from a WSL2 checkout; use the PowerShell
+  commands above for the native Windows stack and quality gates.
 
 ### Not yet validated on Windows
 
