@@ -3,6 +3,46 @@
 Backlog généré depuis les issues GitHub ouvertes. Chaque item est une tâche.
 Coche la case quand la tâche est terminée. Une seule tâche par itération Ralph.
 
+- [ ] #25 — Retirer Temporal : exécuteur in-process + polling SQLite (labels: —)
+
+  **Issue #25 — détail complet**
+  > ## Contexte
+  > Temporal est actuellement l'exécuteur des runs (workflow MissionWorkflow → RunWorkflow → activités recordStarted/executeProvider/recordTerminal) et le transport des commandes interactives (steer/resume/cancel) pendant des exécutions de plusieurs minutes.
+  >
+  > Pour un outil de dev local mono-utilisateur (SQLite, agent codex invoqué en child process), c'est overkill :
+  > - binaire Go externe `temporal` requis sur le PATH (supervisor à 4 composants, démarrage 10-120s)
+  > - dispatcher manuel : les runs restent QUEUED indéfiniment si l'outbox n'est pas dispatchée
+  > - serveur dev réinitialisé au restart → workflows perdus → runs orphelins (bug vécu le 2026-08-02)
+  > - toute la vérité durable est déjà en SQLite : Temporal n'est qu'une enveloppe d'orchestration
+  >
+  > ## Ce qui est réutilisable tel quel (déjà découplé de Temporal)
+  > - packages/adapters/src/sqlite/sqlite-run-workflow-activity.ts
+  > - packages/adapters/src/sqlite/sqlite-provider-run-store.ts
+  > - packages/adapters/src/sqlite/sqlite-provider-permission-handler.ts
+  > - packages/adapters/src/sqlite/sqlite-workflow-outbox-store.ts
+  >
+  > ## Migration proposée (1-2 jours)
+  > 1. Nouvel exécuteur in-process dans l'API (ou child_process par run) : poll outbox SQLite → exécute provider avec les mêmes sinks → transitions de state en direct
+  > 2. Remplacer les signaux Temporal par une file de commandes en DB pollée (steer/resume/cancel)
+  > 3. Heartbeat en DB + watchdog au boot : reprise des runs STARTING/RUNNING orphelins après restart
+  > 4. Supprimer packages/adapters/src/temporal/** (8 fichiers prod) + apps/worker, recâbler nodra.module.ts et run-cli.ts
+  > 5. Repenser les colonnes runs.temporal_workflow_id (NOT NULL unique), missions/managers/pipelines.temporal_*
+  > 6. Supervisor à 3 composants (opencode, api, executor) ; retirer les checks RUNTIME_UNHEALTHY liés à Temporal
+  > 7. Réécrire ~20 fichiers de tests (e2e i7-temporal, i8-opencode, poc/temporal)
+  >
+  > ## Ce qu'on perd (acceptable en local)
+  > - historique rejouable + UI Temporal
+  > - garanties d'idempotence workflow (remplaçables par inbox/outbox existants)
+  > - attente durable 'gratuite' (remplacée par file de commandes DB)
+  >
+  > ## Ce qu'on gagne
+  > - plus de binaire Go externe, démarrage ~5s
+  > - plus de dispatcher manuel, plus de runs QUEUED orphelins
+  > - 1 process de moins dans le supervisor
+
+
+---
+
 - [x] #7 — Mini-cartes de run actif sur le board (labels: —)
 
   **Issue #7 — détail complet**
@@ -413,40 +453,3 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - Implémenter avec des **subagents**
   > - **Committer le plus fréquemment possible** : commits atomiques (endpoint agrégé → composant → filtres)
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
-
-- [ ] #25 — Retirer Temporal : exécuteur in-process + polling SQLite (labels: —)
-
-  **Issue #25 — détail complet**
-  > ## Contexte
-  > Temporal est actuellement l'exécuteur des runs (workflow MissionWorkflow → RunWorkflow → activités recordStarted/executeProvider/recordTerminal) et le transport des commandes interactives (steer/resume/cancel) pendant des exécutions de plusieurs minutes.
-  >
-  > Pour un outil de dev local mono-utilisateur (SQLite, agent codex invoqué en child process), c'est overkill :
-  > - binaire Go externe `temporal` requis sur le PATH (supervisor à 4 composants, démarrage 10-120s)
-  > - dispatcher manuel : les runs restent QUEUED indéfiniment si l'outbox n'est pas dispatchée
-  > - serveur dev réinitialisé au restart → workflows perdus → runs orphelins (bug vécu le 2026-08-02)
-  > - toute la vérité durable est déjà en SQLite : Temporal n'est qu'une enveloppe d'orchestration
-  >
-  > ## Ce qui est réutilisable tel quel (déjà découplé de Temporal)
-  > - packages/adapters/src/sqlite/sqlite-run-workflow-activity.ts
-  > - packages/adapters/src/sqlite/sqlite-provider-run-store.ts
-  > - packages/adapters/src/sqlite/sqlite-provider-permission-handler.ts
-  > - packages/adapters/src/sqlite/sqlite-workflow-outbox-store.ts
-  >
-  > ## Migration proposée (1-2 jours)
-  > 1. Nouvel exécuteur in-process dans l'API (ou child_process par run) : poll outbox SQLite → exécute provider avec les mêmes sinks → transitions de state en direct
-  > 2. Remplacer les signaux Temporal par une file de commandes en DB pollée (steer/resume/cancel)
-  > 3. Heartbeat en DB + watchdog au boot : reprise des runs STARTING/RUNNING orphelins après restart
-  > 4. Supprimer packages/adapters/src/temporal/** (8 fichiers prod) + apps/worker, recâbler nodra.module.ts et run-cli.ts
-  > 5. Repenser les colonnes runs.temporal_workflow_id (NOT NULL unique), missions/managers/pipelines.temporal_*
-  > 6. Supervisor à 3 composants (opencode, api, executor) ; retirer les checks RUNTIME_UNHEALTHY liés à Temporal
-  > 7. Réécrire ~20 fichiers de tests (e2e i7-temporal, i8-opencode, poc/temporal)
-  >
-  > ## Ce qu'on perd (acceptable en local)
-  > - historique rejouable + UI Temporal
-  > - garanties d'idempotence workflow (remplaçables par inbox/outbox existants)
-  > - attente durable 'gratuite' (remplacée par file de commandes DB)
-  >
-  > ## Ce qu'on gagne
-  > - plus de binaire Go externe, démarrage ~5s
-  > - plus de dispatcher manuel, plus de runs QUEUED orphelins
-  > - 1 process de moins dans le supervisor
