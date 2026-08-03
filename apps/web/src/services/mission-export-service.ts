@@ -40,7 +40,8 @@ const AUDIT_EVENT_LABELS: Record<string, string> = {
   EVIDENCE_RECORDED: "Preuve enregistrée",
   GATE_DEFINED: "Gate définie",
   GATE_EVALUATED: "Gate évaluée",
-  GATE_EVIDENCE_STALE: "Preuve de gate périmée"
+  GATE_EVIDENCE_STALE: "Preuve de gate périmée",
+  MISSION_TAGS_UPDATED: "Tags de la mission mis à jour"
 };
 
 /** Échappe une cellule de tableau GFM (barres verticales + retours à la ligne). */

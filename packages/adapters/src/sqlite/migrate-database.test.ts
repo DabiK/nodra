@@ -32,7 +32,7 @@ describe("migrateDatabase", () => {
 
     const result = await migrateDatabase(database, migrationsDirectory);
 
-    expect(result).toMatchObject({ version: 12, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] });
+    expect(result).toMatchObject({ version: 13, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] });
     expect(registeredMigrations(database)).toEqual([
       expect.objectContaining({ version: 1 }),
       expect.objectContaining({ version: 2 }),
@@ -45,7 +45,8 @@ describe("migrateDatabase", () => {
       expect.objectContaining({ version: 9 }),
       expect.objectContaining({ version: 10 }),
       expect.objectContaining({ version: 11 }),
-      expect.objectContaining({ version: 12, checksum: result.checksum })
+      expect.objectContaining({ version: 12 }),
+      expect.objectContaining({ version: 13, checksum: result.checksum })
     ]);
   });
 
@@ -71,7 +72,7 @@ describe("migrateDatabase", () => {
 
     const upgraded = await migrateDatabase(database, resolve("packages/adapters/drizzle"));
 
-    expect(upgraded).toMatchObject({ version: 12, registeredVersions: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12] });
+    expect(upgraded).toMatchObject({ version: 13, registeredVersions: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] });
     expect(database.connection.prepare("select name from sqlite_master where type = 'index' and name = 'gate_override_approval_id_unique'").get()).toBeTruthy();
     expect(database.connection.prepare("select name from sqlite_master where type = 'index' and name = 'idx_confirmation_state_expires'").get()).toBeTruthy();
     expect(database.connection.prepare("select name from sqlite_master where type = 'trigger' and name = 'confirmation_exact_fields_immutable'").get()).toBeTruthy();
@@ -159,8 +160,8 @@ describe("migrateDatabase", () => {
 
     const result = await migrateDatabase(database, migrationsDirectory);
 
-    expect(result).toMatchObject({ version: 13, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] });
-    expect(registeredMigrations(database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    expect(result).toMatchObject({ version: 14, registeredVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] });
+    expect(registeredMigrations(database).map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
     expect(database.connection.prepare("select name from sqlite_master where name = 'migration_probe'").get()).toBeTruthy();
   });
 });
