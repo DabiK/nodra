@@ -481,3 +481,38 @@ L'UI était desktop-only : aucun breakpoint 768px, sidebar statique (voire barre
 
 ### Statut
 - [x] #15 — Responsive / vue tablette
+
+## Itération 14 — 2026-08-03 — Task #16 : Rejouer / dupliquer un run
+
+### Fait (3 commits atomiques, comme suggéré par l'issue : service → dialog → intégration)
+1. **Service de duplication** (`feat(web): service de duplication de mission (rejouer un run)`)
+   - `duplicateMission({ title, projectId, source: AgentConfigView, modelId })` dans `mission-service.ts` : recrée une mission (POST /api/missions) → active la config agent (enable) → PUT agent-config avec **tous les réglages de la source** (provider, effort, providerOptions, prompt, permissions, auto-commit, integrationTargetRef) + le modèle choisi → `POST /ready` (la copie arrive **en READY** dans le board, prête à lancer).
+   - **Workspace = celui de la source** (même sémantique « mêmes réglages » : la copie relance dans le même terrain de travail ; le repo SQLite déduplique par chemin de toute façon). Si la source n'a pas de workspace (config activée jamais renseignée), scratch créé à la volée (`workspacePathFromName`).
+   - Replis robustes : prompt vide → prompt par défaut « Traite la mission « X » de bout en bout. » ; effort/permissions null → `provider_default`/`workspace` ; provider null → `opencode`.
+   - `expectedVersion` du `/ready` = `created.version + 1` : la mission est créée en version 0, `enable` l'incrémente à 1, et l'update de config n'incrémente que la version de la config (pas celle de la mission) — vérifié dans `sqlite-agent-config-repository`.
+   - Tests : 3 nouveaux dans `mission-service.test.ts` (séquence complète des 4 appels avec payloads exacts + modèle varié, workspace scratch quand la source n'en a pas, replis prompt/effort/permissions).
+2. **Dialog de replay** (`feat(web): dialog Rejouer — dupliquer en READY avec choix du modèle`)
+   - `MissionReplayDialog` : titre éditable (pré-rempli du titre source), **listbox des modèles du même provider** (`ModelPicker`, défaut = modèle de la source — l'option « varier le modèle au lancement » de l'issue), résumé des réglages copiés (moteur, réflexion, permissions, workspace), aperçu du prompt, bouton « ↻ Dupliquer en READY » (désactivé si titre vide, busy → « Duplication... »), erreur en `role="alert"`, fermeture Escape/Annuler.
+   - Tests : 7 nouveaux (`MissionReplayDialog.test.tsx` : pré-remplissage + résumé, variation du modèle via la listbox, titre édité, état occupé, échec → erreur + réarmement, fermeture Annuler/Escape, titre vide bloqué).
+3. **Intégration fiche mission** (`feat(web): bouton Rejouer dans la fiche mission + styles`)
+   - Bouton « ↻ Rejouer » dans le footer de la fiche (à côté d'Exporter), visible pour toute **mission agent configurée hors ACTIVE** (un run en cours ne se duplique pas — les états DRAFT/READY/BLOCKED/VALIDATION/DONE/ABANDONED sont couverts).
+   - Au succès : dialog fermé, `onSaved()` (refresh du board — la copie apparaît en READY) + notice « Mission « X » dupliquée — prête dans le board (READY). ».
+   - Garde Escape de la fiche étendue (`showReplay`) pour que le dialog gère son propre Escape ; CSS `.mission-replay-*` (dialog, résumé, aperçu prompt, footer) + variantes dark.
+   - Tests : 6 nouveaux dans `MissionInspector.test.tsx` (masqué sans config, visible pour agent configurée, masqué en ACTIVE, masqué pour mission humaine, ouverture + refresh board + notice, fermeture sans fermer la fiche ni rafraîchir).
+
+### Vérifications
+- `npm run typecheck` (racine) : OK
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
+- Web : 49 fichiers / 374 tests OK (358 → 374, +16 : 3 service, 7 dialog, 6 fiche)
+- Suite complète `npm test` : 692 OK ; **6 échecs pré-existants environnementaux vérifiés** (architecture-boundaries — confirmé par git stash, health/i6/i14 → Temporal/Codex, temporal-envelope ×2 → serveur Temporal non démarré) — aucun lié aux changements
+- ESLint sur tous les fichiers touchés : propre
+
+### Décisions / notes / limites
+- **Tout côté client, zéro changement backend** : la duplication enchaîne 4 endpoints existants (création, enable, update config, ready) — le pattern de `createConfiguredMission`, avec un `/ready` final pour satisfaire l'acceptance « apparaît en READY ». L'option serveur (use case `DuplicateMission`) aurait dupliqué cette logique côté API sans bénéfice ici.
+- **Même workspace** : la copie référence le workspace de la source (relancer dans le même terrain de travail, avec l'état laissé par le run précédent). C'est le sens de « mêmes réglages » ; deux missions peuvent partager un workspace (pas de contrainte d'unicité `workspaceId` côté config agent).
+- **Pas de copie des notes** (localStorage par mission) ni des pré-requis pipeline : l'issue ne porte que config agent + prompt + workspace. L'**historique des lancements** (option) n'est pas implémenté — l'historique des runs par mission (issue #6) couvre déjà la traçabilité.
+- **Limite** : si le provider de la source n'est plus dans le catalogue, le ModelPicker est désactivé mais la duplication fonctionne quand même avec le modèle d'origine (`config.modelId`).
+- Le build web est resté vert sur toute l'itération.
+
+### Statut
+- [x] #16 — Rejouer / dupliquer un run

@@ -3,7 +3,7 @@
 Backlog généré depuis les issues GitHub ouvertes. Chaque item est une tâche.
 Coche la case quand la tâche est terminée. Une seule tâche par itération Ralph.
 
-- [ ] #7 — Mini-cartes de run actif sur le board (labels: —)
+- [x] #7 — Mini-cartes de run actif sur le board (labels: —)
 
   **Issue #7 — détail complet**
   > ## Contexte
@@ -24,7 +24,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #8 — Export de mission en Markdown (labels: —)
+- [x] #8 — Export de mission en Markdown (labels: —)
 
   **Issue #8 — détail complet**
   > ## Contexte
@@ -46,7 +46,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #9 — Recherche dans les conversations (labels: —)
+- [x] #9 — Recherche dans les conversations (labels: —)
 
   **Issue #9 — détail complet**
   > ## Contexte
@@ -68,7 +68,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #10 — Warning perte de contexte (compact / truncate) (labels: —)
+- [x] #10 — Warning perte de contexte (compact / truncate) (labels: —)
 
   **Issue #10 — détail complet**
   > ## Contexte
@@ -203,7 +203,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   > - **Committer le plus fréquemment possible** : commits atomiques par écran
   > - Vérifier : `npm run typecheck`, `npm run lint`, `npm test`
 
-- [ ] #16 — Rejouer / dupliquer un run (labels: —)
+- [x] #16 — Rejouer / dupliquer un run (labels: —)
 
   **Issue #16 — détail complet**
   > ## Contexte
