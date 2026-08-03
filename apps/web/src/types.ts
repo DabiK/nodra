@@ -314,6 +314,24 @@ export interface ManagerThreadView {
   threadId: string;
 }
 
+export type ManagerTimelineItemKind = "user" | "assistant" | "tool" | "system" | "steer" | "result";
+
+export interface ManagerTimelineItemView {
+  id: string;
+  conversationId: string;
+  managerId: string;
+  managerName: string;
+  managerState: string;
+  kind: ManagerTimelineItemKind;
+  body: string | null;
+  createdAt: string;
+}
+
+export interface ManagerTimelineView {
+  items: ManagerTimelineItemView[];
+  truncated: boolean;
+}
+
 export type ProviderSessionCapabilityState = "certified" | "compatible_unverified" | "unavailable";
 
 export interface ProviderSessionCapability {
