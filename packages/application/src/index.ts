@@ -273,6 +273,10 @@ export type {
   ManagerListFilter,
   ManagerReadModel,
   ManagerRepository,
+  ManagerTimelineFilter,
+  ManagerTimelineItemKind,
+  ManagerTimelineItemView,
+  ManagerTimelineView,
   ManagerView,
   SaveManagerInput
 } from "./manager-repository.js";
@@ -284,6 +288,7 @@ export type {
 export { CreateManager, type CreateManagerInput } from "./create-manager.js";
 export { UpdateManager, ArchiveManager, type UpdateManagerInput } from "./update-manager.js";
 export { ListManagers, ShowManager, ListManagerConversations } from "./list-managers.js";
+export { ListManagerTimeline } from "./list-manager-timeline.js";
 export {
   StartManagerRun,
   DEVFLOW_MANAGER_PREAMBLE,

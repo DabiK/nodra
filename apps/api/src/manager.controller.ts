@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "@nodra/adapters";
@@ -9,6 +9,7 @@ import type {
   CreateManager,
   DispatchWorkflowOutbox,
   ListManagerConversations,
+  ListManagerTimeline,
   ListManagers,
   ShowManager,
   StartManagerRun,
@@ -25,6 +26,7 @@ import {
   DATABASE,
   DISPATCH_WORKFLOW_OUTBOX,
   LIST_MANAGER_CONVERSATIONS,
+  LIST_MANAGER_TIMELINE,
   LIST_MANAGERS,
   SHOW_MANAGER,
   START_MANAGER_RUN,
@@ -46,6 +48,7 @@ export class ManagerController {
     @Inject(LIST_MANAGERS) private readonly listManagers: ListManagers,
     @Inject(SHOW_MANAGER) private readonly showManager: ShowManager,
     @Inject(LIST_MANAGER_CONVERSATIONS) private readonly listConversations: ListManagerConversations,
+    @Inject(LIST_MANAGER_TIMELINE) private readonly listTimeline: ListManagerTimeline,
     @Inject(START_MANAGER_RUN) private readonly startRun: StartManagerRun,
     @Inject(STEER_RUN) private readonly steerRun: SteerRun,
     @Inject(CANCEL_RUN) private readonly cancelRun: CancelRun,
@@ -55,6 +58,26 @@ export class ManagerController {
   @Get()
   list() {
     return this.listManagers.execute();
+  }
+
+  // Déclarée AVANT @Get(":id") : « timeline » ne doit pas être capturé comme un id.
+  @Get("timeline")
+  timeline(
+    @Query("managerId") managerId?: string,
+    @Query("missionId") missionId?: string,
+    @Query("query") query?: string,
+    @Query("since") since?: string,
+    @Query("until") until?: string,
+    @Query("limit") limit?: string
+  ) {
+    return this.listTimeline.execute({
+      ...(managerId ? { managerId: toId(managerId) } : {}),
+      ...(missionId ? { missionId: toId(missionId) } : {}),
+      ...(query ? { query } : {}),
+      ...(since ? { since } : {}),
+      ...(until ? { until } : {}),
+      ...(limit !== undefined && limit !== "" ? { limit: Math.min(Math.max(Number(limit) || 200, 1), 500) } : {})
+    });
   }
 
   @Post()

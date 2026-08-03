@@ -2,10 +2,13 @@ import type {
   ManagerConversationView,
   ManagerListFilter,
   ManagerReadModel,
+  ManagerTimelineFilter,
+  ManagerTimelineItemKind,
+  ManagerTimelineView,
   ManagerView
 } from "@nodra/application";
 import { asId, type Id } from "@nodra/domain";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lte, ne, sql } from "drizzle-orm";
 import type { NodraSqliteDatabase } from "./nodra-sqlite-database.js";
 import { conversationItems, conversations } from "./schema/conversations.js";
 import { workspaces } from "./schema/core.js";
@@ -83,6 +86,61 @@ export class SqliteManagerReadModel implements ManagerReadModel {
           }))
         };
       });
+    } catch (error) {
+      throw translateSqliteError(error);
+    }
+  }
+
+  async timeline(filter: ManagerTimelineFilter): Promise<ManagerTimelineView> {
+    try {
+      const limit = Math.min(Math.max(filter.limit ?? 200, 1), 500);
+      const conditions = [
+        isNotNull(conversations.managerId),
+        ne(conversations.state, "deleted")
+      ];
+      if (filter.managerId) conditions.push(eq(conversations.managerId, filter.managerId));
+      if (filter.missionId) {
+        conditions.push(sql`${conversationItems.body} like ${`%${filter.missionId}%`}`);
+      }
+      if (filter.query?.trim()) {
+        const escaped = filter.query.replace(/[\\%_]/g, "\\$&");
+        conditions.push(sql`${conversationItems.body} like ${`%${escaped}%`} escape '\\'`);
+      }
+      if (filter.since) conditions.push(gte(conversationItems.createdAt, filter.since));
+      if (filter.until) conditions.push(lte(conversationItems.createdAt, filter.until));
+
+      const rows = this.database.orm
+        .select({
+          id: conversationItems.id,
+          conversationId: conversationItems.conversationId,
+          managerId: managers.id,
+          managerName: managers.name,
+          managerState: managers.state,
+          kind: conversationItems.kind,
+          body: conversationItems.body,
+          createdAt: conversationItems.createdAt
+        })
+        .from(conversationItems)
+        .innerJoin(conversations, eq(conversationItems.conversationId, conversations.id))
+        .innerJoin(managers, eq(conversations.managerId, managers.id))
+        .where(and(...conditions))
+        .orderBy(desc(conversationItems.createdAt))
+        .limit(limit + 1)
+        .all();
+      const truncated = rows.length > limit;
+      return {
+        truncated,
+        items: rows.slice(0, limit).map((row) => ({
+          id: row.id,
+          conversationId: row.conversationId,
+          managerId: row.managerId,
+          managerName: row.managerName ?? "",
+          managerState: row.managerState,
+          kind: row.kind as ManagerTimelineItemKind,
+          body: row.body,
+          createdAt: row.createdAt
+        }))
+      };
     } catch (error) {
       throw translateSqliteError(error);
     }

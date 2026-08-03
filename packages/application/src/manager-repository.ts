@@ -64,8 +64,39 @@ export interface ManagerConversationView {
   turns: ManagerConversationTurn[];
 }
 
+export type ManagerTimelineItemKind = "user" | "assistant" | "tool" | "system" | "steer" | "result";
+
+export interface ManagerTimelineItemView {
+  id: string;
+  conversationId: string;
+  managerId: string;
+  managerName: string;
+  managerState: string;
+  kind: ManagerTimelineItemKind;
+  body: string | null;
+  createdAt: string;
+}
+
+export interface ManagerTimelineFilter {
+  managerId?: Id;
+  /** Messages dont le corps mentionne cet identifiant de mission (les conversations
+   * manager ne portent pas de mission_id : la mention est le seul lien disponible). */
+  missionId?: Id;
+  /** Recherche plein texte (LIKE) sur le corps des messages. */
+  query?: string;
+  since?: string;
+  until?: string;
+  limit?: number;
+}
+
+export interface ManagerTimelineView {
+  items: ManagerTimelineItemView[];
+  truncated: boolean;
+}
+
 export interface ManagerReadModel {
   list(filter?: ManagerListFilter): Promise<ManagerView[]>;
   show(id: Id): Promise<ManagerView | null>;
   conversations(id: Id): Promise<ManagerConversationView[]>;
+  timeline(filter: ManagerTimelineFilter): Promise<ManagerTimelineView>;
 }

@@ -84,6 +84,7 @@ import {
   DeleteTag,
   SetMissionTags,
   ListManagerConversations,
+  ListManagerTimeline,
   ListProviderSessions,
   ListManagers,
   ManageApprovals,
@@ -187,6 +188,7 @@ import {
   LIST_MISSION_TAGS,
   SET_MISSION_TAGS,
   LIST_MANAGER_CONVERSATIONS,
+  LIST_MANAGER_TIMELINE,
   LIST_MANAGERS,
   LIST_MISSIONS,
   LIST_MISSION_RUNS,
@@ -798,6 +800,11 @@ export class NodraModule {
           provide: LIST_MANAGER_CONVERSATIONS,
           inject: [DATABASE],
           useFactory: (database: NodraSqliteDatabase) => new ListManagerConversations(new SqliteManagerReadModel(database))
+        },
+        {
+          provide: LIST_MANAGER_TIMELINE,
+          inject: [DATABASE],
+          useFactory: (database: NodraSqliteDatabase) => new ListManagerTimeline(new SqliteManagerReadModel(database))
         },
         {
           provide: START_MANAGER_RUN,
