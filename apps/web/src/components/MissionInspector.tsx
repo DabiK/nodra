@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type { AgentConfigView, MissionInspectorData, MissionRunsView, MissionView, ProviderOptionsCatalog, ProviderReasoningEffort, WorkspaceDraftKind } from "../types";
 import { permissionLabels, reasoningLabels, selectDefaultModel } from "../services/provider-service";
 import { loadMissionInspector, loadMissionRuns, updateAgentConfig } from "../services/mission-service";
@@ -28,10 +28,12 @@ import {
 import { performMissionAction } from "../services/mission-action-service";
 import { getMissionUiPolicy, type MissionUiAction, type MissionUiPolicy } from "../services/mission-ui-policy";
 import { showWorkspace } from "../services/worktree-service";
+import { loadMissionTags, loadTags, setMissionTags, type MissionTag } from "../services/tag-service";
 import { WorkspaceModePicker } from "./WorkspaceModePicker";
 import { WorktreeResolutionDialog } from "./WorktreeResolutionDialog";
 import { MissionExportDialog } from "./MissionExportDialog";
 import { MissionReplayDialog } from "./MissionReplayDialog";
+import { TagManagerDialog } from "./TagManagerDialog";
 import { PixelAvatar } from "./PixelAvatar";
 import { ModelPicker } from "./ModelPicker";
 import { MissionRunComparator } from "./MissionRunComparator";
@@ -82,6 +84,9 @@ export function MissionInspector({
   const [showWorktreeDialog, setShowWorktreeDialog] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showReplay, setShowReplay] = useState(false);
+  const [showTagManager, setShowTagManager] = useState(false);
+  /** Incrémenté quand le gestionnaire de tags modifie le catalogue → le panneau recharge. */
+  const [tagManagerVersion, setTagManagerVersion] = useState(0);
 
   // Raccourci clavier : Escape ferme la fiche. Ignoré pendant la saisie et
   // quand un sous-dialog (model picker, worktree) est ouvert — ces derniers
@@ -93,12 +98,12 @@ export function MissionInspector({
       if (target?.isContentEditable) return;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
-      if (document.querySelector(".model-picker-backdrop") || showWorktreeDialog || showReplay) return;
+      if (document.querySelector(".model-picker-backdrop") || showWorktreeDialog || showReplay || showTagManager) return;
       onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, showWorktreeDialog, showReplay]);
+  }, [onClose, showWorktreeDialog, showReplay, showTagManager]);
 
   useEffect(() => {
     void loadMissionInspector(missionId)
@@ -289,7 +294,16 @@ export function MissionInspector({
         </header>
 
         {step === "inspect" ? (
-          <InspectStep data={data} result={result} runs={runs} audit={audit} policy={policy} />
+          <InspectStep
+            data={data}
+            result={result}
+            runs={runs}
+            audit={audit}
+            policy={policy}
+            tagManagerVersion={tagManagerVersion}
+            onOpenTagManager={() => setShowTagManager(true)}
+            onTagsChanged={onSaved}
+          />
         ) : (
           <form id="mission-inspector-form" className="mission-configurator" onSubmit={save}>
             {!data?.config || !form ? (
@@ -373,6 +387,13 @@ export function MissionInspector({
           onReplayed={replayDone}
         />
       )}
+      {showTagManager && (
+        <TagManagerDialog
+          open
+          onClose={() => setShowTagManager(false)}
+          onChanged={() => setTagManagerVersion((version) => version + 1)}
+        />
+      )}
     </div>
   );
 }
@@ -405,6 +426,119 @@ function MissionNotesPanel({ missionId }: { missionId: string }) {
         maxLength={20000}
         placeholder="Contexte, étapes, liens, checklist, décisions… Tout ce qui t'aide à avancer sur cette tâche."
       />
+    </section>
+  );
+}
+
+/**
+ * Panneau Tags (issue #23) : tags attachés à la mission (ajout/retrait) et
+ * accès au gestionnaire de tags (créer, renommer, recolorer, supprimer).
+ * Le catalogue et la liaison sont chargés côté serveur ; chaque mutation
+ * notifie le board (`onChanged` → refreshBoard).
+ */
+function MissionTagsPanel({
+  missionId,
+  version,
+  onOpenManager,
+  onChanged
+}: {
+  missionId: string;
+  /** Incrémenté quand le gestionnaire de tags modifie le catalogue. */
+  version: number;
+  onOpenManager(): void;
+  onChanged(): void;
+}) {
+  const [catalog, setCatalog] = useState<MissionTag[]>([]);
+  const [attached, setAttached] = useState<MissionTag[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const reload = useCallback(async () => {
+    try {
+      const [nextCatalog, nextAttached] = await Promise.all([loadTags(), loadMissionTags(missionId)]);
+      setCatalog(nextCatalog);
+      setAttached(nextAttached);
+      setLoaded(true);
+    } catch (reason) {
+      setError((reason as Error).message);
+    }
+  }, [missionId]);
+
+  useEffect(() => { void reload(); }, [reload, version]);
+
+  if (!loaded) return null;
+
+  const available = catalog.filter((tag) => !attached.some((item) => item.id === tag.id));
+
+  const applyTagIds = async (tagIds: string[]) => {
+    setBusy(true);
+    setError("");
+    try {
+      await setMissionTags(missionId, tagIds);
+      await reload();
+      onChanged();
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addTag = (tagId: string) => applyTagIds([...attached.map((tag) => tag.id), tagId]);
+  const removeTag = (tagId: string) => applyTagIds(attached.filter((tag) => tag.id !== tagId).map((tag) => tag.id));
+
+  return (
+    <section className="mission-tags-panel" aria-label="Tags de la mission">
+      <header>
+        <div>
+          <span className="eyebrow">TAGS</span>
+          <strong>Étiquettes de la mission</strong>
+        </div>
+        {attached.length > 0 && (
+          <span className="mission-tags-total" title={`${attached.length} tag(s) attaché(s)`}>
+            {attached.length} tag{attached.length > 1 ? "s" : ""}
+          </span>
+        )}
+      </header>
+      {error && <p className="mission-tags-error" role="alert">{error}</p>}
+      <div className="mission-tags-editor">
+        {attached.length > 0 ? (
+          <ul className="mission-tags-list">
+            {attached.map((tag) => (
+              <li className="mission-tag-chip" style={{ ["--tag-color" as string]: tag.color }} key={tag.id}>
+                <i className="tag-dot" aria-hidden="true" />
+                <span>{tag.label}</span>
+                <button
+                  type="button"
+                  className="mission-tag-remove"
+                  disabled={busy}
+                  aria-label={`Retirer le tag ${tag.label}`}
+                  onClick={() => void removeTag(tag.id)}
+                >×</button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="empty">Aucun tag pour le moment.</p>
+        )}
+        <div className="mission-tags-actions">
+          {available.length > 0 && (
+            <select
+              aria-label="Ajouter un tag à la mission"
+              disabled={busy}
+              value=""
+              onChange={(event) => { if (event.target.value) void addTag(event.target.value); }}
+            >
+              <option value="" disabled>＋ Ajouter un tag…</option>
+              {available.map((tag) => <option value={tag.id} key={tag.id}>{tag.label}</option>)}
+            </select>
+          )}
+          <button type="button" className="secondary-button mission-tags-manage" disabled={busy} onClick={onOpenManager}>
+            ⚙ Gérer les tags
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
@@ -599,13 +733,20 @@ function InspectStep({
   result,
   runs,
   audit,
-  policy
+  policy,
+  tagManagerVersion,
+  onOpenTagManager,
+  onTagsChanged
 }: {
   data: MissionInspectorData | null;
   result: MissionResultView | null;
   runs: MissionRunsView | null;
   audit: MissionAuditView[] | null;
   policy: MissionUiPolicy | null;
+  /** Incrémenté quand le gestionnaire de tags modifie le catalogue. */
+  tagManagerVersion: number;
+  onOpenTagManager(): void;
+  onTagsChanged(): void;
 }) {
   return (
     <div className="agent-modal-body">
@@ -644,6 +785,14 @@ function InspectStep({
           <p>{policy?.description ?? "Lecture de l'état mission..."}</p>
         </div>
         {data?.mission && <MissionNotesPanel missionId={data.mission.id} />}
+        {data?.mission && (
+          <MissionTagsPanel
+            missionId={data.mission.id}
+            version={tagManagerVersion}
+            onOpenManager={onOpenTagManager}
+            onChanged={onTagsChanged}
+          />
+        )}
         {data?.mission && <MissionBudgetPanel runs={runs} />}
         {data?.mission && runs && <MissionRunComparator runs={runs.runs} />}
         {data?.mission && <MissionAuditPanel missionId={data.mission.id} audit={audit} />}

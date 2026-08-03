@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Put } fro
 import { toId, type CreateTag, type DeleteTag, type ListTags, type UpdateTag } from "@nodra/application";
 import { randomUUID } from "node:crypto";
 import { CREATE_TAG, DELETE_TAG, LIST_TAGS, UPDATE_TAG } from "./tokens.js";
-import { TagDto } from "./dto/tag.dto.js";
+import type { TagDto } from "./dto/tag.dto.js";
 
 /**
  * Tags libres des missions (issue #23) : libellé + couleur, attachables à

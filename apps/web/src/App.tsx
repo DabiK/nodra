@@ -25,6 +25,7 @@ import { browseFolders } from "./services/workspace-service";
 import { loadViewMode, saveViewMode, type MissionViewMode } from "./services/view-mode-service";
 import { loadSavedMissionFilters, saveMissionFilters } from "./services/mission-filter-service";
 import { loadActivity, markActivityRead, type ActivityView } from "./services/activity-service";
+import { loadTags, type MissionTag } from "./services/tag-service";
 import { dragActionId, findDragTransition } from "./services/mission-drag-transitions";
 import { performMissionAction } from "./services/mission-action-service";
 import { loadMissionResult } from "./services/mission-result-service";
@@ -76,6 +77,8 @@ export function App() {
   const [kindFilter, setKindFilter] = useState(savedFilters.kind);
   const [sort, setSort] = useState(savedFilters.sort);
   const [dayFilter, setDayFilter] = useState(savedFilters.day);
+  const [tagFilter, setTagFilter] = useState<string[]>(savedFilters.tags);
+  const [tags, setTags] = useState<MissionTag[]>([]);
   const [viewMode, setViewMode] = useState<MissionViewMode>(() => loadViewMode());
   const [createExpanded, setCreateExpanded] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
@@ -167,6 +170,7 @@ export function App() {
     void listPipelines().then((next) => { if (mountedRef.current) setPipelines(next); }).catch(() => undefined);
     void listManagers().then((next) => { if (mountedRef.current) setManagers(next); }).catch(() => undefined);
     void loadActivity().then((next) => { if (mountedRef.current) setActivity(next); }).catch(() => undefined);
+    void loadTags().then((next) => { if (mountedRef.current) setTags(next); }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -269,14 +273,22 @@ export function App() {
   }, [pipelines]);
 
   const filtered = useMemo(
-    () => filterMissions(missions, { query, state: stateFilter, kind: kindFilter, sort, day: dayFilter }, schedule),
-    [missions, query, stateFilter, kindFilter, sort, dayFilter, schedule]
+    () => filterMissions(missions, { query, state: stateFilter, kind: kindFilter, sort, day: dayFilter, tags: tagFilter }, schedule),
+    [missions, query, stateFilter, kindFilter, sort, dayFilter, tagFilter, schedule]
   );
 
   // Filtres sauvegardés : le board rouvre avec la même configuration.
   useEffect(() => {
-    saveMissionFilters({ query, state: stateFilter, kind: kindFilter, sort, day: dayFilter });
-  }, [query, stateFilter, kindFilter, sort, dayFilter]);
+    saveMissionFilters({ query, state: stateFilter, kind: kindFilter, sort, day: dayFilter, tags: tagFilter });
+  }, [query, stateFilter, kindFilter, sort, dayFilter, tagFilter]);
+  // Compteurs par tag : nombre de missions portant chaque tag (découverte, indépendant des filtres).
+  const tagCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const mission of missions) {
+      for (const tagId of mission.tagIds ?? []) counts[tagId] = (counts[tagId] ?? 0) + 1;
+    }
+    return counts;
+  }, [missions]);
   const stateCounts = useMemo(
     () => missions.reduce<Partial<Record<MissionState, number>>>((counts, mission) => {
       counts[mission.state] = (counts[mission.state] ?? 0) + 1;
@@ -684,6 +696,9 @@ export function App() {
           kindFilter={kindFilter}
           dayFilter={dayFilter}
           dayCount={dayCount}
+          tags={tags}
+          tagFilter={tagFilter}
+          tagCounts={tagCounts}
           onSubmit={createMission}
           onDraftChange={patchDraft}
           onExpandedChange={setCreateExpanded}
@@ -692,6 +707,7 @@ export function App() {
           onStateFilterChange={setStateFilter}
           onKindFilterChange={setKindFilter}
           onDayFilterChange={setDayFilter}
+          onTagFilterChange={setTagFilter}
           onViewModeChange={changeViewMode}
           viewMode={viewMode}
           onFolderOpen={() => void openFolderBrowser(draft?.workspacePath || undefined)}
@@ -715,6 +731,7 @@ export function App() {
             <MissionRelay
               missions={missions}
               missionPipelineIndex={missionPipelineIndex}
+              tags={tags}
               kindFilter={kindFilter}
               stateFilter={stateFilter}
               dayFilter={dayFilter}

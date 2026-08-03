@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { AgentConfigView, MissionRunsView, MissionView } from "../types";
 import { MissionInspector } from "./MissionInspector";
 import { loadMissionInspector, loadMissionRuns } from "../services/mission-service";
@@ -8,6 +8,7 @@ import { loadMissionAudit } from "../services/mission-audit-service";
 import type { MissionAuditView } from "../services/mission-audit-service";
 import { loadWorkspaceDiff } from "../services/mission-diff-service";
 import type { WorkspaceDiffView } from "../services/mission-diff-service";
+import { loadMissionTags, loadTags, setMissionTags } from "../services/tag-service";
 
 vi.mock("../services/mission-service", () => ({
   loadMissionInspector: vi.fn().mockResolvedValue({
@@ -46,6 +47,15 @@ vi.mock("../services/mission-notes-service", () => ({
   loadMissionNotes: vi.fn().mockReturnValue(""),
   saveMissionNotes: vi.fn()
 }));
+vi.mock("../services/tag-service", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    loadTags: vi.fn().mockResolvedValue([]),
+    loadMissionTags: vi.fn().mockResolvedValue([]),
+    setMissionTags: vi.fn().mockResolvedValue(undefined)
+  };
+});
 vi.mock("../services/worktree-service", () => ({
   showWorkspace: vi.fn().mockRejectedValue(new Error("mock: pas de workspace"))
 }));
@@ -489,5 +499,58 @@ describe("MissionInspector replay (rejouer / dupliquer)", () => {
     expect(screen.queryByTestId("replay-dialog")).toBeNull();
     expect(onSaved).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Mission test" })).toBeTruthy();
+  });
+});
+
+describe("MissionInspector tags panel (issue #23)", () => {
+  const catalog = [
+    { id: "tag-1", label: "Urgent", color: "#e5484d", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+    { id: "tag-2", label: "WIP", color: "#46a758", createdAt: "2026-01-01", updatedAt: "2026-01-01" }
+  ];
+
+  it("masque le panneau tant que rien n'est chargé, puis affiche les tags attachés", async () => {
+    vi.mocked(loadTags).mockResolvedValue(catalog);
+    vi.mocked(loadMissionTags).mockResolvedValue([catalog[0]]);
+    renderInspector();
+    const panel = await screen.findByLabelText("Tags de la mission");
+    expect(within(panel).getByText("Urgent")).toBeTruthy();
+    expect(within(panel).getByText("1 tag")).toBeTruthy();
+  });
+
+  it("ajoute un tag via le sélecteur et rafraîchit le board", async () => {
+    vi.mocked(loadTags).mockResolvedValue(catalog);
+    vi.mocked(loadMissionTags).mockResolvedValue([catalog[0]]);
+    const { onSaved } = renderInspector();
+    const panel = await screen.findByLabelText("Tags de la mission");
+    fireEvent.change(within(panel).getByLabelText("Ajouter un tag à la mission"), { target: { value: "tag-2" } });
+    await waitFor(() => expect(setMissionTags).toHaveBeenCalledWith("m1", ["tag-1", "tag-2"]));
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it("retire un tag via sa croix", async () => {
+    vi.mocked(loadTags).mockResolvedValue(catalog);
+    vi.mocked(loadMissionTags).mockResolvedValue([catalog[0], catalog[1]]);
+    const { onSaved } = renderInspector();
+    const panel = await screen.findByLabelText("Tags de la mission");
+    fireEvent.click(within(panel).getByLabelText("Retirer le tag Urgent"));
+    await waitFor(() => expect(setMissionTags).toHaveBeenCalledWith("m1", ["tag-2"]));
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it("ouvre le gestionnaire de tags depuis le panneau", async () => {
+    vi.mocked(loadTags).mockResolvedValue(catalog);
+    vi.mocked(loadMissionTags).mockResolvedValue([]);
+    renderInspector();
+    const panel = await screen.findByLabelText("Tags de la mission");
+    fireEvent.click(within(panel).getByRole("button", { name: /Gérer les tags/ }));
+    expect(await screen.findByText("Gérer les tags")).toBeTruthy();
+  });
+
+  it("affiche l'état vide sans tag attaché", async () => {
+    vi.mocked(loadTags).mockResolvedValue(catalog);
+    vi.mocked(loadMissionTags).mockResolvedValue([]);
+    renderInspector();
+    const panel = await screen.findByLabelText("Tags de la mission");
+    expect(within(panel).getByText("Aucun tag pour le moment.")).toBeTruthy();
   });
 });

@@ -434,3 +434,31 @@ describe("MissionRelay day filter (ma journée)", () => {
     ]);
   });
 });
+
+describe("MissionRelay tag chips (issue #23)", () => {
+  const tags = [
+    { id: "tag-urgent", label: "Urgent", color: "#e5484d", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+    { id: "tag-wip", label: "WIP", color: "#46a758", createdAt: "2026-01-01", updatedAt: "2026-01-01" }
+  ];
+
+  it("renders colored chips for the tags of a mission", () => {
+    const tagged = mission({ id: "m-tagged", title: "Tagged task", executionKind: "agent", state: "READY", tagIds: ["tag-urgent", "tag-wip"] });
+    render(<MissionRelay missions={[tagged]} tags={tags} onInspect={noop} onOpenPipeline={noop} onNewTask={noop} />);
+    const chip = screen.getByLabelText("Tags : Urgent, WIP");
+    expect(chip).toBeTruthy();
+    expect(chip.querySelectorAll(".relay-task-tag")).toHaveLength(2);
+    expect(screen.getByTitle("Urgent").textContent).toContain("Urgent");
+    expect(screen.getByTitle("WIP").textContent).toContain("WIP");
+  });
+
+  it("renders no chips when the mission has no tags", () => {
+    render(<MissionRelay missions={[agentMission]} tags={tags} onInspect={noop} onOpenPipeline={noop} onNewTask={noop} />);
+    expect(screen.queryByLabelText(/^Tags :/)).toBeNull();
+  });
+
+  it("ignores tag ids that are not in the catalog", () => {
+    const tagged = mission({ id: "m-tagged", title: "Tagged task", executionKind: "agent", state: "READY", tagIds: ["tag-ghost"] });
+    render(<MissionRelay missions={[tagged]} tags={tags} onInspect={noop} onOpenPipeline={noop} onNewTask={noop} />);
+    expect(screen.queryByLabelText(/^Tags :/)).toBeNull();
+  });
+});

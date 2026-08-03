@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, Matches, ValidateIf } from "class-validator";
+import { IsNotEmpty, IsString, Matches, ValidateIf } from "class-validator";
 
 /** Corps de création / mise à jour d'un tag libre de mission (issue #23). */
 export class TagDto {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type DragEvent } from "react";
 import type { MissionState, MissionView } from "../types";
+import type { MissionTag } from "../services/tag-service";
 import { hasMissionNotes } from "../services/mission-notes-service";
 import { findDragTransition } from "../services/mission-drag-transitions";
 import { isMissionToday, sortByUrgency } from "../services/mission-day-service";
@@ -87,10 +88,15 @@ function relativeTime(value: string): string {
   return `il y a ${days} j`;
 }
 
-function MissionCard({ mission, tone, pipeline, dragging, disabled, menuOpen, onInspect, onOpenPipeline, onDragStart, onDragEnd, onOpenMenu }: { mission: MissionView; tone: string; pipeline?: { id: string; name: string; hue: number }; dragging: boolean; disabled: boolean; menuOpen: boolean; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onDragStart(id: string): void; onDragEnd(): void; onOpenMenu(mission: MissionView, x: number, y: number, align: "left" | "right"): void }) {
+function MissionCard({ mission, tone, pipeline, tags, dragging, disabled, menuOpen, onInspect, onOpenPipeline, onDragStart, onDragEnd, onOpenMenu }: { mission: MissionView; tone: string; pipeline?: { id: string; name: string; hue: number }; tags?: MissionTag[]; dragging: boolean; disabled: boolean; menuOpen: boolean; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onDragStart(id: string): void; onDragEnd(): void; onOpenMenu(mission: MissionView, x: number, y: number, align: "left" | "right"): void }) {
   const style: CSSProperties = pipeline
     ? { ["--pipeline-hue" as string]: `${pipeline.hue}` }
     : {};
+  // Chips de tags (issue #23) : le catalogue arrive d'App (chargé avec le board).
+  const missionTags = useMemo(() => {
+    if (!tags?.length || !mission.tagIds?.length) return [];
+    return tags.filter((tag) => mission.tagIds.includes(tag.id));
+  }, [tags, mission.tagIds]);
   return (
     <div className="relay-task-wrap">
       <button
@@ -137,6 +143,13 @@ function MissionCard({ mission, tone, pipeline, dragging, disabled, menuOpen, on
               onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onOpenPipeline?.(pipeline.id); } }}
             >⌁ {pipeline.name} <b>↗</b></span>
           )}
+          {missionTags.length > 0 && (
+            <span className="relay-task-tags" aria-label={`Tags : ${missionTags.map((tag) => tag.label).join(", ")}`}>
+              {missionTags.map((tag) => (
+                <i key={tag.id} className="relay-task-tag" style={{ ["--tag-color" as string]: tag.color }} title={tag.label}>{tag.label}</i>
+              ))}
+            </span>
+          )}
         </span>
         <span className="relay-arrow" aria-hidden="true">→</span>
       </button>
@@ -172,7 +185,7 @@ function pipelineGroupStyle(pipelineId: string): CSSProperties {
   return { ["--pipeline-hue" as string]: `${pipelineHue(pipelineId)}` };
 }
 
-function Lane({ state, missions, pipelineIndex, draggingId, transitioningId, dayFilter, schedule, menuOpenId, getMission, onInspect, onOpenPipeline, onDragStart, onDragEnd, onTransition, onOpenMenu }: { state: MissionState; missions: MissionView[]; pipelineIndex?: PipelineIndex; draggingId: string | null; transitioningId: string | null; dayFilter?: string; schedule?: MissionSchedule; menuOpenId: string | null; getMission(id: string): MissionView | undefined; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onDragStart(id: string): void; onDragEnd(): void; onTransition(mission: MissionView, targetState: MissionState): void; onOpenMenu(mission: MissionView, x: number, y: number, align: "left" | "right"): void }) {
+function Lane({ state, missions, pipelineIndex, tags, draggingId, transitioningId, dayFilter, schedule, menuOpenId, getMission, onInspect, onOpenPipeline, onDragStart, onDragEnd, onTransition, onOpenMenu }: { state: MissionState; missions: MissionView[]; pipelineIndex?: PipelineIndex; tags?: MissionTag[]; draggingId: string | null; transitioningId: string | null; dayFilter?: string; schedule?: MissionSchedule; menuOpenId: string | null; getMission(id: string): MissionView | undefined; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onDragStart(id: string): void; onDragEnd(): void; onTransition(mission: MissionView, targetState: MissionState): void; onOpenMenu(mission: MissionView, x: number, y: number, align: "left" | "right"): void }) {
   const column = COLUMN_LIBRARY[state];
   const [dropState, setDropState] = useState<"idle" | "allowed" | "forbidden">("idle");
   const inState = missions.filter((mission) => mission.state === state);
@@ -237,17 +250,17 @@ function Lane({ state, missions, pipelineIndex, draggingId, transitioningId, day
         {[...groups.entries()].map(([pipelineId, group]) => (
           <div className="relay-pipeline-group" key={pipelineId} style={pipelineGroupStyle(pipelineId)}>
             <span className="relay-pipeline-tag"><i aria-hidden="true">⌁</i>{group.name}<b>{group.missions.length}</b></span>
-            {group.missions.map((mission) => <MissionCard key={mission.id} mission={mission} tone={column.tone} pipeline={{ id: pipelineId, name: group.name, hue: pipelineHue(pipelineId) }} dragging={draggingId === mission.id} disabled={transitioningId === mission.id} menuOpen={menuOpenId === mission.id} onInspect={onInspect} onOpenPipeline={onOpenPipeline} onDragStart={onDragStart} onDragEnd={onDragEnd} onOpenMenu={onOpenMenu} />)}
+            {group.missions.map((mission) => <MissionCard key={mission.id} mission={mission} tone={column.tone} pipeline={{ id: pipelineId, name: group.name, hue: pipelineHue(pipelineId) }} tags={tags} dragging={draggingId === mission.id} disabled={transitioningId === mission.id} menuOpen={menuOpenId === mission.id} onInspect={onInspect} onOpenPipeline={onOpenPipeline} onDragStart={onDragStart} onDragEnd={onDragEnd} onOpenMenu={onOpenMenu} />)}
           </div>
         ))}
-        {visibleStandalone.map((mission) => <MissionCard key={mission.id} mission={mission} tone={column.tone} dragging={draggingId === mission.id} disabled={transitioningId === mission.id} menuOpen={menuOpenId === mission.id} onInspect={onInspect} onOpenPipeline={onOpenPipeline} onDragStart={onDragStart} onDragEnd={onDragEnd} onOpenMenu={onOpenMenu} />)}
+        {visibleStandalone.map((mission) => <MissionCard key={mission.id} mission={mission} tone={column.tone} tags={tags} dragging={draggingId === mission.id} disabled={transitioningId === mission.id} menuOpen={menuOpenId === mission.id} onInspect={onInspect} onOpenPipeline={onOpenPipeline} onDragStart={onDragStart} onDragEnd={onDragEnd} onOpenMenu={onOpenMenu} />)}
       </div>
       {standalone.length > visibleStandalone.length && <p className="relay-overflow">+ {standalone.length - visibleStandalone.length} autre(s)</p>}
     </section>
   );
 }
 
-export function MissionRelay({ missions, missionPipelineIndex, kindFilter, stateFilter, dayFilter, schedule, onInspect, onOpenPipeline, onNewTask, onTransition, onActionApplied }: { missions: MissionView[]; missionPipelineIndex?: PipelineIndex; kindFilter?: string; stateFilter?: string; dayFilter?: string; schedule?: MissionSchedule; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onNewTask?(): void; onTransition?(mission: MissionView, targetState: MissionState): Promise<void> | void; onActionApplied?(label: string): void }) {
+export function MissionRelay({ missions, missionPipelineIndex, tags, kindFilter, stateFilter, dayFilter, schedule, onInspect, onOpenPipeline, onNewTask, onTransition, onActionApplied }: { missions: MissionView[]; missionPipelineIndex?: PipelineIndex; tags?: MissionTag[]; kindFilter?: string; stateFilter?: string; dayFilter?: string; schedule?: MissionSchedule; onInspect(id: string): void; onOpenPipeline?(pipelineId: string): void; onNewTask?(): void; onTransition?(mission: MissionView, targetState: MissionState): Promise<void> | void; onActionApplied?(label: string): void }) {
   const [columns, setColumns] = useState<MissionState[]>(loadColumns);
   const [configOpen, setConfigOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -383,7 +396,7 @@ export function MissionRelay({ missions, missionPipelineIndex, kindFilter, state
 
       <div className="relay-lanes" style={{ ["--relay-columns" as string]: String(visibleColumns.length || 1) }}>
         {visibleColumns.length
-          ? visibleColumns.map((state) => <Lane key={state} state={state} missions={filteredMissions} pipelineIndex={missionPipelineIndex} draggingId={draggingId} transitioningId={transitioningId} dayFilter={dayFilter} schedule={schedule} menuOpenId={menuTarget?.mission.id ?? null} getMission={getMission} onInspect={onInspect} onOpenPipeline={onOpenPipeline} onDragStart={setDraggingId} onDragEnd={() => setDraggingId(null)} onTransition={(mission, target) => void handleTransition(mission, target)} onOpenMenu={openMenu} />)
+          ? visibleColumns.map((state) => <Lane key={state} state={state} missions={filteredMissions} pipelineIndex={missionPipelineIndex} tags={tags} draggingId={draggingId} transitioningId={transitioningId} dayFilter={dayFilter} schedule={schedule} menuOpenId={menuTarget?.mission.id ?? null} getMission={getMission} onInspect={onInspect} onOpenPipeline={onOpenPipeline} onDragStart={setDraggingId} onDragEnd={() => setDraggingId(null)} onTransition={(mission, target) => void handleTransition(mission, target)} onOpenMenu={openMenu} />)
           : <p className="relay-empty board-empty"><span aria-hidden="true">·</span>Aucune colonne sélectionnée. Ajoute un état via ⚙ Colonnes.</p>}
       </div>
 

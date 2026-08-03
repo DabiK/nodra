@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import type { FolderBrowseResult, MissionIntakeDraft, MissionState, ProviderOptionsCatalog } from "../types";
+import type { MissionTag } from "../services/tag-service";
 import type { MissionViewMode } from "../services/view-mode-service";
 import { permissionLabels, reasoningLabels } from "../services/provider-service";
 import { workspacePathFromName } from "../services/workspace-service";
@@ -27,6 +28,9 @@ export function TaskIntakeCard({
   kindFilter,
   dayFilter,
   dayCount,
+  tags,
+  tagFilter,
+  tagCounts,
   viewMode,
   onSubmit,
   onDraftChange,
@@ -36,6 +40,7 @@ export function TaskIntakeCard({
   onStateFilterChange,
   onKindFilterChange,
   onDayFilterChange,
+  onTagFilterChange,
   onViewModeChange,
   onFolderOpen,
   onFolderClose,
@@ -61,6 +66,9 @@ export function TaskIntakeCard({
   kindFilter: string;
   dayFilter: string;
   dayCount: number;
+  tags: MissionTag[];
+  tagFilter: string[];
+  tagCounts: Record<string, number>;
   viewMode: MissionViewMode;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   onDraftChange(patch: Partial<MissionIntakeDraft>): void;
@@ -70,6 +78,7 @@ export function TaskIntakeCard({
   onStateFilterChange(value: string): void;
   onKindFilterChange(value: string): void;
   onDayFilterChange(value: string): void;
+  onTagFilterChange(tagIds: string[]): void;
   onViewModeChange(mode: MissionViewMode): void;
   onFolderOpen(): void;
   onFolderClose(): void;
@@ -153,6 +162,40 @@ export function TaskIntakeCard({
             ☀ Ma journée
             <small>{dayCount}</small>
           </button>
+          {tags.length > 0 && (
+            <>
+              <span className="chip-divider" />
+              {tagFilter.length > 0 && (
+                <button
+                  type="button"
+                  className="view-chip tag-clear"
+                  onClick={() => onTagFilterChange([])}
+                  title="Retirer le filtre par tags"
+                >
+                  ✕ Tags
+                </button>
+              )}
+              {tags.map((tag) => (
+                <button
+                  type="button"
+                  className={`view-chip tag${tagFilter.includes(tag.id) ? " active" : ""}`}
+                  style={{ ["--tag-color" as string]: tag.color }}
+                  aria-pressed={tagFilter.includes(tag.id)}
+                  onClick={() => onTagFilterChange(
+                    tagFilter.includes(tag.id)
+                      ? tagFilter.filter((tagId) => tagId !== tag.id)
+                      : [...tagFilter, tag.id]
+                  )}
+                  key={tag.id}
+                  title={`Filtrer par « ${tag.label} » (combinable avec les autres filtres)`}
+                >
+                  <i className="tag-dot" aria-hidden="true" />
+                  {tag.label}
+                  <small>{tagCounts[tag.id] ?? 0}</small>
+                </button>
+              ))}
+            </>
+          )}
           {draft?.kind !== "human" && (
             <button type="button" className="folder-chip active" onClick={onFolderOpen}>
               <span aria-hidden="true">▰</span>

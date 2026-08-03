@@ -83,8 +83,9 @@ describe("shared Terrain de travail is used by both screens", () => {
         selectedModelId="m1" reasoningOptions={["medium"]} expanded creating={false} probingProviderId={null}
         folderOpen={false} folderBrowse={null} folderLoading={false} error="" notice="" missionCount={0}
         stateCounts={{}} stateFilter="all" kindFilter="all" dayFilter="all" dayCount={0} viewMode="board"
+        tags={[]} tagFilter={[]} tagCounts={{}}
         onSubmit={noop} onDraftChange={noop} onExpandedChange={noop} onProviderChange={noop} onProbeProvider={noop}
-        onStateFilterChange={noop} onKindFilterChange={noop} onDayFilterChange={noop} onFolderOpen={noop} onFolderClose={noop}
+        onStateFilterChange={noop} onKindFilterChange={noop} onDayFilterChange={noop} onTagFilterChange={noop} onFolderOpen={noop} onFolderClose={noop}
         onFolderBrowse={noop} onFolderSelect={noop} onViewModeChange={noop}
       />
     );
