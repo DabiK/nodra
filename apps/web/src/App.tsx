@@ -401,7 +401,7 @@ export function App() {
     }
   };
 
-  const activeSidebarMissions = useMemo(() => selectActiveSidebarMissions(missions), [missions]);
+  const activeSidebarMissions = useMemo(() => selectActiveSidebarMissions(missions, query), [missions, query]);
 
   const selectMission = (missionId: string) => {
     setInspectedMissionId(missionId);
