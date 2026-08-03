@@ -413,3 +413,39 @@ Le relay (`relay_item`) matérialisait déjà exactement les 4 sources du hub (q
 
 ### Statut
 - [x] #13 — Notifications et hub d'activité
+
+## Itération 12 — 2026-08-03 — Task #14 : États vides et onboarding
+
+### Fait (3 commits atomiques, comme suggéré par l'issue : états vides → templates → bannière)
+1. **Services onboarding** (`feat(web): services onboarding — bannière masquable, templates de mission, pipeline d'exemple…`)
+   - `onboarding-service.ts` (+ 3 tests) : bannière de bienvenue visible tant que non masquée — clé `nodra.onboarding.welcome.dismissed`, pattern `view-mode-service` (try/catch, stockage indisponible → visible).
+   - `mission-template-service.ts` (+ 3 tests) : 3 modèles `MISSION_TEMPLATES` (refactor / test / release) avec libellé, emoji, description, titre et **prompt type complet** (FR, contraintes explicites) ; `findMissionTemplate` ; `templateDraft(template, catalog)` → `MissionIntakeDraft` agent pré-rempli (provider/modèle/réflexion/permissions depuis `catalog.defaults`, workspace scratch, `workspaceName = template.id` pour un chemin stable).
+   - `pipeline-template-service.ts` (+ 2 tests) : `EXAMPLE_PIPELINE_NAME` (« Exemple · Revue puis livraison »), `EXAMPLE_REVIEW_PROMPT`, `exampleAgentDraft(catalog)` ; `createExamplePipeline(catalog)` = mission agent « Revue de code » (config complète) puis mission humaine « Livraison manuelle », puis `POST /api/pipelines` (nœuds `review → ship`).
+   - `pipeline-service.ts` : nouvelle fonction générique `createPipeline({name, nodes, edges})` (les nœuds référencent des missions existantes, contrainte de l'API).
+2. **États vides par écran avec CTA** (`feat(web): états vides par écran avec CTA — tâches (modèles 1 clic), pipelines (exemple), sessions`)
+   - `BoardEmptyState` (+ 4 tests) : remplace le board quand `missions.length === 0` — titre, explication, CTA « ＋ Confier une tâche » (expand intake + scroll + focus) et grille de 3 cartes modèles (« Créer en 1 clic → », désactivées pendant une création, « Création… » sur la carte active).
+   - `App.tsx` : `createMissionFromTemplate` (submit du brouillon du modèle, notice « Mission créée depuis le modèle… ») + `createExamplePipelineHandler` (création, `refreshPipelines`, `setFocusPipelineId` → l'onglet se sélectionne, notice). États `templateBusyId` / `examplePipelineBusy`.
+   - `PipelinesPage` : l'état vide textuel devient un vrai panneau avec CTA « ⚡ Créer un pipeline d'exemple » (busy → « Création… » désactivé, `error` affichée en `role="alert"`). + 3 tests.
+   - Sessions provider : nouveau `ProviderSessionsEmpty` (titre, explication, CTA « ⟳ Recharger » → `reloadLists`) affiché à la place du layout quand `mergedSessions.length === 0` (après chargement). + 1 test.
+   - Managers : l'écran avait déjà un état vide avec CTA (`.manager-empty` « Inviter un chef d'équipe » + manifesto) — inchangé, l'acceptation est couverte.
+3. **Bannière de bienvenue** (`feat(web): bannière de bienvenue au premier lancement (masquable, localStorage)`)
+   - Bannière `role="status"` sous le hero-row des tâches : « 👋 Bienvenue dans Nodra », CTA « Confier une première mission → » (expand intake + focus), bouton × « Masquer le message de bienvenue » qui persiste `dismissWelcomeBanner()` — l'onboarding est masquable.
+   - CSS : section `/* Onboarding (issue #14) */` (`.board-empty-state`, `.template-*`, `.pipeline-empty-state`, `.provider-sessions-empty`, `.welcome-banner`) + overrides dark dans le bloc `[data-theme="dark"]`.
+
+### Vérifications
+- `npm run typecheck` (racine) : OK
+- `npm run build -w @nodra/web` : OK (warning chunk > 500 kB pré-existant, informatif)
+- Web : 47 fichiers / 352 tests OK (336 → 352, +16 : 3 onboarding-service, 3 mission-template, 2 pipeline-template, 4 BoardEmptyState, 3 PipelineFlux, 1 ProviderSessionsPage)
+- packages/domain + application + adapters/sqlite : 80 fichiers / 518 tests OK avec le web
+- apps/api : 7 fichiers OK ; 3 échecs **pré-existants documentés** (health → Temporal non démarré, i6 + i14 → binaire Codex non certifié sur cette machine) — aucun code API touché
+- ESLint sur tous les fichiers touchés : propre
+
+### Décisions / notes / limites
+- **Templates = pré-remplissage côté client** : aucun endpoint template (rien n'existe côté serveur) — le modèle est un brouillon pré-rempli soumis par le flux d'intake existant (workspace → mission → agent-config). Réglages modifiables ensuite dans la fiche mission, comme pour une mission créée à la main.
+- **Pipeline d'exemple = 2 missions créées d'abord** : l'API pipeline exige des `missionId` existants (min 2 nœuds) — le 1-clic crée donc la mission agent « Revue de code » (config par défaut du catalogue) puis la mission humaine « Livraison manuelle » avant le `POST /api/pipelines`. Une mission humaine en 2ᵉ étape illustre la validation manuelle.
+- **Bannière bienvenue** : affichée sur la page Tâches (page d'atterrissage par défaut) jusqu'à fermeture explicite ; pas de réapparition (localStorage). Le choix de la montrer même avec des missions déjà présentes est volontaire (premier lancement ≠ board vide).
+- **Sessions provider** : l'état vide ne s'affiche qu'après chargement ; les bannières de capacités restent au-dessus (elles expliquent comment démarrer l'observatoire) — le CTA « Recharger » complète l'action.
+- **Limite** : les modèles et le pipeline d'exemple dépendent du catalogue provider chargé (`providerOptions`) — si le catalogue n'est pas chargé, les CTA ne font rien (les boutons restent actifs, aucun crash ; même garde que l'intake classique `draft.kind !== "human" && !providerOptions`).
+
+### Statut
+- [x] #14 — États vides et onboarding
