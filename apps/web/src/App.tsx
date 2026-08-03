@@ -40,9 +40,6 @@ import { BoardEmptyState } from "./components/BoardEmptyState";
 import { MISSION_TEMPLATES, templateDraft, type MissionTemplate } from "./services/mission-template-service";
 import { createExamplePipeline } from "./services/pipeline-template-service";
 import { dismissWelcomeBanner, loadWelcomeDismissed } from "./services/onboarding-service";
-import { buildRunGlance, type RunGlanceItem } from "./services/run-glance-service";
-import { RunGlance } from "./components/RunGlance";
-
 const missionStates: MissionState[] = ["BACKLOG", "READY", "ACTIVE", "BLOCKED", "VALIDATION", "DONE", "ABANDONED"];
 
 function formatDate(value: string) {
@@ -268,26 +265,6 @@ export function App() {
     }
     return index;
   }, [pipelines]);
-
-  // Glance : tous les runs actifs (missions, pipelines, managers) en une barre.
-  // Données déjà rafraîchies par le SSE → aucun polling additionnel.
-  const glanceItems = useMemo(
-    () => buildRunGlance({ missions, pipelines, managers }),
-    [missions, pipelines, managers]
-  );
-
-  const openGlanceItem = (item: RunGlanceItem) => {
-    if (item.kind === "mission") {
-      location.assign(`/agent.html?missionId=${encodeURIComponent(item.id)}`);
-      return;
-    }
-    if (item.kind === "pipeline") {
-      openPipeline(item.id);
-      return;
-    }
-    setManagerFocusId(item.id);
-    navigate("managers");
-  };
 
   const filtered = useMemo(
     () => filterMissions(missions, { query, state: stateFilter, kind: kindFilter, sort, day: dayFilter }, schedule),
@@ -701,8 +678,6 @@ export function App() {
             setFolderOpen(false);
           }}
         />
-
-        <RunGlance items={glanceItems} onOpen={openGlanceItem} />
 
         {effectiveViewMode === "board" ? (
           missions.length === 0 ? (
