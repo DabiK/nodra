@@ -140,7 +140,7 @@ Coche la case quand la tâche est terminée. Une seule tâche par itération Ral
   >
   > Aucun impact fonctionnel : le contenu descriptif de la feature est exact (endpoints, fichiers, sémantique lu/résolu vérifiés dans le code). Simple correction de chiffres/références dans progress.txt.
 
-- [ ] #27 — web: léger flash du BoardEmptyState au chargement initial (avant le 1er fetch missions) (labels: —)
+- [x] #27 — web: léger flash du BoardEmptyState au chargement initial (avant le 1er fetch missions) (labels: —)
 
   **Issue #27 — détail complet**
   > Point mineur repéré en revue de l'itération 12 (#14, états vides et onboarding).

@@ -1,5 +1,29 @@
 # Journal d'avancement — DabiK/nodra
 
+## Itération 26 — 2026-08-03 — Task #27 : flash du BoardEmptyState au chargement initial
+
+### Contexte
+Dans `App.tsx`, `missions` démarre à `[]` et le premier chargement (`loadMissionIntake`) est async : la condition `missions.length === 0` du `BoardEmptyState` était vraie au premier rendu — un utilisateur avec des missions voyait l'état vide clignoter avant le board réel. Le `ProviderSessionsEmpty` gère déjà ce cas (`loading ? … : mergedSessions.length === 0 ? …`), le board ne le faisait pas.
+
+### Fait (1 commit)
+- `feat` → `fix(web): no board empty-state flash before first missions load (#27)` (`62297f2`) :
+  - Nouveau flag `boardLoaded` (`useState(false)`) : au premier rendu, l'état vide est masqué.
+  - Passé à `true` dès qu'un chargement de missions aboutit : dans le `.then` de `loadMissionIntake` (premier chargement) **et** dans `refreshBoard` (montage, focus, SSE) — ainsi un board réellement vide (vraiment 0 mission) affiche toujours l'état vide, dès que le fetch initial répond.
+  - Condition de rendu : `boardLoaded && missions.length === 0` (ligne du board) au lieu de `missions.length === 0`.
+- Piste de l'issue suivie : flag `loaded` (alternative `missions === null` non retenue car `missions` alimente de nombreux props/derivés attendus en tableau).
+
+### Vérifications
+- `npm run typecheck` : OK.
+- `npx eslint apps/web/src/App.tsx` : propre.
+- `npx vitest run apps/web` : 60 fichiers / 503 tests OK (aucune régression ; `App.tsx` n'a pas de fichier de test dédié dans le projet — le composant `BoardEmptyState` reste couvert par son propre test, 4 tests OK).
+
+### Décisions / notes / limites
+- **Comportement en échec réseau** : si le premier chargement échoue, `boardLoaded` reste `false` → le relay s'affiche avec l'erreur, sans prétendre « Aucune mission » à tort (comportement précédent : état vide trompeur). Un refresh ultérieur réussi bascule `boardLoaded` à `true`.
+- **Post-chargement** : si l'utilisateur supprime toutes ses missions après chargement, `boardLoaded` reste `true` → l'état vide s'affiche correctement (flag figé à `true`, seule la longueur des missions varie).
+
+### Statut
+- [x] #27 — web: léger flash du BoardEmptyState au chargement initial (avant le 1er fetch missions)
+
 ## Itération 25 — 2026-08-03 — Task #26 : docs — imprécisions mineures dans progress.txt (itération 11)
 
 ### Contexte
