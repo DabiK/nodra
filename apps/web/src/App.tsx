@@ -156,7 +156,12 @@ export function App() {
   }, []);
 
   const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  // La ref est réarmée au setup : un remount (StrictMode, Fast Refresh/HMR)
+  // la laisserait à `false` après le cleanup, figeant tout refreshBoard.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const refreshBoard = useCallback(() => {
     void listMissions().then((next) => { if (mountedRef.current) setMissions(next); }).catch(() => undefined);
