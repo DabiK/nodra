@@ -104,6 +104,26 @@ describe("PipelinesPage empty state", () => {
   });
 });
 
+describe("PipelinesPage favorite templates", () => {
+  it("lists saved templates and delegates creation, rename and deletion", () => {
+    localStorage.setItem("nodra.pipelines.favorites", JSON.stringify([{
+      id: "fav-1", name: "Revue complète", createdAt: "2026-08-03T00:00:00Z", nodes: [{ nodeKey: "review", title: "Revue", kind: "agent", transitionMode: "human", projectId: null }], edges: []
+    }]));
+    const onCreateFavorite = vi.fn();
+    renderPage({ onCreateFavorite });
+    expect(screen.getByRole("heading", { name: "Créer depuis un modèle" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Créer" }));
+    expect(onCreateFavorite).toHaveBeenCalledWith(expect.objectContaining({ id: "fav-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Supprimer" }));
+    expect(screen.queryByText("Revue complète")).toBeNull();
+  });
+
+  it("offers saving the selected pipeline as a template", () => {
+    renderPage();
+    expect(screen.getByRole("button", { name: "☆ Enregistrer comme modèle" })).toBeTruthy();
+  });
+});
+
 describe("PipelinesPage timeline view", () => {
   it("switches from graph to timeline with the toggle and persists the choice", () => {
     renderPage();
